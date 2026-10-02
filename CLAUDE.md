@@ -23,7 +23,7 @@ On this machine `~/.claude/settings.json` sets `env.CLAUDE_CODE_PLUGIN_DIRS` to 
   - The engine's validator only accepts `$` calls inside functions declared in `hooks/register.tsx`. All wiring lives there.
   - All other modules are pure: they take `(home, now, rng)` and return a new value, with no `$`, no `Date.now()` and no `Math.random()`.
 - **The browser arcade** (`web/`, served by `server/arcade.mjs`).
-  - `web/*.ts` is bundled into `server/public/arcade.js`, which is committed. **After any change under `web/` or `hooks/arcade/games|engine|sprites`, run `node tools/build-web.mjs` and commit the bundle.**
+  - `web/*.ts` is bundled into `server/public/arcade.js`, which is committed. **After any change under `web/` or to what it imports (`hooks/arcade/{engine,games,sprites,medals,bridge}`, `hooks/theme.ts`), run `node tools/build-web.mjs` and commit the bundle.**
   - The games in `hooks/arcade/games/*.ts` are shared: the mod reads their medals and `maxScore`, and the browser runs them.
   - `server/arcade.mjs` is plain Node with no dependencies. The mod spawns it with an `ARCADE_TOKEN`.
     - The first stdout line is `{"kind":"ready","port":N}`. After that, browser actions arrive as JSON lines; `parseLine` in `hooks/arcade/bridge.ts` reads them.
