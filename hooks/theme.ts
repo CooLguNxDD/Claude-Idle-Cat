@@ -23,6 +23,7 @@ const build = (name: FlavorName): Flavor => {
 export const FLAVORS: Record<FlavorName, Flavor> = {
   latte: build('latte'), frappe: build('frappe'), macchiato: build('macchiato'), mocha: build('mocha'),
 }
+export const FLAVOR_NAMES = ['latte', 'frappe', 'macchiato', 'mocha'] as const
 export const FLAVOR_SETTINGS: readonly FlavorSetting[] = ['auto', 'daycycle', 'latte', 'frappe', 'macchiato', 'mocha']
 
 export type DayPart = 'day' | 'dusk' | 'night'
@@ -35,6 +36,9 @@ export const resolveFlavor = (setting: string, claudeTheme: string, hour: number
     return FLAVORS[part === 'day' ? 'latte' : part === 'dusk' ? 'frappe' : 'mocha']
   }
   if (setting in FLAVORS) return FLAVORS[setting as FlavorName]
+  // A custom theme made by this mod (themes/catppuccin-<flavor>.json) names its flavor.
+  const own = FLAVOR_NAMES.find(n => claudeTheme.toLowerCase().includes(`catppuccin-${n}`) || claudeTheme.toLowerCase().includes(`catppuccin ${n}`))
+  if (own) return FLAVORS[own]
   return claudeTheme.includes('light') ? FLAVORS.latte : FLAVORS.mocha
 }
 
@@ -52,3 +56,41 @@ export const uiTokens = (f: Flavor) => ({
   title: css(f.lavender), accent: css(f.mauve), muted: css(f.overlay1), ok: css(f.green),
   warn: css(f.yellow), bad: css(f.red), coin: css(f.yellow), log: css(f.subtext0),
 })
+
+const TITLES: Record<FlavorName, string> = { latte: 'Latte', frappe: 'Frappe', macchiato: 'Macchiato', mocha: 'Mocha' }
+
+// A Claude Code custom theme (~/.claude/themes/*.json) painted with one flavor.
+export const claudeThemeOf = (f: Flavor) => {
+  const tint = (c: number, t: number) => css(mix(f.base, c, t))
+  const glow = (c: number) => css(mix(c, f.text, 0.25))
+  return {
+    name: `Catppuccin ${TITLES[f.name]}`,
+    base: f.isLight ? 'light' : 'dark',
+    overrides: {
+      claude: css(f.mauve), text: css(f.text), inverseText: css(f.isLight ? f.base : f.crust),
+      inactive: css(f.subtext0), subtle: css(f.surface2), suggestion: css(f.lavender),
+      permission: css(f.lavender), remember: css(f.blue),
+      success: css(f.green), error: css(f.red), warning: css(f.yellow), merged: css(f.mauve),
+      promptBorder: css(f.mauve), planMode: css(f.teal), autoAccept: css(f.mauve), bashBorder: css(f.pink),
+      ide: css(f.blue), fastMode: css(f.peach),
+      diffAdded: tint(f.green, 0.25), diffRemoved: tint(f.red, 0.25),
+      diffAddedDimmed: tint(f.green, 0.12), diffRemovedDimmed: tint(f.red, 0.12),
+      diffAddedWord: tint(f.green, 0.45), diffRemovedWord: tint(f.red, 0.45),
+      userMessageBackground: css(f.surface0), userMessageBackgroundHover: css(f.surface1),
+      bashMessageBackgroundColor: css(f.mantle), memoryBackgroundColor: css(f.surface0), selectionBg: css(f.surface2),
+      rate_limit_fill: css(f.mauve), rate_limit_empty: css(f.surface1),
+      briefLabelYou: css(f.blue), briefLabelClaude: css(f.mauve),
+      claudeShimmer: glow(f.mauve), warningShimmer: glow(f.yellow), permissionShimmer: glow(f.lavender),
+      promptBorderShimmer: glow(f.mauve), inactiveShimmer: glow(f.subtext0), fastModeShimmer: glow(f.peach),
+      red_FOR_SUBAGENTS_ONLY: css(f.red), blue_FOR_SUBAGENTS_ONLY: css(f.blue), green_FOR_SUBAGENTS_ONLY: css(f.green),
+      yellow_FOR_SUBAGENTS_ONLY: css(f.yellow), purple_FOR_SUBAGENTS_ONLY: css(f.mauve),
+      orange_FOR_SUBAGENTS_ONLY: css(f.peach), pink_FOR_SUBAGENTS_ONLY: css(f.pink), cyan_FOR_SUBAGENTS_ONLY: css(f.sky),
+      rainbow_red: css(f.red), rainbow_orange: css(f.peach), rainbow_yellow: css(f.yellow), rainbow_green: css(f.green),
+      rainbow_blue: css(f.blue), rainbow_indigo: css(f.lavender), rainbow_violet: css(f.mauve),
+    },
+  }
+}
+
+// The /theme option that names this flavor's custom theme, whatever form Claude Code lists it in.
+export const themeOptionFor = (options: readonly string[], flavor: string): string | undefined =>
+  options.find(o => /catppuccin[\s_-]*/i.test(o) && o.toLowerCase().replace(/é/g, 'e').includes(flavor))

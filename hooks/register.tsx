@@ -27,8 +27,11 @@ import { CLIP_FOR, clipAsset, powershellArgv } from './sfx'
 import type { Clip } from './sfx'
 import { BRANCHES, FORM_LEVEL, SKILLS, branchPoints, canLearn, formOf, freePoints, rankOf, respecPrice } from './skills'
 import type { Branch } from './skills'
-import { FLAVORS, css, resolveFlavor, uiTokens } from './theme'
+import { RUN_MAX_COLS, RUN_ROWS, nextX, runFrame } from './runner'
+import { catHint, doneWord, hintTail, pawPrefix, skinLevel, spinnerWord, walkFrame } from './skin'
+import { FLAVORS, FLAVOR_NAMES, css, resolveFlavor, themeOptionFor, uiTokens } from './theme'
 import type { Flavor } from './theme'
+import type { SkinLevel } from './skin'
 import { visibleTabs } from './ui/tabs'
 import { goBack, initialRoute, navigate } from './ui/router'
 import { parseCurrent } from './weather/conditions'
@@ -37,6 +40,7 @@ import { acceptWeather, emptyWeather, liveWeather, refreshDue, setLocation, weat
 
 const PANE = 'afk-cat'
 const SCENE = 'scene'
+const RUNNER = 'runner'
 const SERVER = 'server/arcade.mjs'
 const SERVER_START_MS = 10_000
 const TICK_MS = 10_000
@@ -53,6 +57,12 @@ let frame = 0
 // Claude Code's own theme row, read for the `auto` flavor.
 let claudeTheme = 'dark'
 let isSoundOn = true
+let skin: SkinLevel = 'full'
+// The running-cat band above the prompt: its render instance, width and how it is drawn; the frame loop repaints it.
+let band = { id: '', cols: 0, mode: 'off' as 'off' | 'raster' | 'text' }
+let runX = 0
+// Frame number until which the cat sprints; a tool call starts it.
+let sprintUntil = 0
 let flavorNow: (now: number) => Flavor = () => FLAVORS.mocha
 // The browser arcade's server: started on first use, killed with the module; the token guards it.
 const arcade = { port: 0, token: newToken(Math.random), starting: null as Promise<number> | null, pushed: '', isOpened: false }
@@ -324,8 +334,23 @@ const HELP = [
   '/cat export [file] — save a backup (default: ~/.claude-kitten/backups/)',
   '/cat import <file> — load a backup (your current save is backed up first)',
   '/cat weather <city> — real weather; system for device location, off to clear, refresh to update',
+  '/cat theme <latte|frappe|macchiato|mocha> — switch Claude Code to that Catppuccin theme',
   'In the pane: ‹ › tabs · q back · c a s h r b m g t visible tab shortcuts · f e n feed/pet/nap · p arcade · w cat list',
 ].join('\n')
+
+// Sets Claude Code's own theme to one of this mod's Catppuccin themes, found in the theme row's options.
+const themeCommand = async ($: EngineInterface, arg: string) => {
+  const flavor = arg.trim().toLowerCase().replace(/é/g, 'e')
+  if (!(FLAVOR_NAMES as readonly string[]).includes(flavor)) return { text: `Usage: /cat theme <${FLAVOR_NAMES.join('|')}>` }
+  const row = (await $.config.list()).find(r => r.key === 'theme')
+  const option = themeOptionFor(row?.options ?? [], flavor)
+  if (!option) return { text: `Claude Code doesn't list a Catppuccin ${flavor} theme yet. Restart it once so the plugin's themes load, or pick one with /theme.` }
+  const set = await $.config.set({ key: 'theme', value: option })
+  if ('deny' in set && set.deny) return { text: `Couldn't change the theme: ${set.deny}` }
+  await readTheme($)
+  $.ui.invalidate('ui.render')
+  return { text: `Theme set to ${option}.` }
+}
 
 const userHome = async ($: EngineInterface) => (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
 
@@ -371,6 +396,7 @@ const readTheme = async ($: EngineInterface) => {
 
 export const register: Register = (on, options) => {
   isSoundOn = options.sound !== false
+  skin = skinLevel(options.skin)
   const flavorAt = (now: number) => resolveFlavor(String(options.flavor ?? 'auto'), claudeTheme, hourOf(now))
   flavorNow = flavorAt
 
@@ -399,6 +425,9 @@ export const register: Register = (on, options) => {
       void $.http.fetch(`http://127.0.0.1:${arcade.port}/api/ping`, { method: 'POST', headers: { 'x-arcade-token': arcade.token } })
         .catch(() => undefined)
     })
+    $.clock.every(500, () => {
+      if (band.mode === 'text') $.ui.invalidate('ui.render')
+    })
     $.clock.every(FRAME_MS, async () => {
       if (!latest) return
       frame += 1
@@ -407,6 +436,11 @@ export const register: Register = (on, options) => {
       const cells = view === 'adopt' ? shelterCells(latest, now, frame, flavorAt(now), cols)
         : frameCells({ home: latest, now, tick: frame, hour: hourOf(now), flavor: flavorAt(now), cols })
       await $.ui.blit({ requestId: PANE, key: SCENE, cells })
+      if (band.mode !== 'raster') return
+      const isSprint = frame < sprintUntil
+      runX = nextX(runX, band.cols, isSprint)
+      const run = { cat: activeCat(latest), flavor: flavorAt(now), tick: frame, x: runX, cols: band.cols, isSprint }
+      await $.ui.blit({ requestId: band.id, key: RUNNER, cells: runFrame(run) })
     })
     return next(e)
   })
@@ -419,6 +453,7 @@ export const register: Register = (on, options) => {
       return { text: 'The cats will keep earning while the pane is closed. /cat brings it back.' }
     }
     if (sub === 'export' || sub === 'import') return backupCommand($, sub, arg)
+    if (sub === 'theme') return themeCommand($, arg)
     if (sub === 'weather') {
       await routeTo($, 'weather')
       const result = await weatherCommand($, arg)
@@ -452,7 +487,15 @@ export const register: Register = (on, options) => {
     return set
   })
 
+  on('config.set', { key: 'skin' }, async ($, e, next) => {
+    const set = await next(e)
+    skin = skinLevel(e.value)
+    $.ui.invalidate('ui.render')
+    return set
+  })
+
   on('tool.call', async ($, e, next) => {
+    sprintUntil = frame + 16
     const ran = await next(e)
     void change($, (h, t) => track(reward(h, 1), 'tools', 1, t))
     return ran
@@ -882,5 +925,54 @@ export const register: Register = (on, options) => {
         </Box>
       </Box>
     )
+  })
+
+  // Cat skin: redraws Claude Code's own spinner, turn line, hint, band and tool rows.
+  on('ui.render', { component: 'Spinner' }, async ($, e, next) => {
+    if (skin === 'off') return next(e)
+    return next({ ...e, props: { ...e.props, word: spinnerWord(e.props.mode, e.props.word) } })
+  })
+
+  on('ui.render', { component: 'TurnDuration' }, async ($, e, next) => {
+    if (skin === 'off') return next(e)
+    return next({ ...e, props: { ...e.props, word: doneWord(e.props.word) } })
+  })
+
+  on('ui.render', { component: 'PromptHint' }, async ($, e, next) => {
+    if (skin === 'off' || e.props.isDraft) return next(e)
+    const tail = [e.props.tail, hintTail(await read($, homeRef))].filter(Boolean).join(' ')
+    return next({ ...e, props: { ...e.props, tail } })
+  })
+
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    band.mode = 'off'
+    if (skin !== 'full' || e.props.hasSurvey || !e.props.isWorking) return next(e)
+    const ui = $.ui.resolve(e)
+    const now = await $.clock.now()
+    const width = Math.min(e.props.bodyColumns, RUN_MAX_COLS)
+    if ('Raster' in ui && latest && width >= 30 && e.props.maxRows >= RUN_ROWS) {
+      band = { id: e.requestId, cols: width, mode: 'raster' }
+      const run = { cat: activeCat(latest), flavor: flavorAt(now), tick: frame, x: runX, cols: width, isSprint: frame < sprintUntil }
+      return <ui.Raster key={RUNNER} columns={width} rows={RUN_ROWS} cells={runFrame(run)} />
+    }
+    band.mode = 'text'
+    return <ui.Text color={uiTokens(flavorAt(now)).accent}>{walkFrame(frame, e.props.bodyColumns)}</ui.Text>
+  })
+
+  on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
+    if (skin !== 'full') return next(e)
+    const { Box, Text } = $.ui.resolve(e)
+    const tone = uiTokens(flavorAt(await $.clock.now()))
+    return (
+      <Box>
+        <Text color={tone.accent}>{pawPrefix(e.props.tool)} </Text>
+        {await next(e)}
+      </Box>
+    )
+  })
+
+  on('ui.render', { component: 'ToolProgress' }, async ($, e, next) => {
+    if (skin !== 'full' || e.props.kind !== 'background_hint') return next(e)
+    return next({ ...e, props: { ...e.props, hint: catHint(e.props.hint) } })
   })
 }

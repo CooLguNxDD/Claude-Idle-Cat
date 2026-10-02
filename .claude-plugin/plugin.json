@@ -4,6 +4,7 @@
   "description": "A Tamagotchi-style AFK cat that lives in a Claude Code pane, earns coins while you idle and while Claude works",
   "author": { "name": "Andrew Liang" },
   "types": "./types/index.d.ts",
+  "experimental": { "themes": "./themes/" },
   "userConfig": {
     "flavor": {
       "type": "string",
@@ -11,6 +12,13 @@
       "description": "auto follows Claude Code's theme; daycycle is Latte by day, Frappé at dusk, Mocha at night",
       "default": "auto",
       "options": ["auto", "daycycle", "latte", "frappe", "macchiato", "mocha"]
+    },
+    "skin": {
+      "type": "string",
+      "title": "Cat interface",
+      "description": "full redraws the spinner, turn line, prompt hint, tool rows and a walking-cat band; light only the spinner, turn line and hint; off leaves Claude Code alone",
+      "default": "full",
+      "options": ["full", "light", "off"]
     },
     "sound": {
       "type": "boolean",
