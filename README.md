@@ -51,6 +51,12 @@ How the game works:
   - Five Paw Miles tasks a day, such as "pet 3 times" or "Claude runs 10 tools".
   - 16 achievements.
   - A Miles shop with exclusive furniture and a shiny charm.
+- **Calendar**:
+  - The yard follows the real calendar: snow in winter, cherry petals in spring, fireflies on summer nights, falling leaves in autumn, pumpkins in October and string lights in December.
+  - Nyan stocks seasonal furniture only in its season.
+  - Each cat has a yearly birthday on the anniversary of the day it joined: a party hat and a coin gift.
+  - **Catnip market** (in Home): Daisy Meow sells catnip on Sunday mornings (05:00–12:00). Nyan buys it Monday to Saturday at prices that swing twice a day. Unsold catnip spoils after Saturday.
+- Daily resets (shop stock, tasks, gifts, streak) happen at your local midnight.
 - When you come back after 30+ minutes, the cats greet you with **WELCOME BACK!** and a summary of what happened while you were away.
 
 Progress is saved in the plugin's `$.store`, so it carries over between sessions.
@@ -82,6 +88,8 @@ hooks/visitors.ts            strays: arrivals by decor pull, gifts, departures
 hooks/friends.ts             friendship levels, daily gifts, dialogue and memory
 hooks/critters.ts            seasonal critters, finding, museum donations, selling
 hooks/collection.ts          cat book, Paw Miles tasks, achievements, miles shop
+hooks/calendar.ts            seasons, festivals, birthdays, catnip market
+hooks/time.ts                local-midnight day numbers
 hooks/rng.ts                 seeded random numbers (repeatable tests)
 hooks/theme.ts               Catppuccin palettes and flavor resolution
 hooks/art.ts                 ASCII fallback

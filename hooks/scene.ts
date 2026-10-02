@@ -1,5 +1,6 @@
 import type { Cat, Home } from '../types'
 import { activeCat, moodOf, stageOf } from './game'
+import { festivalOf, isBirthday, seasonOf } from './calendar'
 import { coatPixel } from './genes'
 import { tierOf } from './home'
 import { formOf } from './skills'
@@ -92,9 +93,25 @@ export const frameCells = ({ home, now, tick, hour, flavor: f, cols }: SceneInpu
     for (let x = 0; x < W; x++) put(x, y, (x + y * 3) % 7 === 0 ? mix(f.peach, f.crust, 0.6) : mix(f.peach, f.crust, 0.4))
   }
 
+  // Seasons follow the real calendar.
+  const month = new Date(now).getMonth() + 1
+  const season = seasonOf(month)
+  const festival = festivalOf(month)
+  const snow = f.isLight ? f.base : f.text
+  if (season === 'winter') for (let x = 0; x < W; x++) { put(x, FLOOR_Y, snow); put(x, 14, snow) }
+  if (festival === 'lights') {
+    for (let x = 1; x < W; x += 3) put(x, 14, [f.red, f.green, f.yellow, f.blue][(x + (tick >> 2)) % 4] ?? f.red)
+  }
+
   const age = home.effect ? (now - home.effect.at) / 1000 : 99
   const fresh = (kind: string, secs: number) => home.effect?.kind === kind && age < secs
   const bx = W - 9
+  if (festival === 'pumpkins') {
+    const px = W - 13
+    for (const [dx, dy] of [[0, 1], [1, 0], [1, 1], [2, 0], [2, 1], [3, 1]] as const) put(px + dx, 19 + dy, f.peach)
+    put(px + 1, 18, f.green)
+    if (isNight) put(px + 2, 19, f.yellow)
+  }
   drawDecor(home, W, bx, tick, isNight, fresh('fish', 3), f, put)
 
   // One spare cat naps on the bed; other spare cats and visiting strays sit on the fence.
@@ -134,6 +151,18 @@ export const frameCells = ({ home, now, tick, hour, flavor: f, cols }: SceneInpu
   const tailColor = coatPixel(cat.genes, f, 'f', 12, 10) ?? f.peach
   for (const [x, y] of TAIL[mood === 'sleeping' ? 0 : Math.floor(tick / 4) % 2] ?? []) put(ox + x, oy + y, tailColor)
   drawFormFront(form, ox, oy, tick, f, put)
+  const birthday = isBirthday(cat, now)
+  if (birthday) for (const [dx, dy] of [[6, -1], [7, -1], [8, -1], [7, -2], [7, -3]] as const) put(ox + dx, oy + dy, dy === -3 ? f.yellow : f.mauve)
+
+  // Seasonal particles drift across the whole scene.
+  for (let i = 0; i < 9; i++) {
+    const x = (i * 7 + (tick >> 2) * (season === 'autumn' ? 1 : 0) + (tick >> 3)) % W
+    const y = (i * 5 + (tick >> 1)) % (FLOOR_Y + 1)
+    if (season === 'winter') put(x, y, snow)
+    if (season === 'spring' && i % 2 === 0) put((x + (tick >> 1)) % W, y, f.pink)
+    if (season === 'autumn' && i % 2 === 1) put(x, y, i % 3 ? f.peach : f.red)
+    if (season === 'summer' && isNight && (tick + i * 5) % 14 < 7) put((x * 3) % W, 4 + ((y + i) % 12), f.yellow)
+  }
 
   // Particles drawn as characters over the pixels.
   const headRow = Math.floor(oy / 2)
@@ -152,6 +181,7 @@ export const frameCells = ({ home, now, tick, hour, flavor: f, cols }: SceneInpu
   if (fresh('yarn', 2)) text(2 + (Math.floor(age * 12) % 22), 10, '@', f.maroon)
   if (fresh('shop', 2)) text(10, 1, 'NEW ITEM!', rainbow(tick))
   if (fresh('adopt', 3)) [...'WELCOME!'].forEach((ch, i) => text(11 + i, 1, ch, rainbow(tick + i)))
+  if (birthday) [...'HAPPY BIRTHDAY!'].forEach((ch, i) => tick % 16 < 12 && text(8 + i, 0, ch, rainbow(tick + i)))
   if (fresh('catch', 3)) text(ox + 6, headRow - 2 - (Math.floor(age * 2) % 2), '!', f.yellow)
   if (fresh('award', 4)) [...'ACHIEVEMENT!'].forEach((ch, i) => text(10 + i, 0, ch, rainbow(tick + i)))
   if (fresh('welcome', 4)) [...'WELCOME BACK!'].forEach((ch, i) => text(10 + i, 1, ch, rainbow(tick + i)))

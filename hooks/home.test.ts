@@ -7,6 +7,8 @@ import { seeded } from './rng'
 import { arrivalsPerHour, maxVisitors, stepVisitors } from './visitors'
 
 const DAY = 86_400_000
+// Local-clock times, so day boundaries match the game's local midnight.
+const local = (day: number, hour = 9) => new Date(2026, 0, 1 + day, hour).getTime()
 const HOUR = 3_600_000
 const rich = (home: Home): Home => ({ ...home, coins: 100_000 })
 
@@ -18,10 +20,10 @@ test('the catalog is consistent', async () => {
 })
 
 test('the daily stock is stable within a day and changes across days', async () => {
-  const today = dailyStock(10 * DAY + HOUR).map(f => f.id)
+  const today = dailyStock(local(10, 1)).map(f => f.id)
   expect(today.length).toBe(STOCK_SIZE)
-  expect(dailyStock(10 * DAY + 20 * HOUR).map(f => f.id)).toEqual(today)
-  const week = new Set(Array.from({ length: 7 }, (_, d) => dailyStock((10 + d) * DAY).map(f => f.id).join()))
+  expect(dailyStock(local(10, 23)).map(f => f.id)).toEqual(today)
+  const week = new Set(Array.from({ length: 7 }, (_, d) => dailyStock(local(10 + d)).map(f => f.id).join()))
   expect(week.size).toBeGreaterThan(1)
 })
 

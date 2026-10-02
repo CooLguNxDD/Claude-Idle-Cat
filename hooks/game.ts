@@ -1,4 +1,5 @@
 import type { Cat, EffectKind, Genes, Home, Slot } from '../types'
+import { celebrate, spoil } from './calendar'
 import { EMPTY_BOOK, EMPTY_MILES, track } from './collection'
 import type { Counter } from './collection'
 import { addToPocket, critter, donate, findCritters } from './critters'
@@ -9,6 +10,7 @@ import { modsOf } from './mods'
 import { pick } from './rng'
 import { FORM_LEVEL, canLearn, formOf, learn, respecPrice } from './skills'
 import type { Rng } from './rng'
+import { localDay } from './time'
 import { stepVisitors } from './visitors'
 
 const MINUTE = 60_000
@@ -31,7 +33,7 @@ const AFK_EVENTS = [
 
 const clamp = (n: number) => Math.max(0, Math.min(100, n))
 const decay = (from: number, by: number) => clamp(Math.max(Math.min(from, DECAY_FLOOR), from - by))
-const dayOf = (now: number) => Math.floor(now / DAY)
+const dayOf = localDay
 const fx = (kind: EffectKind, at: number) => ({ kind, at })
 
 export const newCat = (id: string, name: string, genes: Genes, now: number): Cat => ({
@@ -49,6 +51,7 @@ export const newHome = (now: number, cat: Cat = newCat('c1', 'Mochi', GINGER, no
   log: `${cat.name} has moved in!`, streak: 0, lastDay: 0, effect: null,
   tier: 0, loan: 0, owned: [...STARTER], decor: { ...STARTER_DECOR }, visitors: [], nextId: 2,
   book: EMPTY_BOOK, pocket: {}, museum: [], miles: EMPTY_MILES, achievements: {}, shinyCharm: false,
+  celebrated: [], catnip: { week: 0, qty: 0, paid: 0 },
 })
 
 type OldUpgrades = Partial<{ feeder: number; toy: number; bed: number }>
@@ -185,7 +188,7 @@ export const tick = (home: Home, now: number, rng: Rng = Math.random): Home => {
       log: found.length === 1 ? `${who} brought home a ${names[0]}!` : `The cats brought home ${found.length} critters!` },
     'catch', found.length, now)
   }
-  return stepVisitors(next, now, min, rng)
+  return celebrate(spoil(stepVisitors(next, now, min, rng), now), now)
 }
 
 // Once per calendar day: a bonus that grows with the streak (capped at 7 days).

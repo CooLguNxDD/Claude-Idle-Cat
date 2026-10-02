@@ -1,5 +1,6 @@
 import type { Home, Personality, Slot } from '../types'
 import { seeded } from './rng'
+import { localDay } from './time'
 
 export type HomeMods = { coin: number; regen: number; autoFeed: boolean; eventRate: number; joyDecay: number; gift: number }
 export type Furniture = {
@@ -7,6 +8,8 @@ export type Furniture = {
   mods: Partial<HomeMods>; bait: number; likes?: Personality
   // Paw Miles-only items never appear in Nyan's stock.
   miles?: number
+  // Seasonal items are stocked only in these months.
+  months?: number[]
 }
 
 // Starter items cost nothing and are owned from day one.
@@ -28,6 +31,10 @@ export const CATALOG: readonly Furniture[] = [
   { id: 'birds', name: 'Bird feeder', slot: 'hanging', price: 150, perk: '+50% AFK events', mods: { eventRate: 1.5 }, bait: 3, likes: 'curious' },
   { id: 'lantern', name: 'Paper lantern', slot: 'hanging', price: 120, perk: 'glows at night', mods: {}, bait: 2, likes: 'lazy' },
   { id: 'chime', name: 'Wind chime', slot: 'hanging', price: 90, perk: '+20% gifts', mods: { gift: 1.2 }, bait: 2, likes: 'shy' },
+  { id: 'beachball', name: 'Beach ball', slot: 'toy', price: 150, months: [6, 7, 8], perk: '+40% coins (summer)', mods: { coin: 1.4 }, bait: 3, likes: 'playful' },
+  { id: 'sakura', name: 'Sakura rug', slot: 'rug', price: 160, months: [3, 4, 5], perk: 'joy fades 30% slower (spring)', mods: { joyDecay: 0.7 }, bait: 3, likes: 'cuddly' },
+  { id: 'jackolantern', name: "Jack-o'-lantern", slot: 'plant', price: 130, months: [10], perk: '+60% AFK events (October)', mods: { eventRate: 1.6 }, bait: 4, likes: 'curious' },
+  { id: 'snowglobe', name: 'Snow globe', slot: 'hanging', price: 170, months: [12, 1, 2], perk: '+40% gifts (winter)', mods: { gift: 1.4 }, bait: 3, likes: 'shy' },
   { id: 'goldbowl', name: 'Golden bowl', slot: 'bowl', price: 0, miles: 800, perk: 'auto-feeds, +50% gifts', mods: { autoFeed: true, gift: 1.5 }, bait: 5, likes: 'greedy' },
   { id: 'rainbow', name: 'Rainbow rug', slot: 'rug', price: 0, miles: 1000, perk: 'joy fades 40% slower', mods: { joyDecay: 0.6 }, bait: 4, likes: 'cuddly' },
   { id: 'moonlamp', name: 'Moon lamp', slot: 'hanging', price: 0, miles: 1200, perk: 'double AFK events', mods: { eventRate: 2 }, bait: 4, likes: 'curious' },
@@ -79,8 +86,9 @@ export const STOCK_SIZE = 4
 
 // Nyan's stock changes every day: the same day always shows the same items.
 export const dailyStock = (now: number): Furniture[] => {
-  const rng = seeded(Math.floor(now / DAY) * 7919 + 13)
-  const pool = CATALOG.filter(f => f.price > 0)
+  const rng = seeded(localDay(now) * 7919 + 13)
+  const month = new Date(now).getMonth() + 1
+  const pool = CATALOG.filter(f => f.price > 0 && (!f.months || f.months.includes(month)))
   const picked: Furniture[] = []
   while (picked.length < STOCK_SIZE && picked.length < pool.length) {
     const item = pool[Math.floor(rng() * pool.length)]

@@ -8,7 +8,7 @@ import { ROWS, frameCells } from './scene'
 import { FLAVORS } from './theme'
 
 const HOUR = 3_600_000
-const DAY = 24 * HOUR
+const local = (day: number, hour = 9) => new Date(2026, 0, 1 + day, hour).getTime()
 const noEvents = () => 0
 const rich = (home: Home): Home => ({ ...home, coins: 10_000 })
 
@@ -62,11 +62,11 @@ test('adoption rolls genes, picks a free name and respects the house size', asyn
 })
 
 test('daily streak pays once per day and resets after a gap', async () => {
-  const day1 = checkIn(newHome(0), 10 * DAY)
+  const day1 = checkIn(newHome(0), local(10))
   expect(day1.bonus).toBeGreaterThan(0)
-  expect(checkIn(day1.home, 10 * DAY + HOUR).bonus).toBe(0)
-  expect(checkIn(day1.home, 11 * DAY).home.streak).toBe(2)
-  expect(checkIn(day1.home, 13 * DAY).home.streak).toBe(1)
+  expect(checkIn(day1.home, local(10, 23)).bonus).toBe(0)
+  expect(checkIn(day1.home, local(11, 1)).home.streak).toBe(2)
+  expect(checkIn(day1.home, local(13)).home.streak).toBe(1)
 })
 
 test('a v0.2 save migrates into a household without losing progress', async () => {

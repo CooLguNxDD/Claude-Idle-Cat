@@ -3,6 +3,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Home, View } from '../types'
 import { catArt } from './art'
+import { buyCatnip, marketNow, seasonOf, sellCatnip, weekOf } from './calendar'
 import { ACHIEVEMENTS, MILES_SHOP, buyWithMiles, settle, tasksFor, track } from './collection'
 import { CRITTERS, critter, isAvailable, sell } from './critters'
 import { act, activeCat, adopt, adoptPrice, adoptVisitor, bar, buyItem, checkIn, coinRate, donateCritter, giveGift,
@@ -328,6 +329,30 @@ export const register: Register = (on, options) => {
               label={`${home.owned.includes(item.id) ? '✓' : ' '} ${item.name} · ${item.price}c · ${item.slot} · ${item.perk}`}
               onPress={() => change($, (h, t) => buyItem(h, item.id, t, hourOf(t)))} />
           ))}
+          <Text bold color={tone.accent}>Catnip market · it's {seasonOf(new Date(now).getMonth() + 1)}</Text>
+          {(() => {
+            const market = marketNow(now, hour, isOpen)
+            const held = home.catnip.week === weekOf(now) ? home.catnip.qty : 0
+            const holding = held > 0 ? ` · you hold ${held} (paid ${home.catnip.paid}c each, spoils after Saturday)` : ''
+            if (market.kind === 'buy') {
+              return (
+                <Box>
+                  <Text>Daisy Meow sells catnip at {market.price}c a bundle{holding} </Text>
+                  <Button key="catnip-10" plain label="Buy 10" onPress={() => change($, (h, t) => buyCatnip(h, 10, t, hourOf(t), isShopOpen(hourOf(t))))} />
+                  <Button key="catnip-50" plain label=" Buy 50" onPress={() => change($, (h, t) => buyCatnip(h, 50, t, hourOf(t), isShopOpen(hourOf(t))))} />
+                </Box>
+              )
+            }
+            if (market.kind === 'sell') {
+              return (
+                <Box>
+                  <Text>Nyan buys catnip for {market.price}c right now{holding} </Text>
+                  {held > 0 && <Button key="catnip-sell" plain label="Sell all" onPress={() => change($, (h, t) => sellCatnip(h, t, hourOf(t), isShopOpen(hourOf(t))))} />}
+                </Box>
+              )
+            }
+            return <Text color={tone.muted}>{market.why}{holding}</Text>
+          })()}
           <Text italic color={tone.log}>{home.log}</Text>
         </Box>
       )

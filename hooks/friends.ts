@@ -1,7 +1,8 @@
 import type { Cat, Personality } from '../types'
+import { localDay } from './time'
 
 const DAY = 86_400_000
-export const dayOf = (now: number) => Math.floor(now / DAY)
+export const dayOf = localDay
 export const DAILY_CAP = 10
 
 // Animal Crossing-style friendship: six levels, unlocking more as it grows.

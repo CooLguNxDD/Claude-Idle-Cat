@@ -1,4 +1,4 @@
-export type EffectKind = 'hearts' | 'fish' | 'yarn' | 'coins' | 'levelup' | 'evolve' | 'shop' | 'adopt' | 'visitor' | 'welcome' | 'gift' | 'catch' | 'award'
+export type EffectKind = 'hearts' | 'fish' | 'yarn' | 'coins' | 'levelup' | 'evolve' | 'shop' | 'adopt' | 'visitor' | 'welcome' | 'gift' | 'catch' | 'award' | 'birthday'
 export type Effect = { kind: EffectKind; at: number }
 
 export type Coat = 'ginger' | 'tabby' | 'grey' | 'black' | 'white' | 'cream' | 'calico' | 'tuxedo' | 'siamese'
@@ -59,6 +59,10 @@ export type Home = {
   miles: Miles
   achievements: Record<string, number>
   shinyCharm: boolean
+  // Birthdays already celebrated, as `${catId}:${year}`.
+  celebrated: string[]
+  // Catnip bought from Daisy Meow this week; it spoils after Saturday.
+  catnip: { week: number; qty: number; paid: number }
 }
 
 declare module 'claude-code' {
