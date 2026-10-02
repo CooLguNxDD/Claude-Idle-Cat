@@ -791,7 +791,6 @@ export const register: Register = (on, options) => {
         {tabs}
         {header}
         {scene}
-        {weatherRow}
         <Text italic color={tone.title}>{cat.name}: "{dialogue(cat, now, hourOf(now))}"</Text>
         <Button key="cat-list" hotkey="w" plain
           label={`${isCatListOpen ? '▾' : '▸'} Cats ${home.cats.length}/${maxCats(home)} · ${cat.name} (w)`}
