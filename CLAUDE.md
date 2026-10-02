@@ -23,9 +23,11 @@ On this machine `~/.claude/settings.json` sets `env.CLAUDE_CODE_PLUGIN_DIRS` to 
   - The engine's validator only accepts `$` calls inside functions declared in `hooks/register.tsx`. All wiring lives there.
   - All other modules are pure: they take `(home, now, rng)` and return a new value, with no `$`, no `Date.now()` and no `Math.random()`.
 - **The browser arcade** (`web/`, served by `server/arcade.mjs`).
-  - `web/*.ts` is bundled into `server/public/arcade.js`, which is committed. **After any change under `web/` or to what it imports (`hooks/arcade/{engine,games,sprites,medals,bridge}`, `hooks/theme.ts`), run `node tools/build-web.mjs` and commit the bundle.**
+  - `web/*.ts` is bundled into `server/public/arcade.js`, which is committed. **After any change under `web/` or to what it imports (`hooks/arcade/{engine,games,render,art,medals,bridge}`, `hooks/art`, `hooks/theme.ts`), run `node tools/build-web.mjs` and commit the bundle.**
+  - `server/public/art/*.png` is generated from `tools/build-art.mjs`; regenerate it after changing its source art or theme palettes. The browser draws at 320×180 from a 112×64 simulation world.
   - The games in `hooks/arcade/games/*.ts` are shared: the mod reads their medals and `maxScore`, and the browser runs them.
   - `server/arcade.mjs` is plain Node with no dependencies. The mod spawns it with an `ARCADE_TOKEN`.
+    - Append `&canvas=1` to an authorized arcade URL to inspect the Canvas fallback.
     - The first stdout line is `{"kind":"ready","port":N}`. After that, browser actions arrive as JSON lines; `parseLine` in `hooks/arcade/bridge.ts` reads them.
     - The mod pushes state to `POST /api/state`.
     - The server listens on 127.0.0.1 only. It checks the token and the Host header and caps request bodies. Keep all of that when adding routes.

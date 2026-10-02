@@ -150,7 +150,8 @@ const plain = (canvas: HTMLCanvasElement, w: number, h: number): Renderer => {
 }
 
 // A canvas that took a WebGL context cannot give a 2D one, so the fallback gets a fresh canvas in its place.
-export const createRenderer = (canvas: HTMLCanvasElement, w: number, h: number): Renderer => {
+export const createRenderer = (canvas: HTMLCanvasElement, w: number, h: number, forceCanvas = false): Renderer => {
+  if (forceCanvas) return plain(canvas, w, h)
   const gl = webgl(canvas, w, h)
   if (gl) return gl
   const fresh = canvas.cloneNode() as HTMLCanvasElement

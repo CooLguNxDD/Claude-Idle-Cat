@@ -12,8 +12,8 @@ import type { LaserState } from './games/laser'
 import { whack } from './games/whack'
 import type { WhackState } from './games/whack'
 
-const W = 48
-const H = 32
+const W = 112
+const H = 64
 const play = <S>(game: Game<S>, bot: (s: S, i: number) => Input[] = () => []) => {
   let s = game.init(11, NO_MODS, W, H)
   const f = frame(W, H)
@@ -28,7 +28,7 @@ test('Fish Catch: a bowl that follows the fish wins a medal, an idle one does no
   const idle = play(fishCatch)
   const good = play(fishCatch, (s: CatchState) => {
     const next = s.drops.filter(d => d.kind === 'fish' || d.kind === 'gold').sort((a, b) => b.y - a.y)[0]
-    return next ? [{ kind: 'move', x: next.x + 3, y: 0 }] : []
+    return next ? [{ kind: 'move', x: next.x + 6, y: 0 }] : []
   })
   expect(fishCatch.score(good)).toBeGreaterThan(fishCatch.medals[0])
   expect(fishCatch.score(good)).toBeGreaterThan(fishCatch.score(idle))
@@ -38,7 +38,7 @@ test('Fish Catch: a bowl that follows the fish wins a medal, an idle one does no
 test('Fish Catch: three cucumbers end the round', async () => {
   let s = fishCatch.init(1, NO_MODS, W, H)
   for (let n = 0; n < 3; n++) {
-    s.drops.push({ kind: 'cucumber', x: s.bowl - 3, y: H - 10, vy: 30 })
+    s.drops.push({ kind: 'cucumber', x: s.bowl - 6, y: H - 20, vy: 60 })
     for (let i = 0; i < 30; i++) s = fishCatch.step(s, STEP, [])
   }
   expect(s.lives).toBe(0)
@@ -75,6 +75,6 @@ test('Whack-a-Mouse: bopping mice scores and the slipper costs points', async ()
   s = whack.step(s, STEP, [{ kind: 'key', key: '5' }])
   expect(s.points).toBe(30)
   s.holes[0] = { kind: 'mouse', up: 0.5, life: 1, isHit: false }
-  s = whack.step(s, STEP, [{ kind: 'down', x: 2, y: 4 }])
+  s = whack.step(s, STEP, [{ kind: 'down', x: 4, y: 8 }])
   expect(s.points).toBe(40)
 })

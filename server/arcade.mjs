@@ -9,7 +9,17 @@ const TOKEN = process.env.ARCADE_TOKEN ?? ''
 const PUBLIC = join(dirname(fileURLToPath(import.meta.url)), 'public')
 const IDLE_MS = Number(process.env.ARCADE_IDLE_MS ?? 120_000)
 const MAX_BODY = 8192
-const STATIC = { '/': ['index.html', 'text/html; charset=utf-8'], '/arcade.js': ['arcade.js', 'text/javascript; charset=utf-8'] }
+const STATIC = {
+  '/': ['index.html', 'text/html; charset=utf-8'],
+  '/arcade.js': ['arcade.js', 'text/javascript; charset=utf-8'],
+  '/arcade.css': ['arcade.css', 'text/css; charset=utf-8'],
+}
+const GAME_IDS = new Set(['dash', 'catch', 'laser', 'whack', 'tank', 'lanes'])
+const FLAVORS = new Set(['latte', 'frappe', 'macchiato', 'mocha'])
+const artFile = pathname => {
+  const match = /^\/art\/(dash|catch|laser|whack|tank|lanes)\.(latte|frappe|macchiato|mocha)\.png$/.exec(pathname)
+  return match && GAME_IDS.has(match[1]) && FLAVORS.has(match[2]) ? `art/${match[1]}.${match[2]}.png` : null
+}
 
 if (TOKEN.length < 16) {
   process.stderr.write('ARCADE_TOKEN is missing\n')
@@ -23,7 +33,7 @@ const listeners = new Set()
 
 const send = (res, status, body, type = 'application/json') => {
   res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' })
-  res.end(typeof body === 'string' ? body : JSON.stringify(body))
+  res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body))
 }
 
 const readBody = req => new Promise((resolve, reject) => {
@@ -58,11 +68,12 @@ const server = createServer(async (req, res) => {
   // Only loopback names: a DNS-rebinding page cannot reach this server under its own host name.
   if (host !== '127.0.0.1' && host !== 'localhost') return send(res, 421, { error: 'host' })
   const token = req.headers['x-arcade-token'] ?? url.searchParams.get('t')
-  const asset = STATIC[url.pathname]
+  const png = artFile(url.pathname)
+  const asset = STATIC[url.pathname] ?? (png ? [png, 'image/png'] : null)
   if (req.method === 'GET' && asset) {
     if (url.pathname === '/' && token !== TOKEN) return send(res, 403, 'Open the arcade from the cat pane.', 'text/plain')
     try {
-      return send(res, 200, await readFile(join(PUBLIC, asset[0]), 'utf8'), asset[1])
+      return send(res, 200, await readFile(join(PUBLIC, asset[0]), asset[1] === 'image/png' ? undefined : 'utf8'), asset[1])
     } catch {
       return send(res, 500, 'The arcade bundle is missing: run node tools/build-web.mjs', 'text/plain')
     }

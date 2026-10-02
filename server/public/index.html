@@ -6,33 +6,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:">
   <title>AFK Cat Arcade</title>
   <link rel="icon" href="data:,">
-  <style>
-    :root { --base: #1e1e2e; --mantle: #181825; --crust: #11111b; --text: #cdd6f4; --sub: #a6adc8; --muted: #7f849c;
-      --surface: #313244; --surface1: #45475a; --accent: #cba6f7; --title: #b4befe; --ok: #a6e3a1; --coin: #f9e2af; --bad: #f38ba8; }
-    * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; background: var(--crust); color: var(--text);
-      font: 15px/1.45 ui-monospace, "Cascadia Code", "JetBrains Mono", Menlo, monospace; display: flex; justify-content: center; }
-    main { width: min(1100px, 100%); padding: 20px 16px 32px; }
-    header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-    h1 { margin: 0; font-size: 20px; color: var(--title); }
-    #cat { color: var(--sub); }
-    #mode { color: var(--muted); font-size: 12px; border: 1px solid var(--surface1); border-radius: 6px; padding: 1px 6px; }
-    #log { color: var(--coin); min-height: 1.45em; margin: 10px 0 4px; }
-    #rules { color: var(--muted); margin: 0 0 14px; font-size: 13px; }
-    #games { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
-    .card { text-align: left; display: flex; flex-direction: column; gap: 6px; padding: 14px; cursor: pointer; font: inherit;
-      color: var(--text); background: var(--base); border: 1px solid var(--surface1); border-radius: 10px; transition: transform .12s, border-color .12s; }
-    .card:hover, .card:focus-visible { transform: translateY(-2px); border-color: var(--accent); outline: none; }
-    .card.featured { border-color: var(--coin); }
-    .card strong { color: var(--title); font-size: 16px; }
-    .card small { color: var(--muted); }
-    #play { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 12px; }
-    #screen { image-rendering: pixelated; border-radius: 8px; box-shadow: 0 10px 40px #0008; background: var(--base); touch-action: none; }
-    #screen:focus { outline: 2px solid var(--accent); outline-offset: 3px; }
-    #hud { color: var(--coin); }
-    #controls { color: var(--muted); font-size: 13px; }
-    [hidden] { display: none !important; }
-  </style>
+  <link rel="stylesheet" href="/arcade.css">
 </head>
 <body>
   <main>
@@ -46,6 +20,19 @@
       <div id="games"></div>
     </section>
     <section id="play" hidden>
+      <div id="display-options">
+        <label for="resolution">Display</label>
+        <select id="resolution" aria-label="Display resolution">
+          <option value="fit">Fit window</option>
+          <option value="1">320×180</option>
+          <option value="2">640×360</option>
+          <option value="3">960×540</option>
+          <option value="4">1280×720</option>
+          <option value="5">1600×900</option>
+          <option value="6">1920×1080</option>
+        </select>
+        <button id="fullscreen" type="button">Fullscreen</button>
+      </div>
       <canvas id="screen" tabindex="0" aria-label="Game screen"></canvas>
       <div id="hud"></div>
       <div id="controls"></div>

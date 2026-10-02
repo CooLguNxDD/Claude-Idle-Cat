@@ -8,10 +8,10 @@ import type { Input } from './game'
 import { COST, geometry, lanes } from './games/lanes'
 import type { Card, LanesState } from './games/lanes'
 
-const W = 48
-const H = 32
+const W = 112
+const H = 64
 const g = geometry(W, H)
-const at = (lane: number, col: number): Input => ({ kind: 'down', x: g.left + col * g.cw + 2, y: g.top + lane * g.lh + 3 })
+const at = (lane: number, col: number): Input => ({ kind: 'down', x: g.left + col * g.cw + 4, y: g.top + lane * g.lh + 6 })
 const steps = (s: LanesState, n: number, input: (s: LanesState) => Input[] = () => []) => {
   for (let i = 0; i < n && !s.isOver; i++) s = lanes.step(s, STEP, input(s))
   return s
@@ -26,7 +26,7 @@ const plan: [Card, number, number][] = [
 ]
 const general = (s: LanesState): Input[] => {
   const drop = s.drops[0]
-  if (drop) return [{ kind: 'down', x: drop.x + 1, y: drop.y + 1 }]
+  if (drop) return [{ kind: 'down', x: drop.x + 2, y: drop.y + 2 }]
   const todo = plan.find(([, lane, col]) => !s.units.some(u => u.lane === lane && u.col === col) && !s.lost[lane])
   if (todo && s.catnip >= COST[todo[0]] && s.recharge[todo[0]] <= 0) return [pickKey(todo[0]), at(todo[1], todo[2])]
   const busy = [0, 1, 2].sort((a, b) => s.mice.filter(m => m.lane === b).length - s.mice.filter(m => m.lane === a).length)[0] ?? 0
@@ -45,14 +45,14 @@ test('yarn throwers stop mice, box traps catch one, and napping cats dream catni
   s = lanes.step(s, STEP, [pickKey('yarn'), at(0, 0)])
   expect(s.units.length).toBe(1)
   expect(s.catnip).toBe(100 - COST.yarn)
-  s.mice.push({ lane: 0, x: W - 10, hp: 3, isRat: false, bite: 0 })
+  s.mice.push({ lane: 0, x: W - 20, hp: 3, isRat: false, bite: 0 })
   s = steps(s, 5 * 60)
   expect(s.repelled).toBe(1)
   s.recharge.box = 0
   s.catnip = 200
   s = lanes.step(s, STEP, [pickKey('box'), at(1, 3)])
   s = steps(s, 70)
-  s.mice.push({ lane: 1, x: g.left + 3 * g.cw + g.cw - 2, hp: 7, isRat: true, bite: 0 })
+  s.mice.push({ lane: 1, x: g.left + 3 * g.cw + g.cw - 4, hp: 7, isRat: true, bite: 0 })
   s = steps(s, 2)
   expect(s.repelled).toBe(2)
   expect(s.units.some(u => u.card === 'box')).toBe(false)
@@ -73,8 +73,8 @@ test('a good general holds the yard for a medal within the score limit', async (
   expect(lanes.score(s)).toBeLessThanOrEqual(lanes.maxScore(60_000))
 })
 
-test('a narrow pane gets five columns so every cell fits a cat', async () => {
-  expect(geometry(34, H).cols).toBe(5)
-  expect(geometry(34, H).cw).toBeGreaterThanOrEqual(6)
-  expect(geometry(56, H).cols).toBe(7)
+test('a narrow world gets five columns so every cell fits a cat', async () => {
+  expect(geometry(68, H).cols).toBe(5)
+  expect(geometry(68, H).cw).toBeGreaterThanOrEqual(12)
+  expect(geometry(112, H).cols).toBe(7)
 })

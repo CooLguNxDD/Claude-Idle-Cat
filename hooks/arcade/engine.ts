@@ -1,20 +1,34 @@
 // Pure pixel engine for the arcade: a framebuffer drawn as '▀' half-block cells.
 import { mix } from '../theme'
+import type { Background } from '../art/backgrounds'
 
 export const STEP = 1 / 60
 export const TICK_MS = 33
 export const STEPS_PER_TICK = 2
 
-export type Frame = { w: number; h: number; px: Uint32Array }
+export type Frame = { w: number; h: number; px: Uint32Array; pixelW?: number; pixelH?: number }
 export type Run = { text: string; fg: number; bg: number }
 
 export const frame = (w: number, h: number): Frame => ({ w, h, px: new Uint32Array(w * h) })
+export const scaledFrame = (pixelW: number, pixelH: number, w: number, h: number): Frame =>
+  ({ w, h, pixelW, pixelH, px: new Uint32Array(pixelW * pixelH) })
 export const clear = (f: Frame, c: number) => f.px.fill(c)
+
+// Missing or undecoded PNGs use each game's code-drawn fallback.
+export const backdrop = (f: Frame, image: Background | undefined, fallback: () => void) => {
+  if (image?.w === (f.pixelW ?? f.w) && image.h === (f.pixelH ?? f.h) && image.px.length === f.px.length) f.px.set(image.px)
+  else fallback()
+}
 
 export const plot = (f: Frame, x: number, y: number, c: number) => {
   const ix = Math.round(x)
   const iy = Math.round(y)
-  if (ix >= 0 && iy >= 0 && ix < f.w && iy < f.h) f.px[iy * f.w + ix] = c
+  if (ix < 0 || iy < 0 || ix >= f.w || iy >= f.h) return
+  const pw = f.pixelW ?? f.w
+  const ph = f.pixelH ?? f.h
+  const x0 = Math.floor(ix * pw / f.w), x1 = Math.floor((ix + 1) * pw / f.w)
+  const y0 = Math.floor(iy * ph / f.h), y1 = Math.floor((iy + 1) * ph / f.h)
+  for (let py = y0; py < y1; py++) for (let px = x0; px < x1; px++) f.px[py * pw + px] = c
 }
 
 // Mixes `c` into the pixel by `a` (0..1): fades, glows and soft edges.
@@ -22,8 +36,13 @@ export const blend = (f: Frame, x: number, y: number, c: number, a: number) => {
   const ix = Math.round(x)
   const iy = Math.round(y)
   if (ix < 0 || iy < 0 || ix >= f.w || iy >= f.h || a <= 0) return
-  const i = iy * f.w + ix
-  f.px[i] = a >= 1 ? c : mix(f.px[i] ?? 0, c, a)
+  const pw = f.pixelW ?? f.w
+  const ph = f.pixelH ?? f.h
+  for (let py = Math.floor(iy * ph / f.h); py < Math.floor((iy + 1) * ph / f.h); py++)
+    for (let px = Math.floor(ix * pw / f.w); px < Math.floor((ix + 1) * pw / f.w); px++) {
+      const i = py * pw + px
+      f.px[i] = a >= 1 ? c : mix(f.px[i] ?? 0, c, a)
+    }
 }
 
 export const rect = (f: Frame, x: number, y: number, w: number, h: number, c: number) => {
@@ -101,13 +120,17 @@ export const shakeOffset = (s: Shake, tick: number) =>
 // Shifts a whole frame (screen shake) and fills the gap with `fill`.
 export const offset = (f: Frame, dx: number, dy: number, fill: number): Frame => {
   if (dx === 0 && dy === 0) return f
-  const out = frame(f.w, f.h)
+  const pw = f.pixelW ?? f.w
+  const ph = f.pixelH ?? f.h
+  const pxDx = Math.round(dx * pw / f.w)
+  const pxDy = Math.round(dy * ph / f.h)
+  const out = f.pixelW && f.pixelH ? scaledFrame(pw, ph, f.w, f.h) : frame(f.w, f.h)
   out.px.fill(fill)
-  for (let y = 0; y < f.h; y++) {
-    for (let x = 0; x < f.w; x++) {
-      const sx = x - dx
-      const sy = y - dy
-      if (sx >= 0 && sy >= 0 && sx < f.w && sy < f.h) out.px[y * f.w + x] = f.px[sy * f.w + sx] ?? fill
+  for (let y = 0; y < ph; y++) {
+    for (let x = 0; x < pw; x++) {
+      const sx = x - pxDx
+      const sy = y - pxDy
+      if (sx >= 0 && sy >= 0 && sx < pw && sy < ph) out.px[y * pw + x] = f.px[sy * pw + sx] ?? fill
     }
   }
   return out
@@ -119,9 +142,10 @@ export const approach = (from: number, to: number, rate: number, dt: number) => 
 // Tiny 3x5 digits, drawn into the frame for score pops.
 const DIGITS = ['111101101101111', '010110010010111', '111001111100111', '111001111001111', '101101111001001',
   '111100111001111', '111100111101111', '111001001001001', '111101111101111', '111101111001111']
-export const number = (f: Frame, n: number, x: number, y: number, c: number) => {
+export const number = (f: Frame, n: number, x: number, y: number, c: number, scale = 1) => {
   String(Math.max(0, Math.floor(n))).split('').forEach((d, k) => {
     const bits = DIGITS[Number(d)] ?? ''
-    for (let i = 0; i < 15; i++) if (bits[i] === '1') plot(f, x + k * 4 + (i % 3), y + Math.floor(i / 3), c)
+    for (let i = 0; i < 15; i++) if (bits[i] === '1')
+      rect(f, x + k * 4 * scale + (i % 3) * scale, y + Math.floor(i / 3) * scale, scale, scale, c)
   })
 }

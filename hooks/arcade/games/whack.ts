@@ -1,11 +1,10 @@
 // Whack-a-Mouse: mice pop out of a 3x3 board; bop them, but never the owner's slipper.
+import { renderWhack } from '../render/whack'
 import { seeded } from '../../rng'
 import type { Rng } from '../../rng'
-import { mix } from '../../theme'
-import { burst, clear, drawParticles, number, rect, shake, sprite, stepParticles, stepShake } from '../engine'
+import { burst, shake, stepParticles, stepShake } from '../engine'
 import type { Particle, Shake } from '../engine'
 import type { Game } from '../game'
-import { catPaint, paletteOf } from '../sprites'
 
 type Kind = 'mouse' | 'gold' | 'slipper'
 type Pop = { kind: Kind; up: number; life: number; isHit: boolean }
@@ -16,26 +15,18 @@ export type WhackState = {
 }
 
 const SECONDS = 40
-const RISE_S = 0.12
+export const RISE_S = 0.12
 const VALUE: Record<Kind, number> = { mouse: 10, gold: 25, slipper: -20 }
 const MIN_GAP_S = 0.4
-const ART: Record<Kind, readonly string[]> = {
-  mouse: ['m...m', 'mmmmm', 'mEmEm', 'mmpmm', '.mmm.'],
-  gold: ['y...y', 'yyyyy', 'yEyEy', 'yypyy', '.yyy.'],
-  slipper: ['.sss.', 'sSSSs', 'sSSSs', 'sssss', '.....'],
-}
-// The paw that bops, in the cat's own coat.
-const PAW = ['.f.f.', 'fffff', 'fwwwf', '.fff.']
-
 // Holes are numbered like a phone keypad: 1 2 3 on top.
-const cellOf = (s: WhackState, hole: number) => {
+export const cellOf = (s: WhackState, hole: number) => {
   const cw = s.w / 3
-  const ch = (s.h - 2) / 3
-  return { x: (hole % 3) * cw, y: 2 + Math.floor(hole / 3) * ch, cw, ch }
+  const ch = (s.h - 4) / 3
+  return { x: (hole % 3) * cw, y: 4 + Math.floor(hole / 3) * ch, cw, ch }
 }
 const holeAt = (s: WhackState, x: number, y: number) => {
   const col = Math.floor(x / (s.w / 3))
-  const row = Math.floor((y - 2) / ((s.h - 2) / 3))
+  const row = Math.floor((y - 4) / ((s.h - 4) / 3))
   return col >= 0 && col < 3 && row >= 0 && row < 3 ? row * 3 + col : -1
 }
 
@@ -98,32 +89,7 @@ export const whack: Game<WhackState> = {
     if (s.t >= SECONDS) s.isOver = true
     return s
   },
-  draw: (s, f, { f: fl, genes }) => {
-    const grass = mix(fl.green, fl.base, 0.75)
-    clear(f, grass)
-    const paint = paletteOf(fl, { m: fl.overlay2, y: fl.yellow, E: fl.crust, p: fl.pink, s: fl.blue, S: fl.sapphire })
-    for (let hole = 0; hole < 9; hole++) {
-      const c = cellOf(s, hole)
-      const cx = Math.round(c.x + c.cw / 2)
-      const base = Math.round(c.y + c.ch - 3)
-      const pop = s.holes[hole]
-      if (pop) {
-        const rise = Math.min(1, pop.up / RISE_S) * (pop.isHit ? Math.max(0, pop.life / 0.2) : 1)
-        sprite(f, ART[pop.kind], paint, cx - 2, base - Math.round(rise * 5))
-      }
-      // Grass and the hole's lip cover the critter's lower half, so it seems to rise out of the hole.
-      rect(f, cx - 4, base, 9, 5, grass)
-      rect(f, cx - 4, base, 9, 2, fl.crust)
-      rect(f, cx - 3, base + 2, 7, 1, mix(fl.crust, fl.green, 0.3))
-      number(f, hole + 1, c.x + 1, c.y, mix(fl.text, fl.base, 0.5))
-    }
-    if (s.swipe) {
-      const c = cellOf(s, s.swipe.hole)
-      sprite(f, PAW, catPaint(genes, fl), c.x + c.cw / 2 - 2, c.y + c.ch - 9)
-    }
-    drawParticles(f, s.particles)
-    for (const p of s.pops) number(f, p.n, p.x, p.y - (0.6 - p.life) * 8, fl.yellow)
-  },
+  draw: (s, f, look) => renderWhack(s, f, look),
   isOver: s => s.isOver,
   score: s => s.points,
   maxScore: ms => Math.ceil((ms / 1000 / MIN_GAP_S) * VALUE.gold) + 50,

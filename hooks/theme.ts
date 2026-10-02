@@ -2,10 +2,10 @@
 export type FlavorName = 'latte' | 'frappe' | 'macchiato' | 'mocha'
 export type FlavorSetting = 'auto' | 'daycycle' | FlavorName
 
-const NAMES = ['rosewater', 'flamingo', 'pink', 'mauve', 'red', 'maroon', 'peach', 'yellow', 'green', 'teal',
+export const COLOR_TOKENS = ['rosewater', 'flamingo', 'pink', 'mauve', 'red', 'maroon', 'peach', 'yellow', 'green', 'teal',
   'sky', 'sapphire', 'blue', 'lavender', 'text', 'subtext1', 'subtext0', 'overlay2', 'overlay1', 'overlay0',
   'surface2', 'surface1', 'surface0', 'base', 'mantle', 'crust'] as const
-export type ColorName = (typeof NAMES)[number]
+export type ColorName = (typeof COLOR_TOKENS)[number]
 export type Flavor = Record<ColorName, number> & { name: FlavorName; isLight: boolean }
 
 const HEX: Record<FlavorName, string> = {
@@ -17,7 +17,7 @@ const HEX: Record<FlavorName, string> = {
 
 const build = (name: FlavorName): Flavor => {
   const hex = HEX[name].split(' ')
-  const colors = Object.fromEntries(NAMES.map((n, i) => [n, parseInt(hex[i] ?? '0', 16)]))
+  const colors = Object.fromEntries(COLOR_TOKENS.map((n, i) => [n, parseInt(hex[i] ?? '0', 16)]))
   return { ...(colors as Record<ColorName, number>), name, isLight: name === 'latte' }
 }
 export const FLAVORS: Record<FlavorName, Flavor> = {

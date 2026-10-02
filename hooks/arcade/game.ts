@@ -2,6 +2,7 @@
 import type { GameId, Genes } from '../../types'
 import type { Flavor } from '../theme'
 import type { Frame } from './engine'
+import type { Background } from '../art/backgrounds'
 
 export type { GameId }
 
@@ -13,7 +14,7 @@ export type Input =
 // Skill-tree branch points: they ease a game, never multiply its payout.
 export type GameMods = { hunter: number; cuddler: number; dreamer: number }
 
-export type Look = { f: Flavor; genes: Genes; tick: number }
+export type Look = { f: Flavor; genes: Genes; tick: number; background?: Background }
 
 export type Game<S> = {
   id: GameId

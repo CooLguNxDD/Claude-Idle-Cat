@@ -8,8 +8,8 @@ import type { Input } from './game'
 import { tank } from './games/tank'
 import type { TankState } from './games/tank'
 
-const W = 48
-const H = 32
+const W = 112
+const H = 64
 const steps = (s: TankState, n: number, input: (s: TankState) => Input[] = () => []) => {
   for (let i = 0; i < n; i++) s = tank.step(s, STEP, input(s))
   return s
@@ -17,11 +17,11 @@ const steps = (s: TankState, n: number, input: (s: TankState) => Input[] = () =>
 
 // Swats the crow, grabs coins, feeds the hungriest fish, and reinvests in fry.
 const keeper = (s: TankState): Input[] => {
-  if (s.crow && s.crow.warn <= 0) return [{ kind: 'down', x: s.crow.x + 3, y: s.crow.y + 2 }]
+  if (s.crow && s.crow.warn <= 0) return [{ kind: 'down', x: s.crow.x + 6, y: s.crow.y + 4 }]
   const coin = s.coins.sort((a, b) => b.y - a.y)[0]
   if (coin) return [{ kind: 'down', x: coin.x, y: coin.y }]
   const hungry = s.fish.filter(f => !f.isDead && f.hunger > 0.5).sort((a, b) => b.hunger - a.hunger)[0]
-  if (hungry && s.food.length === 0) return [{ kind: 'down', x: hungry.x + 2, y: hungry.y - 2 }]
+  if (hungry && s.food.length === 0) return [{ kind: 'down', x: hungry.x + 4, y: hungry.y - 4 }]
   if (s.bank >= 40 && s.t < 40) return [{ kind: 'key', key: 'b' }]
   return []
 }
@@ -31,7 +31,7 @@ test('feeding grows a fry into a fish that drops a coin you can click', async ()
   const fry = s.fish[0]!
   for (let n = 0; n < 2; n++) {
     fry.hunger = 0.9
-    s.food = [{ x: fry.x + 2, y: fry.y + 1 }]
+    s.food = [{ x: fry.x + 4, y: fry.y + 2 }]
     s = steps(s, 3)
   }
   expect(fry.stage).toBe(1)
@@ -47,7 +47,7 @@ test('an unfed tank starves and an unswatted crow eats a fish', async () => {
   expect(idle.fish.every(f => f.isDead)).toBe(true)
   let s = tank.init(4, NO_MODS, W, H)
   s.t = 19.9
-  s = steps(s, 10 * 60, st => (st.crow ? [] : st.fish.filter(f => f.hunger > 0.5 && !f.isDead).map(f => ({ kind: 'down' as const, x: f.x + 2, y: f.y - 2 }))))
+  s = steps(s, 10 * 60, st => (st.crow ? [] : st.fish.filter(f => f.hunger > 0.5 && !f.isDead).map(f => ({ kind: 'down' as const, x: f.x + 4, y: f.y - 4 }))))
   expect(s.fish.filter(f => f.isDead).length).toBeGreaterThan(0)
 })
 

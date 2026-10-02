@@ -28,6 +28,7 @@ Then type `/cat` to open the pane.
 | `a` | adopt from the shelter |
 | `w` | open/close the cat list |
 | `c` `s` `h` `r` `b` `m` `g` | switch tabs: Cat · Skills · Home · Friends · Book · Miles · Arcade |
+| Arcade Display menu / Fullscreen | fit the 320×180 art canvas to the window, choose a 1×–6× size (up to 1080p), or fill the screen |
 
 Saves:
 - The household is one JSON save in the mod's store, written on every change.
@@ -65,7 +66,8 @@ How the game works:
   - A Miles shop with exclusive furniture and a shiny charm.
 - **Arcade tab** (`g`, or Play `p`):
   - The games run in your browser. `p` (or a game in the Arcade tab) starts a small local server and opens a tab at `http://localhost:<port>`. The pane keeps the game list, the round in progress and the results.
-  - The games are drawn with WebGL: crisp pixel art scaled to fit, with a glow on bright pixels. `C` turns on a CRT look (curved screen, scanlines) and `G` toggles the glow. Without WebGL the page falls back to a plain canvas.
+  - The games are drawn on a 320×180 pixel-art canvas, scaled in whole-pixel steps up to 1920×1080. The Display menu offers fit or 1×–6× sizes (clamped to the window); Fullscreen fills the display. WebGL adds glow and an optional CRT look (`G` and `C`). Without WebGL the page falls back to a plain canvas.
+  - Game rules still use a 112×64 coordinate world, keeping round timing, controls, medals and existing best scores comparable. Each game's layered background has a Catppuccin variant and a code-drawn fallback.
   - The active cat stars in its own coat. Esc quits a round. The simulation runs at a fixed 60 Hz. Glow and CRT choices are saved with your cats.
   - Needs Node.js on your PATH. The server listens on 127.0.0.1 only, needs a per-session token, and shuts down two minutes after Claude Code goes away.
   - **Rooftop Dash**: jump flowerpots (space/↑), duck pigeons (↓) and grab fish treats while the rooftops speed up.
@@ -114,7 +116,8 @@ types/index.d.ts             Home and Cat state contract ($.state)
 hooks/hooks.json             names the hooks module
 hooks/register.tsx           wiring: session.start, /cat, tool.call, turn.complete, Pane render, timers
 hooks/game.ts                pure rules: tick, act, buy, checkIn, evolution
-hooks/scene.ts               pixel-art scene → Raster cells (two pixels per cell, '▀')
+hooks/scene.ts + scene/      terminal pixel-art scene → Raster cells (two pixels per cell, '▀')
+hooks/art/                  typed cat, furniture and background registry
 hooks/genes.ts               coats, eyes, personalities, shiny odds, coat painting
 hooks/mods.ts                trait × skill multipliers the rules read
 hooks/skills.ts              skill tree, points, evolution forms
@@ -129,12 +132,15 @@ hooks/sfx.ts                 which moments make a sound, clip paths, Windows pla
 hooks/arcade/engine.ts       pixel framebuffer, half-block runs, particles, shake, easing
 hooks/arcade/bridge.ts       what the mod and the browser exchange: snapshots, server lines, token, URL
 server/arcade.mjs            local web server: serves the arcade, relays starts/results as stdout lines
-server/public/               the arcade page and its built bundle (arcade.js)
+server/public/               arcade page, CSS, built bundle and four-flavor PNG art
 web/*.ts                     browser runtime: game loop, input, WebGL renderer (build: node tools/build-web.mjs)
-hooks/arcade/games/*.ts      the six mini-games (pure: init, step, draw, score)
+hooks/arcade/games/*.ts      the six mini-games (pure: init, step, score)
+hooks/arcade/render/*.ts     focused renderers for each game
+hooks/arcade/art/*.ts        editable pixel-grid sprites and animation frames
 hooks/arcade/rewards.ts      energy cost, medals, daily paid plays, featured game, score checks
 assets/sfx/*.wav             the clips
 tools/gen-sfx.mjs            regenerates the clips
+tools/build-art.mjs          regenerates 24 deterministic 320×180 PNG backgrounds
 hooks/rng.ts                 seeded random numbers (repeatable tests)
 hooks/theme.ts               Catppuccin palettes and flavor resolution
 hooks/art.ts                 ASCII fallback
@@ -146,6 +152,8 @@ hooks/*.test.ts              rule tests + a pane mount test
 ```bash
 claude plugin validate .
 claude plugin test .
+node tools/build-art.mjs
+node tools/build-web.mjs
 ```
 
 To type-check, load the plugin once with `--plugin-dir`. That writes `.claude-plugin/types/` (git-ignored). Then run `npx -p typescript@5 tsc -p .`.

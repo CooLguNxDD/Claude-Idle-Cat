@@ -1,5 +1,5 @@
 // The browser arcade: runs the same pure games as the rules, drawn through WebGL with glow and a CRT mode.
-import { STEP, frame, offset, shakeOffset } from '../hooks/arcade/engine'
+import { STEP, offset, scaledFrame, shakeOffset } from '../hooks/arcade/engine'
 import type { Frame, Shake } from '../hooks/arcade/engine'
 import type { Menu, Round } from '../hooks/arcade/bridge'
 import type { Game, Input } from '../hooks/arcade/game'
@@ -9,11 +9,14 @@ import { FLAVORS, css } from '../hooks/theme'
 import type { Flavor } from '../hooks/theme'
 import { createRenderer } from './render'
 import type { Renderer } from './render'
+import { ART_H, ART_W, WORLD_H, WORLD_W, BACKGROUND_IDS, backgroundUrl } from '../hooks/art/backgrounds'
+import type { Background } from '../hooks/art/backgrounds'
+import type { GameId } from '../types'
 
 type State = { menu: Menu | null; round: Round | null }
 
-const W = 56
-const H = 32
+const W = WORLD_W
+const H = WORLD_H
 const OVER_HOLD_MS = 1200
 const MAX_STEPS = 8
 const KEYS: Record<string, string> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', Enter: 'return' }
@@ -30,9 +33,34 @@ let flavor: Flavor = FLAVORS.mocha
 let renderer: Renderer | null = null
 let last = 0
 let acc = 0
+const backgrounds = new Map<string, Background>()
+const pendingBackgrounds = new Set<string>()
+
+const loadBackground = (id: GameId, name: Flavor['name']) => {
+  const url = backgroundUrl(id, name)
+  if (backgrounds.has(url) || pendingBackgrounds.has(url)) return
+  pendingBackgrounds.add(url)
+  const image = new Image()
+  image.onload = () => {
+    pendingBackgrounds.delete(url)
+    if (image.naturalWidth !== ART_W || image.naturalHeight !== ART_H) return
+    const canvas = document.createElement('canvas')
+    canvas.width = ART_W; canvas.height = ART_H
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    if (!ctx) return
+    ctx.drawImage(image, 0, 0)
+    const rgba = ctx.getImageData(0, 0, ART_W, ART_H).data
+    const px = new Uint32Array(ART_W * ART_H)
+    for (let i = 0; i < px.length; i++) px[i] = ((rgba[i * 4] ?? 0) << 16) | ((rgba[i * 4 + 1] ?? 0) << 8) | (rgba[i * 4 + 2] ?? 0)
+    backgrounds.set(url, { w: ART_W, h: ART_H, px })
+  }
+  image.onerror = () => pendingBackgrounds.delete(url)
+  image.src = url
+}
 
 const theme = (f: Flavor) => {
   flavor = f
+  for (const id of BACKGROUND_IDS) loadBackground(id, f.name)
   const root = document.documentElement.style
   for (const [name, c] of Object.entries({ base: f.base, mantle: f.mantle, crust: f.crust, text: f.text, sub: f.subtext0,
     muted: f.overlay1, surface: f.surface0, surface1: f.surface1, accent: f.mauve, title: f.lavender, ok: f.green, coin: f.yellow, bad: f.red })) {
@@ -62,7 +90,12 @@ const drawMenu = (m: Menu) => {
     meta.textContent = `best ${g.best} · ${g.left}/${m.paidPlays} paid left · medals ${g.medals.join('/')}${g.id === m.featured ? ' · 2× today' : ''}`
     const keys = document.createElement('small')
     keys.textContent = g.controls
-    card.append(name, blurb, meta, keys)
+    const preview = document.createElement('img')
+    preview.className = 'preview'
+    preview.alt = ''
+    preview.src = backgroundUrl(g.id, m.flavor)
+    preview.onerror = () => preview.remove()
+    card.append(preview, name, blurb, meta, keys)
     card.onclick = () => void post('/api/start', { game: g.id })
     return card
   }))
@@ -72,7 +105,7 @@ const start = (round: Round) => {
   const game = gameOf(round.game)
   if (!game) return
   live = { game, round, s: game.init(round.seed, round.mods, W, H), queue: [], ms: 0, tick: 0, overMs: 0, isSent: false }
-  $('controls').textContent = `${game.controls} · Esc quits · G glow · C CRT`
+  $('controls').textContent = `${game.controls} · Esc quits${renderer?.kind === 'webgl' ? ' · G glow · C CRT' : ''}`
   show('play')
   $('screen').focus()
 }
@@ -88,6 +121,7 @@ const onState = (next: State) => {
   if (next.round && next.round.id !== live?.round.id) start(next.round)
   if (!next.round && live) {
     live = null
+    if (document.fullscreenElement === $('play')) void document.exitFullscreen()
     show('menu')
   }
   if (!next.round && !live) show('menu')
@@ -128,8 +162,9 @@ const loop = (now: number) => {
       void post('/api/result', { game: game.id, score: game.score(live.s), ms: Math.round(live.ms) })
     }
   }
-  let f: Frame = frame(W, H)
-  game.draw(live.s, f, { f: flavor, genes: live.round.genes, tick: Math.floor(live.tick / 2) })
+  let f: Frame = scaledFrame(ART_W, ART_H, W, H)
+  game.draw(live.s, f, { f: flavor, genes: live.round.genes, tick: Math.floor(live.tick / 2),
+    background: backgrounds.get(backgroundUrl(game.id, flavor.name)) })
   const quake = (live.s as { shake?: Shake }).shake
   if (quake) {
     const d = shakeOffset(quake, live.tick)
@@ -145,20 +180,37 @@ const loop = (now: number) => {
 }
 
 const boot = () => {
-  renderer = createRenderer($<HTMLCanvasElement>('screen'), W, H)
+  renderer = createRenderer($<HTMLCanvasElement>('screen'), ART_W, ART_H,
+    new URLSearchParams(location.search).get('canvas') === '1')
   const canvas = $<HTMLCanvasElement>('screen')
   $('mode').textContent = renderer.kind === 'webgl' ? 'WebGL' : 'Canvas'
   const fit = () => {
-    const scale = Math.max(4, Math.floor(Math.min(innerWidth * 0.94 / W, (innerHeight - 170) / H)))
-    canvas.style.width = `${W * scale}px`
-    canvas.style.height = `${H * scale}px`
-    renderer?.resize(W * scale * devicePixelRatio, H * scale * devicePixelRatio)
+    const isFullscreen = document.fullscreenElement === $('play')
+    const availableW = isFullscreen ? innerWidth : innerWidth * 0.94
+    const availableH = isFullscreen ? innerHeight : innerHeight - 170
+    const maximum = Math.max(1, Math.floor(Math.min(availableW / ART_W, availableH / ART_H)))
+    const choice = $<HTMLSelectElement>('resolution').value
+    const target = choice === 'fit' ? maximum : Number(choice)
+    const scale = Math.min(6, maximum, target)
+    canvas.style.width = `${ART_W * scale}px`
+    canvas.style.height = `${ART_H * scale}px`
+    renderer?.resize(ART_W * scale * devicePixelRatio, ART_H * scale * devicePixelRatio)
   }
   addEventListener('resize', fit)
+  addEventListener('fullscreenchange', () => {
+    $('fullscreen').textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen'
+    fit()
+  })
+  $<HTMLSelectElement>('resolution').addEventListener('change', fit)
+  $('fullscreen').addEventListener('click', () => {
+    if (document.fullscreenElement) void document.exitFullscreen()
+    else void $('play').requestFullscreen()
+  })
   fit()
   addEventListener('keydown', e => {
     if (!live) return
     if (e.key === 'Escape') {
+      if (document.fullscreenElement) return
       if (!live.isSent) {
         live.isSent = true
         void post('/api/quit', { game: live.game.id })
