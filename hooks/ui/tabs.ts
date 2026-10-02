@@ -2,6 +2,7 @@ import type { View } from '../../types'
 
 export const TABS: { view: View; label: string; hotkey: string }[] = [
   { view: 'cat', label: 'Cat', hotkey: 'c' },
+  { view: 'adopt', label: 'Adopt', hotkey: 'a' },
   { view: 'skills', label: 'Skills', hotkey: 's' },
   { view: 'home', label: 'Home', hotkey: 'h' },
   { view: 'friends', label: 'Friends', hotkey: 'r' },
@@ -9,7 +10,6 @@ export const TABS: { view: View; label: string; hotkey: string }[] = [
   { view: 'miles', label: 'Miles', hotkey: 'm' },
   { view: 'arcade', label: 'Arcade', hotkey: 'g' },
   { view: 'weather', label: 'Weather', hotkey: 't' },
-  { view: 'adopt', label: 'Adopt', hotkey: 'a' },
 ]
 
 export const adjacentTab = (view: View, step: number): View =>

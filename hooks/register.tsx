@@ -324,7 +324,7 @@ const HELP = [
   '/cat export [file] — save a backup (default: ~/.claude-kitten/backups/)',
   '/cat import <file> — load a backup (your current save is backed up first)',
   '/cat weather <city> — real weather; system for device location, off to clear, refresh to update',
-  'In the pane: ‹ › tabs · q back · c s h r b m g t a visible tab shortcuts · f e n feed/pet/nap · p arcade · w cat list',
+  'In the pane: ‹ › tabs · q back · c a s h r b m g t visible tab shortcuts · f e n feed/pet/nap · p arcade · w cat list',
 ].join('\n')
 
 const userHome = async ($: EngineInterface) => (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))

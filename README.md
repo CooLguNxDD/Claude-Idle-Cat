@@ -36,7 +36,7 @@ Then type `/cat` to open the pane.
 | `w` | open/close the cat list |
 | `‹` / `›` in the top bar | previous / next tab; wraps at either end, with tabs fitting on one line |
 | `q` / `↶` in the top bar | go back to the previously visited tab |
-| `c` `s` `h` `r` `b` `m` `g` `t` `a` | shortcuts for visible tabs: Cat · Skills · Home · Friends · Book · Miles · Arcade · Weather · Adopt |
+| `c` `a` `s` `h` `r` `b` `m` `g` `t` | shortcuts for visible tabs: Cat · Adopt · Skills · Home · Friends · Book · Miles · Arcade · Weather |
 | Arcade Display menu / Fullscreen | fit the 320×180 art canvas to the window, choose a 1×–6× size (up to 1080p), or fill the screen |
 
 Saves:
