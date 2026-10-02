@@ -13,7 +13,9 @@ Then type `/cat` to open the pane.
 
 | Command / key | What it does |
 | --- | --- |
-| `/cat` | open the pane |
+| `/cat` (or `/cat show`) | open the pane |
+| `/cat hide` | close the pane (the cats keep earning) |
+| `/cat help` | list the commands |
 | `/cat rename <name>` | rename the active cat |
 | `/cat adopt [name]` | adopt a new cat with random genes (also `a` in the pane) |
 | `/cat switch <name>` | bring another cat front and centre (or click its name) |

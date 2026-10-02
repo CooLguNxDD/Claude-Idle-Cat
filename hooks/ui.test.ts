@@ -5,6 +5,7 @@ test('the pane draws the scene and its buttons work on each surface', async ($, 
   mock.store(on)
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('ui.status', () => ({ value: undefined }))
+  on('ui.close', () => ({ value: undefined }))
   await $.command.run({
     command: 'cat', args: '', origin: { kind: 'composer' },
     presentation: { isFullscreen: true, columns: 160 },
@@ -45,4 +46,23 @@ test('the pane draws the scene and its buttons work on each surface', async ($, 
     await ui.press({ key: 'tab-cat' })
     await ui.unmount()
   }
+})
+
+test('/cat hide closes the pane and unknown words show help', async ($, on) => {
+  mock.clock(on, { now: 1_700_000_000_000 })
+  mock.store(on)
+  const closed: string[] = []
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.close', ($, e) => {
+    closed.push(e.id)
+    return { value: undefined }
+  })
+  const run = (args: string) => $.command.run({
+    command: 'cat', args, origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 160 },
+  })
+  expect((await run('hide')).text).toMatch(/keep earning/)
+  expect(closed).toEqual(['afk-cat'])
+  expect((await run('hlep')).text).toMatch(/\/cat hide/)
+  expect((await run('show')).text).toMatch(/in the pane/)
 })

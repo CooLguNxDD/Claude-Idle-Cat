@@ -90,6 +90,16 @@ const ACTIONS: { action: Action; label: string; hotkey: string }[] = [
 
 const hourOf = (now: number) => new Date(now).getHours()
 
+const HELP = [
+  '/cat (or /cat show) — open the pane',
+  '/cat hide — close the pane (the cats keep earning)',
+  '/cat adopt [name] — adopt from the shelter',
+  '/cat switch <name> — change the active cat',
+  '/cat rename <name> — rename the active cat',
+  '/cat reset — start over (wipes everything)',
+  'In the pane: c s h r b m tabs · f p e n feed/play/pet/nap · a adopt',
+].join('\n')
+
 const readTheme = async ($: EngineInterface) => {
   const row = (await $.config.list()).find(r => r.key === 'theme')
   claudeTheme = typeof row?.value === 'string' ? row.value : 'dark'
@@ -102,7 +112,7 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'cat',
-      description: 'Open your AFK cats (/cat adopt [name], /cat switch <name>, /cat rename <name>, /cat reset)',
+      description: 'Open your AFK cats (/cat hide, /cat adopt [name], /cat switch <name>, /cat rename <name>, /cat reset, /cat help)',
     })
     await readTheme($)
     const saved = (await $.store.get('home')) ?? (await $.store.get('cat'))
@@ -127,8 +137,13 @@ export const register: Register = (on, options) => {
   })
 
   on('command.run', { command: 'cat' }, async ($, e) => {
-    const [sub, ...rest] = e.args.trim().split(/\s+/)
+    const [sub = '', ...rest] = e.args.trim().split(/\s+/)
     const arg = rest.join(' ')
+    if (sub === 'hide' || sub === 'close') {
+      await $.ui.close({ id: PANE })
+      return { text: 'The cats will keep earning while the pane is closed. /cat brings it back.' }
+    }
+    if (sub && !['show', 'open', 'rename', 'adopt', 'switch', 'reset'].includes(sub)) return { text: HELP }
     if (sub === 'rename' && arg) await change($, h => rename(h, arg))
     else if (sub === 'adopt') await change($, (h, t) => adopt(h, t, Math.random, arg || undefined))
     else if (sub === 'switch' && arg) await change($, h => switchTo(h, arg))
