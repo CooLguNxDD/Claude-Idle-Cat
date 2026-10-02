@@ -20,10 +20,11 @@ Then type `/cat` to open the pane.
 | `/cat adopt [name]` | adopt a new cat with random genes (also `a` in the pane) |
 | `/cat switch [name]` | bring another cat front and centre; no name cycles to the next (or pick it from the cat list, `w` in the pane) |
 | `/cat reset` | start over with a new household |
-| `f` `p` `e` `n` | Feed (5c) · Play · Pet · Nap/Wake |
+| `f` `e` `n` | Feed (5c) · Pet · Nap/Wake |
+| `p` | Play: opens the Arcade |
 | `a` | adopt from the shelter |
 | `w` | open/close the cat list |
-| `c` `s` `h` `r` `b` `m` | switch tabs: Cat · Skills · Home · Friends · Book · Miles |
+| `c` `s` `h` `r` `b` `m` `g` | switch tabs: Cat · Skills · Home · Friends · Book · Miles · Arcade |
 
 How the game works:
 - Stats drop and coins build up in real time. Time while you're away counts too, up to 8 hours.
@@ -54,6 +55,12 @@ How the game works:
   - Five Paw Miles tasks a day, such as "pet 3 times" or "Claude runs 10 tools".
   - 16 achievements.
   - A Miles shop with exclusive furniture and a shiny charm.
+- **Arcade tab** (`g`, or Play `p`):
+  - Mini-games that run in the pane at about 30 fps, starring the active cat in its own coat. Click the game to give it the keys; `q` quits a round.
+  - **Rooftop Dash**: jump flowerpots (space/↑), duck pigeons (↓) and grab fish treats while the rooftops speed up.
+  - A round costs 10 energy. Bronze, silver and gold medals pay a few minutes of the household's income plus xp, for 3 paid plays per game a day. Every round adds joy and friendship. One featured game a day pays 2×.
+  - Skills make games easier rather than paying more. For example, Dreamer points slow Dash's speed-up.
+  - Quick play is still there: it tosses the yarn ball for instant joy.
 - **Calendar**:
   - The yard follows the real calendar: snow in winter, cherry petals in spring, fireflies on summer nights, falling leaves in autumn, pumpkins in October and string lights in December.
   - Nyan stocks seasonal furniture only in its season.

@@ -29,7 +29,16 @@ export type Visitor = { id: string; name: string; genes: Genes; arrivedAt: numbe
 
 export type Slot = 'bowl' | 'bed' | 'toy' | 'rug' | 'plant' | 'hanging'
 
-export type View = 'cat' | 'skills' | 'home' | 'friends' | 'book' | 'miles'
+export type View = 'cat' | 'skills' | 'home' | 'friends' | 'book' | 'miles' | 'arcade'
+
+export type GameId = 'dash' | 'catch' | 'laser' | 'whack' | 'tank' | 'lanes'
+// Mini-games: today's paid plays, best scores, and the round in progress (paid only if it was started).
+export type Arcade = {
+  day: number
+  plays: Partial<Record<GameId, number>>
+  best: Partial<Record<GameId, number>>
+  open: { game: GameId; at: number } | null
+}
 
 // What the household has collected, recorded the first time it is seen.
 export type Book = { coats: Coat[]; forms: string[]; shinies: string[]; visitors: string[]; photos: string[] }
@@ -63,6 +72,7 @@ export type Home = {
   celebrated: string[]
   // Catnip bought from Daisy Meow this week; it spoils after Saturday.
   catnip: { week: number; qty: number; paid: number }
+  arcade: Arcade
 }
 
 declare module 'claude-code' {

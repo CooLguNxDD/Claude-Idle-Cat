@@ -51,7 +51,7 @@ export const newHome = (now: number, cat: Cat = newCat('c1', 'Mochi', GINGER, no
   log: `${cat.name} has moved in!`, streak: 0, lastDay: 0, effect: null,
   tier: 0, loan: 0, owned: [...STARTER], decor: { ...STARTER_DECOR }, visitors: [], nextId: 2,
   book: EMPTY_BOOK, pocket: {}, museum: [], miles: EMPTY_MILES, achievements: {}, shinyCharm: false,
-  celebrated: [], catnip: { week: 0, qty: 0, paid: 0 },
+  celebrated: [], catnip: { week: 0, qty: 0, paid: 0 }, arcade: { day: 0, plays: {}, best: {}, open: null },
 })
 
 type OldUpgrades = Partial<{ feeder: number; toy: number; bed: number }>
@@ -83,7 +83,8 @@ export const migrate = (saved: unknown, now: number): Home => {
   const version = (saved as { version?: number }).version
   if (version === 3) {
     const home = saved as Home
-    return { ...base, ...home, cats: home.cats.map(normalizeCat) }
+    // A round left open by a closed session is dropped (its energy stays spent).
+    return { ...base, ...home, cats: home.cats.map(normalizeCat), arcade: { ...base.arcade, ...home.arcade, open: null } }
   }
   if (version === 2) {
     const { upgrades, maxCats: _old, ...v2 } = saved as V2Home & { maxCats?: number }

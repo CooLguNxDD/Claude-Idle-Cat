@@ -71,3 +71,36 @@ test('/cat hide closes the pane and unknown words show help', async ($, on) => {
   expect((await run('hlep')).text).toMatch(/\/cat hide/)
   expect((await run('show')).text).toMatch(/in the pane/)
 })
+
+test('Play opens the arcade, a round runs in a Client and its result pays', async ($, on) => {
+  const clock = mock.clock(on, { now: 1_700_000_000_000 })
+  mock.store(on)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('ui.blit', () => ({ value: {} }))
+  await $.command.run({
+    command: 'cat', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 160 },
+  })
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({
+      plugin: 'afk-cat', surface, component: 'Pane', requestId: 'afk-cat',
+      props: { title: 'AFK Cat', isFocused: true, bodyColumns: 50, placement: 'dock',
+        scroll: { offset: 0, bodyRows: 40 }, view: {} },
+    })
+    await ui.press({ key: 'play' })
+    expect(await ui.find({ key: 'game-dash' })).toBeDefined()
+    await ui.press({ key: 'game-dash' })
+    expect(await ui.find({ key: 'arcade' })).toBeDefined()
+    await ui.advance(100)
+    await ui.key({ key: ' ', in: 'arcade' })
+    await ui.advance(500)
+    expect(await ui.find({ type: 'Text', text: /Rooftop Dash · \d+ pts/, in: 'arcade' })).toBeDefined()
+    await clock.advance(40_000)
+    await ui.post({ kind: 'result', game: 'dash', score: 600, ms: 40_000 }, { in: 'arcade' })
+    expect(await ui.find({ key: 'arcade' })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: /scored 600 in Rooftop Dash · silver medal/ })).toBeDefined()
+    await ui.press({ key: 'tab-cat' })
+    await ui.unmount()
+  }
+})

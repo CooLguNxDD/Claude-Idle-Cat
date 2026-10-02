@@ -2,6 +2,8 @@ import { read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Home, View } from '../types'
+import { GAMES, gameOf } from './arcade/games'
+import { ENERGY_COST, PAID_PLAYS, featured, finishGame, modsFor, parseMessage, playsLeft, quitGame, startGame } from './arcade/rewards'
 import { catArt } from './art'
 import { buyCatnip, marketNow, seasonOf, sellCatnip, weekOf } from './calendar'
 import { ACHIEVEMENTS, MILES_SHOP, buyWithMiles, settle, tasksFor, track } from './collection'
@@ -25,6 +27,8 @@ import { resolveFlavor, uiTokens } from './theme'
 
 const PANE = 'afk-cat'
 const SCENE = 'scene'
+const ARCADE = 'arcade'
+const GAME_ROWS = 16
 const TICK_MS = 10_000
 const FRAME_MS = 125
 const homeRef = { plugin: 'afk-cat', key: 'home' } as const
@@ -37,6 +41,7 @@ const TABS: { view: View; label: string; hotkey: string }[] = [
   { view: 'friends', label: 'Friends', hotkey: 'r' },
   { view: 'book', label: 'Book', hotkey: 'b' },
   { view: 'miles', label: 'Miles', hotkey: 'm' },
+  { view: 'arcade', label: 'Arcade', hotkey: 'g' },
 ]
 const COATS: Coat[] = ['ginger', 'tabby', 'grey', 'black', 'white', 'cream', 'calico', 'tuxedo', 'siamese']
 const FORMS = ['ninja', 'royal', 'cloud', 'chonk']
@@ -84,7 +89,7 @@ const change = async ($: EngineInterface, fn: (home: Home, now: number) => Home)
 
 const ACTIONS: { action: Action; label: string; hotkey: string }[] = [
   { action: 'feed', label: 'Feed 5c', hotkey: 'f' },
-  { action: 'play', label: 'Play', hotkey: 'p' },
+  { action: 'play', label: 'Play ▸', hotkey: 'p' },
   { action: 'pet', label: 'Pet', hotkey: 'e' },
   { action: 'nap', label: 'Nap/Wake', hotkey: 'n' },
 ]
@@ -98,7 +103,7 @@ const HELP = [
   '/cat switch [name] — change the active cat (no name: the next one)',
   '/cat rename <name> — rename the active cat',
   '/cat reset — start over (wipes everything)',
-  'In the pane: c s h r b m tabs · f p e n feed/play/pet/nap · w cat list · a adopt',
+  'In the pane: c s h r b m g tabs · f e n feed/pet/nap · p arcade (mini-games) · w cat list · a adopt',
 ].join('\n')
 
 const readTheme = async ($: EngineInterface) => {
@@ -174,6 +179,20 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+  // A finished or abandoned round, posted by the arcade's surface module.
+  on('ui.message', async ($, e, next) => {
+    if (e.element !== ARCADE) return next(e)
+    const msg = parseMessage(e.data)
+    if (!msg) return {}
+    let wasOpen = false
+    const home = await change($, (h, t) => {
+      wasOpen = h.arcade.open?.game === msg.game
+      return msg.kind === 'quit' ? quitGame(h) : finishGame(h, msg.game, msg.score, msg.ms, t)
+    })
+    if (wasOpen && msg.kind === 'result') $.ui.toast(`🎮 ${home.log}`)
+    return {}
+  })
+
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const ui = $.ui.resolve(e)
     const { Box, Text, Button } = ui
@@ -214,6 +233,44 @@ export const register: Register = (on, options) => {
         <Text color={tone.muted}>{describeGenes(cat.genes)} — {PERSONALITY_INFO[cat.genes.personality]}</Text>
       </Box>
     )
+
+    if (view === 'arcade') {
+      const open = home.arcade.open
+      if (open && 'Client' in ui) {
+        return (
+          <Box flexDirection="column">
+            {tabs}
+            <ui.Client key={ARCADE} module="./arcade/client.tsx" props={{
+              game: open.game, seed: open.at % 2_147_483_647, mods: modsFor(cat), flavor: flavor.name,
+              genes: cat.genes, best: home.arcade.best[open.game] ?? 0, cols, rows: GAME_ROWS,
+            }} />
+            <Button key="arcade-quit" plain label="Quit the round" onPress={() => change($, h => quitGame(h))} />
+          </Box>
+        )
+      }
+      const star = featured(now)
+      return (
+        <Box flexDirection="column">
+          {tabs}
+          <Text bold color={tone.title}>Arcade · {cat.name} plays · {Math.round(cat.energy)} energy</Text>
+          <Text color={tone.muted}>
+            Each round costs {ENERGY_COST} energy. Medals pay coins and xp {PAID_PLAYS}× per game a day; joy every time.
+          </Text>
+          {!('Client' in ui) && <Text color={tone.warn}>The arcade needs the terminal or the desktop app.</Text>}
+          {GAMES.map(g => (
+            <Box flexDirection="column">
+              <Button key={`game-${g.id}`} plain
+                label={`${g.id === star ? '★' : '▸'} ${g.name} · best ${home.arcade.best[g.id] ?? 0} · ${playsLeft(home, g.id, now)}/${PAID_PLAYS} paid left${g.id === star ? ' · 2× today' : ''}`}
+                onPress={() => change($, (h, t) => startGame(h, g.id, t))} />
+              <Text color={tone.muted}>{'   '}{g.blurb} ({g.controls}) · medals {g.medals.join('/')}</Text>
+            </Box>
+          ))}
+          <Button key="quick-play" plain label="▸ Quick play · toss the yarn ball, no game"
+            onPress={() => change($, (h, t) => act(h, 'play', t))} />
+          <Text italic color={tone.log}>{home.log}</Text>
+        </Box>
+      )
+    }
 
     if (view === 'book') {
       const date = new Date(now)
@@ -460,7 +517,7 @@ export const register: Register = (on, options) => {
         <Box>
           {ACTIONS.map(a => (
             <Button key={a.action} label={a.label} hotkey={a.hotkey}
-              onPress={() => change($, (h, t) => act(h, a.action, t))} />
+              onPress={() => (a.action === 'play' ? update($, viewRef, (): View => 'arcade') : change($, (h, t) => act(h, a.action, t)))} />
           ))}
         </Box>
         <Button key="adopt" hotkey="a" plain
