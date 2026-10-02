@@ -3,7 +3,7 @@ import type { Mood } from './game'
 const FACES: Record<Mood, [string, string]> = {
   happy: ['( ^.^ )', '( ^ω^ )'],
   ok: ['( o.o )', '( o.- )'],
-  sad: ['( ;_; )', '( T_T )'],
+  grumpy: ['( -_- )', '( ¬_¬ )'],
   sleeping: ['( -.- ) z', '( -.- ) zZ'],
 }
 

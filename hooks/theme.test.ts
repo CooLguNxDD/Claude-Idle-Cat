@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
-import { newCat } from './game'
-import { frameCells } from './sprite'
+import { newHome } from './game'
+import { frameCells } from './scene'
 import { FLAVORS, FLAVOR_SETTINGS, resolveFlavor, uiTokens } from './theme'
 
 test('auto follows the Claude Code theme', async () => {
@@ -28,7 +28,8 @@ test('palettes carry the official hex values', async () => {
 test('every flavor setting renders a scene', async () => {
   for (const setting of FLAVOR_SETTINGS) {
     for (const hour of [3, 12, 18]) {
-      expect(frameCells(newCat(0), 0, 1, hour, resolveFlavor(setting, 'dark', hour)).length).toBeGreaterThan(0)
+      const flavor = resolveFlavor(setting, 'dark', hour)
+      expect(frameCells({ home: newHome(0), now: 0, tick: 1, hour, flavor, cols: 40 }).length).toBeGreaterThan(0)
     }
   }
 })

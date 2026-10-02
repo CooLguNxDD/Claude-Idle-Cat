@@ -14,13 +14,18 @@ Then type `/cat` to open the pane.
 | Command / key | What it does |
 | --- | --- |
 | `/cat` | open the pane |
-| `/cat rename <name>` | rename the cat |
-| `/cat reset` | start over with a new cat |
+| `/cat rename <name>` | rename the active cat |
+| `/cat adopt [name]` | adopt a new cat with random genes (also `a` in the pane) |
+| `/cat switch <name>` | bring another cat front and centre (or click its name) |
+| `/cat reset` | start over with a new household |
 | `f` `p` `e` `n` | Feed (5c) · Play · Pet · Nap/Wake |
 | `1` `2` `3` | buy Auto-feeder · Yarn toy · Cozy bed |
 
 How the game works:
 - Stats drop and coins build up in real time. Time while you're away counts too, up to 8 hours.
+- Being away never hurts: stats stop at 25, so cats get grumpy but never sad.
+- Every cat has genes: one of 9 coats (ginger, tabby, grey, black, white, cream, calico, tuxedo, siamese), eye color (odd eyes are rare), a personality that changes the rules, and a 1-in-64 chance of being shiny.
+- The household starts with room for 2 cats. Every cat earns coins.
 - Claude helps: +1c for each tool call, and +3c and +2xp each time Claude finishes a reply.
 - A daily check-in bonus grows with your streak (up to 7 days). Random AFK events give extra coins.
 - The cat evolves from kitten to cat (red collar) at level 5, and to chonk (gold crown) at level 10.
@@ -42,11 +47,15 @@ Colors come from [Catppuccin](https://catppuccin.com/). Pick a flavor in `/confi
 
 ```
 .claude-plugin/plugin.json   manifest (plugin name: afk-cat)
-types/index.d.ts             Cat state contract ($.state)
+types/index.d.ts             Home and Cat state contract ($.state)
 hooks/hooks.json             names the hooks module
 hooks/register.tsx           wiring: session.start, /cat, tool.call, turn.complete, Pane render, timers
 hooks/game.ts                pure rules: tick, act, buy, checkIn, evolution
-hooks/sprite.ts              pixel-art scene → Raster cells (two pixels per cell, '▀')
+hooks/scene.ts               pixel-art scene → Raster cells (two pixels per cell, '▀')
+hooks/genes.ts               coats, eyes, personalities, shiny odds, coat painting
+hooks/mods.ts                trait multipliers the rules read
+hooks/rng.ts                 seeded random numbers (repeatable tests)
+hooks/theme.ts               Catppuccin palettes and flavor resolution
 hooks/art.ts                 ASCII fallback
 hooks/*.test.ts              rule tests + a pane mount test
 ```

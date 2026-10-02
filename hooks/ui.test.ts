@@ -16,6 +16,7 @@ test('the pane draws the scene and its buttons work on each surface', async ($, 
         scroll: { offset: 0, bodyRows: 30 }, view: {} },
     })
     if (surface === 'terminal') expect(await ui.find({ key: 'scene' })).toBeDefined()
+    expect(await ui.find({ key: 'adopt' })).toBeDefined()
     await ui.press({ key: 'pet' })
     expect(await ui.find({ type: 'Text', text: /purrs/ })).toBeDefined()
     await ui.unmount()
