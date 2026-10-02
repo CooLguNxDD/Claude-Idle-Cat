@@ -152,6 +152,8 @@ export const frameCells = ({ home, now, tick, hour, flavor: f, cols }: SceneInpu
   if (fresh('yarn', 2)) text(2 + (Math.floor(age * 12) % 22), 10, '@', f.maroon)
   if (fresh('shop', 2)) text(10, 1, 'NEW ITEM!', rainbow(tick))
   if (fresh('adopt', 3)) [...'WELCOME!'].forEach((ch, i) => text(11 + i, 1, ch, rainbow(tick + i)))
+  if (fresh('catch', 3)) text(ox + 6, headRow - 2 - (Math.floor(age * 2) % 2), '!', f.yellow)
+  if (fresh('award', 4)) [...'ACHIEVEMENT!'].forEach((ch, i) => text(10 + i, 0, ch, rainbow(tick + i)))
   if (fresh('welcome', 4)) [...'WELCOME BACK!'].forEach((ch, i) => text(10 + i, 1, ch, rainbow(tick + i)))
   if (fresh('evolve', 3)) [...'EVOLVED!'].forEach((ch, i) => text(12 + i, 1, ch, rainbow(tick + i)))
   if (fresh('levelup', 3)) [...'LEVEL UP!'].forEach((ch, i) => text(12 + i, 1, ch, rainbow(tick + i)))

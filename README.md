@@ -20,7 +20,7 @@ Then type `/cat` to open the pane.
 | `/cat reset` | start over with a new household |
 | `f` `p` `e` `n` | Feed (5c) · Play · Pet · Nap/Wake |
 | `a` | adopt from the shelter |
-| `c` `s` `h` `r` | switch tabs: Cat · Skills · Home · Friends |
+| `c` `s` `h` `r` `b` `m` | switch tabs: Cat · Skills · Home · Friends · Book · Miles |
 
 How the game works:
 - Stats drop and coins build up in real time. Time while you're away counts too, up to 8 hours.
@@ -43,6 +43,14 @@ How the game works:
   - You can give each cat one gift a day. Every personality has a favorite, and you find out which by trying.
   - Friendship unlocks a nickname for you (level 3), a catchphrase (level 4) and a photo (level 6).
   - Cats talk. What they say changes through the day, and they remember a favorite gift for a couple of days.
+- **Book tab** (`b`):
+  - While you're away, cats bring home critters: 16 bugs, fish and mice that follow real seasons and hours, as in Animal Crossing. The Hunter branch raises the odds.
+  - Donate one of each to the museum for Paw Miles, and sell extras for coins.
+  - The cat book records every coat, form, shiny, stray and best-friend photo you've seen.
+- **Miles tab** (`m`):
+  - Five Paw Miles tasks a day, such as "pet 3 times" or "Claude runs 10 tools".
+  - 16 achievements.
+  - A Miles shop with exclusive furniture and a shiny charm.
 - When you come back after 30+ minutes, the cats greet you with **WELCOME BACK!** and a summary of what happened while you were away.
 
 Progress is saved in the plugin's `$.store`, so it carries over between sessions.
@@ -72,6 +80,8 @@ hooks/skills.ts              skill tree, points, evolution forms
 hooks/home.ts                furniture catalog, daily shop, house tiers, Tom Mew loan
 hooks/visitors.ts            strays: arrivals by decor pull, gifts, departures
 hooks/friends.ts             friendship levels, daily gifts, dialogue and memory
+hooks/critters.ts            seasonal critters, finding, museum donations, selling
+hooks/collection.ts          cat book, Paw Miles tasks, achievements, miles shop
 hooks/rng.ts                 seeded random numbers (repeatable tests)
 hooks/theme.ts               Catppuccin palettes and flavor resolution
 hooks/art.ts                 ASCII fallback

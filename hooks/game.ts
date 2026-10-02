@@ -1,7 +1,10 @@
 import type { Cat, EffectKind, Genes, Home, Slot } from '../types'
+import { EMPTY_BOOK, EMPTY_MILES, track } from './collection'
+import type { Counter } from './collection'
+import { addToPocket, critter, donate, findCritters } from './critters'
 import { NEW_FRIEND, befriend, giftById, levelName, receiveGift } from './friends'
 import { GINGER, rollGenes } from './genes'
-import { STARTER, homeMods, maxCats, repayFromIncome } from './home'
+import { STARTER, buyFurniture, homeMods, maxCats, repayFromIncome } from './home'
 import { modsOf } from './mods'
 import { pick } from './rng'
 import { FORM_LEVEL, canLearn, formOf, learn, respecPrice } from './skills'
@@ -45,6 +48,7 @@ export const newHome = (now: number, cat: Cat = newCat('c1', 'Mochi', GINGER, no
   version: 3, coins: 10, cats: [cat], activeId: cat.id, lastTick: now, frame: 0,
   log: `${cat.name} has moved in!`, streak: 0, lastDay: 0, effect: null,
   tier: 0, loan: 0, owned: [...STARTER], decor: { ...STARTER_DECOR }, visitors: [], nextId: 2,
+  book: EMPTY_BOOK, pocket: {}, museum: [], miles: EMPTY_MILES, achievements: {}, shinyCharm: false,
 })
 
 type OldUpgrades = Partial<{ feeder: number; toy: number; bed: number }>
@@ -172,6 +176,15 @@ export const tick = (home: Home, now: number, rng: Rng = Math.random): Home => {
     next = { ...next, coins: next.coins + gift, effect: fx('coins', now),
       log: `${finder.name} ${pick(rng, AFK_EVENTS)}! +${gift}c` }
   }
+  const date = new Date(now)
+  const found = findCritters(home, min, date.getMonth() + 1, date.getHours(), rng, home.cats.map(c => modsOf(c).eventRate))
+  if (found.length > 0) {
+    const names = found.map(id => critter(id)?.name ?? id)
+    const who = pick(rng, home.cats).name
+    next = track({ ...addToPocket(next, found), effect: fx('catch', now),
+      log: found.length === 1 ? `${who} brought home a ${names[0]}!` : `The cats brought home ${found.length} critters!` },
+    'catch', found.length, now)
+  }
   return stepVisitors(next, now, min, rng)
 }
 
@@ -186,8 +199,14 @@ export const checkIn = (home: Home, now: number): { home: Home; bonus: number } 
     log: `Day ${streak} streak! The cats bring you ${bonus}c.` } }
 }
 
-// Feed, play, pet or nap the active cat.
+// Feed, play, pet or nap the active cat; each one counts toward today's Paw Miles.
 export const act = (home: Home, action: Action, now: number): Home => {
+  const done = care(home, action, now)
+  // Only a successful action sets a new effect.
+  return action !== 'nap' && done.effect !== home.effect ? track(done, action as Counter, 1, now) : done
+}
+
+const care = (home: Home, action: Action, now: number): Home => {
   const cat = activeCat(home)
   const m = modsOf(cat)
   if (action === 'nap') {
@@ -219,8 +238,10 @@ export const adopt = (home: Home, now: number, rng: Rng = Math.random, name?: st
   if (home.coins < price) return { ...home, log: `Adoption costs ${price}c.` }
   const taken = new Set(home.cats.map(c => c.name))
   const free = NAMES.filter(n => !taken.has(n))
-  const cat = newCat(`c${home.nextId}`, name?.slice(0, 20) || pick(rng, free.length ? free : NAMES), rollGenes(rng), now)
+  const genes = { ...rollGenes(rng), ...(home.shinyCharm ? { isShiny: true } : {}) }
+  const cat = newCat(`c${home.nextId}`, name?.slice(0, 20) || pick(rng, free.length ? free : NAMES), genes, now)
   return { ...home, coins: home.coins - price, cats: [...home.cats, cat], activeId: cat.id, nextId: home.nextId + 1,
+    shinyCharm: false,
     effect: fx('adopt', now), log: `Welcome home, ${cat.name}!${cat.genes.isShiny ? ' ✨ A shiny cat!' : ''}` }
 }
 
@@ -280,8 +301,18 @@ export const giveGift = (home: Home, giftId: string, now: number): Home => {
   const after = levelName(result.cat.friendship)
   const loved = gift.loves === cat.genes.personality ? ' It was their favorite!' : ''
   const up = after !== before ? ` You are now: ${after}.` : ''
-  return withCat({ ...home, coins: home.coins - gift.price, effect: fx('gift', now),
-    log: `${cat.name} got a ${gift.name} (+${result.points}).${loved}${up}` }, cat.id, () => result.cat)
+  return track(withCat({ ...home, coins: home.coins - gift.price, effect: fx('gift', now),
+    log: `${cat.name} got a ${gift.name} (+${result.points}).${loved}${up}` }, cat.id, () => result.cat), 'gift', 1, now)
+}
+
+export const buyItem = (home: Home, id: string, now: number, hour: number): Home => {
+  const next = buyFurniture(home, id, now, hour)
+  return next.owned.length > home.owned.length ? track(next, 'buy', 1, now) : next
+}
+
+export const donateCritter = (home: Home, id: string, now: number): Home => {
+  const next = donate(home, id)
+  return next.museum.length > home.museum.length ? track(next, 'donate', 1, now) : next
 }
 
 // Coming back after a while: the cats greet you and report what happened.

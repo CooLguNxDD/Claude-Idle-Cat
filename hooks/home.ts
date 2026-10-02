@@ -5,6 +5,8 @@ export type HomeMods = { coin: number; regen: number; autoFeed: boolean; eventRa
 export type Furniture = {
   id: string; name: string; slot: Slot; price: number; perk: string
   mods: Partial<HomeMods>; bait: number; likes?: Personality
+  // Paw Miles-only items never appear in Nyan's stock.
+  miles?: number
 }
 
 // Starter items cost nothing and are owned from day one.
@@ -26,10 +28,13 @@ export const CATALOG: readonly Furniture[] = [
   { id: 'birds', name: 'Bird feeder', slot: 'hanging', price: 150, perk: '+50% AFK events', mods: { eventRate: 1.5 }, bait: 3, likes: 'curious' },
   { id: 'lantern', name: 'Paper lantern', slot: 'hanging', price: 120, perk: 'glows at night', mods: {}, bait: 2, likes: 'lazy' },
   { id: 'chime', name: 'Wind chime', slot: 'hanging', price: 90, perk: '+20% gifts', mods: { gift: 1.2 }, bait: 2, likes: 'shy' },
+  { id: 'goldbowl', name: 'Golden bowl', slot: 'bowl', price: 0, miles: 800, perk: 'auto-feeds, +50% gifts', mods: { autoFeed: true, gift: 1.5 }, bait: 5, likes: 'greedy' },
+  { id: 'rainbow', name: 'Rainbow rug', slot: 'rug', price: 0, miles: 1000, perk: 'joy fades 40% slower', mods: { joyDecay: 0.6 }, bait: 4, likes: 'cuddly' },
+  { id: 'moonlamp', name: 'Moon lamp', slot: 'hanging', price: 0, miles: 1200, perk: 'double AFK events', mods: { eventRate: 2 }, bait: 4, likes: 'curious' },
 ]
 const BY_ID = new Map(CATALOG.map(f => [f.id, f]))
 export const furniture = (id: string | undefined) => (id ? BY_ID.get(id) : undefined)
-export const STARTER = CATALOG.filter(f => f.price === 0).map(f => f.id)
+export const STARTER = CATALOG.filter(f => f.price === 0 && !f.miles).map(f => f.id)
 
 // House tiers, paid off through Tom Mew's interest-free loan.
 export const TIERS = [

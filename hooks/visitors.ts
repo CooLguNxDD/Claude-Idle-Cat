@@ -1,4 +1,5 @@
 import type { Home, Personality, Visitor } from '../types'
+import { track } from './collection'
 import { PERSONALITIES, rollGenes } from './genes'
 import { baitOf, homeMods } from './home'
 import { pick, weighted } from './rng'
@@ -45,8 +46,8 @@ export const stepVisitors = (home: Home, now: number, minutes: number, rng: Rng)
       id: `v${next.nextId}`, name: pick(rng, free.length ? free : STRAYS), genes,
       arrivedAt: now, leavesAt: now + (2 + 4 * rng()) * HOUR, gift,
     }
-    next = { ...next, nextId: next.nextId + 1, visitors: [...next.visitors, visitor], effect: { kind: 'visitor', at: now },
-      log: `${visitor.name} the ${genes.coat} cat wandered into the yard!${genes.isShiny ? ' ✨' : ''}` }
+    next = track({ ...next, nextId: next.nextId + 1, visitors: [...next.visitors, visitor], effect: { kind: 'visitor', at: now },
+      log: `${visitor.name} the ${genes.coat} cat wandered into the yard!${genes.isShiny ? ' ✨' : ''}` }, 'visitor', 1, now)
   }
   if (missed > 0) next = { ...next, coins: next.coins + missed, log: `Strays visited while you were away: +${missed}c` }
   return next

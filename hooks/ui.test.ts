@@ -35,6 +35,12 @@ test('the pane draws the scene and its buttons work on each surface', async ($, 
     }
     expect(await ui.find({ type: 'Text', text: /House ·/ })).toBeDefined()
     expect(await ui.find({ key: 'pay' })).toBeDefined()
+    await ui.press({ key: 'tab-book' })
+    expect(await ui.find({ type: 'Text', text: /Museum ·/ })).toBeDefined()
+    await ui.press({ key: 'tab-miles' })
+    expect(await ui.find({ type: 'Text', text: /Paw Miles/ })).toBeDefined()
+    await ui.press({ key: 'miles-charm' })
+    expect(await ui.find({ type: 'Text', text: /miles\./ })).toBeDefined()
     await ui.press({ key: 'tab-cat' })
     await ui.unmount()
   }

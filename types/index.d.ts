@@ -1,4 +1,4 @@
-export type EffectKind = 'hearts' | 'fish' | 'yarn' | 'coins' | 'levelup' | 'evolve' | 'shop' | 'adopt' | 'visitor' | 'welcome' | 'gift'
+export type EffectKind = 'hearts' | 'fish' | 'yarn' | 'coins' | 'levelup' | 'evolve' | 'shop' | 'adopt' | 'visitor' | 'welcome' | 'gift' | 'catch' | 'award'
 export type Effect = { kind: EffectKind; at: number }
 
 export type Coat = 'ginger' | 'tabby' | 'grey' | 'black' | 'white' | 'cream' | 'calico' | 'tuxedo' | 'siamese'
@@ -29,7 +29,12 @@ export type Visitor = { id: string; name: string; genes: Genes; arrivedAt: numbe
 
 export type Slot = 'bowl' | 'bed' | 'toy' | 'rug' | 'plant' | 'hanging'
 
-export type View = 'cat' | 'skills' | 'home' | 'friends'
+export type View = 'cat' | 'skills' | 'home' | 'friends' | 'book' | 'miles'
+
+// What the household has collected, recorded the first time it is seen.
+export type Book = { coats: Coat[]; forms: string[]; shinies: string[]; visitors: string[]; photos: string[] }
+// Paw Miles: today's task counters, which tasks paid out, and the running total.
+export type Miles = { total: number; day: number; counts: Record<string, number>; done: string[] }
 
 export type Home = {
   version: 3
@@ -48,6 +53,12 @@ export type Home = {
   decor: Partial<Record<Slot, string>>
   visitors: Visitor[]
   nextId: number
+  book: Book
+  pocket: Record<string, number>
+  museum: string[]
+  miles: Miles
+  achievements: Record<string, number>
+  shinyCharm: boolean
 }
 
 declare module 'claude-code' {

@@ -3,14 +3,18 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Home, View } from '../types'
 import { catArt } from './art'
-import { act, activeCat, adopt, adoptPrice, adoptVisitor, bar, checkIn, coinRate, giveGift, learnSkill, migrate,
-  moodOf, newHome, rename, respec, reward, stageName, switchTo, tick, welcomeBack, xpToNext } from './game'
+import { ACHIEVEMENTS, MILES_SHOP, buyWithMiles, settle, tasksFor, track } from './collection'
+import { CRITTERS, critter, isAvailable, sell } from './critters'
+import { act, activeCat, adopt, adoptPrice, adoptVisitor, bar, buyItem, checkIn, coinRate, donateCritter, giveGift,
+  learnSkill, migrate, moodOf, newHome, rename, respec, reward, stageName, switchTo, tick, welcomeBack,
+  xpToNext } from './game'
 import { CATCHPHRASE_LEVEL, DAILY_CAP, GIFTS, LEVELS, NICKNAME_LEVEL, PHOTO_LEVEL, dayOf, dialogue, friendLevel,
   levelName, toNextLevel } from './friends'
 import type { Action } from './game'
 import { PERSONALITY_INFO, describeGenes } from './genes'
-import { LOAN_SHARE, SHOP_CLOSE, SHOP_OPEN, TIERS, baitOf, buyFurniture, dailyStock, furniture, isShopOpen, maxCats,
-  payLoan, place, takeLoan, tierOf } from './home'
+import type { Coat } from '../types'
+import { LOAN_SHARE, SHOP_CLOSE, SHOP_OPEN, TIERS, baitOf, dailyStock, furniture, isShopOpen, maxCats, payLoan, place,
+  takeLoan, tierOf } from './home'
 import { ROWS, frameCells, sceneCols } from './scene'
 import { BRANCHES, FORM_LEVEL, SKILLS, branchPoints, canLearn, formOf, freePoints, rankOf, respecPrice } from './skills'
 import type { Branch } from './skills'
@@ -27,7 +31,11 @@ const TABS: { view: View; label: string; hotkey: string }[] = [
   { view: 'skills', label: 'Skills', hotkey: 's' },
   { view: 'home', label: 'Home', hotkey: 'h' },
   { view: 'friends', label: 'Friends', hotkey: 'r' },
+  { view: 'book', label: 'Book', hotkey: 'b' },
+  { view: 'miles', label: 'Miles', hotkey: 'm' },
 ]
+const COATS: Coat[] = ['ginger', 'tabby', 'grey', 'black', 'white', 'cream', 'calico', 'tuxedo', 'siamese']
+const FORMS = ['ninja', 'royal', 'cloud', 'chonk']
 
 // Latest home and scene width for the animation loop, which repaints without a render pass.
 let latest: Home | null = null
@@ -40,8 +48,18 @@ let claudeTheme = 'dark'
 const change = async ($: EngineInterface, fn: (home: Home, now: number) => Home) => {
   const now = await $.clock.now()
   let home!: Home
-  await update($, homeRef, prev => (home = fn(prev ?? newHome(now), now)))
+  let before!: Home
+  await update($, homeRef, prev => {
+    before = prev ?? newHome(now)
+    return (home = settle(fn(before, now), now))
+  })
   latest = home
+  for (const a of ACHIEVEMENTS) if (!(a.id in before.achievements) && a.id in home.achievements) $.ui.toast(`🏆 ${a.name}: ${a.text} (+${a.miles} miles)`)
+  for (const t of tasksFor(now)) {
+    if (!before.miles.done.includes(t.id) && home.miles.done.includes(t.id) && home.miles.day === before.miles.day) {
+      $.ui.toast(`🐾 ${t.text} (+${t.miles} miles)`)
+    }
+  }
   await $.store.set('home', home)
   const cat = activeCat(home)
   $.ui.status(`🐱 ${cat.name} Lv${cat.level} ${moodOf(cat)} · ${Math.floor(home.coins)}c`)
@@ -113,12 +131,12 @@ export const register: Register = (on, options) => {
 
   on('tool.call', async ($, e, next) => {
     const ran = await next(e)
-    void change($, h => reward(h, 1))
+    void change($, (h, t) => track(reward(h, 1), 'tools', 1, t))
     return ran
   })
 
   on('turn.complete', async ($, e, next) => {
-    void change($, (h, t) => ({ ...reward(h, 3, 2, t), effect: { kind: 'coins', at: t } }))
+    void change($, (h, t) => track({ ...reward(h, 3, 2, t), effect: { kind: 'coins', at: t } }, 'turns', 1, t))
     return next(e)
   })
 
@@ -161,6 +179,70 @@ export const register: Register = (on, options) => {
         <Text color={tone.muted}>{describeGenes(cat.genes)} — {PERSONALITY_INFO[cat.genes.personality]}</Text>
       </Box>
     )
+
+    if (view === 'book') {
+      const date = new Date(now)
+      const month = date.getMonth() + 1
+      const pocket = Object.entries(home.pocket)
+      return (
+        <Box flexDirection="column">
+          {tabs}
+          <Text bold color={tone.title}>Museum · {home.museum.length}/{CRITTERS.length} donated</Text>
+          <Text color={tone.muted}>
+            {CRITTERS.map(c => (home.museum.includes(c.id) ? c.name : isAvailable(c, month, date.getHours()) ? '??? (out now)' : '???')).join(' · ')}
+          </Text>
+          <Text bold color={tone.accent}>Pocket (critters the cats brought home)</Text>
+          {pocket.length === 0 && <Text color={tone.muted}>Empty. Cats find critters while you're away, by season and hour.</Text>}
+          {pocket.map(([id, n]) => (
+            <Box>
+              <Text>{critter(id)?.name} ×{n} </Text>
+              {!home.museum.includes(id) && (
+                <Button key={`donate-${id}`} plain label="Donate" onPress={() => change($, (h, t) => donateCritter(h, id, t))} />
+              )}
+              <Button key={`sell-${id}`} plain label={` Sell ${critter(id)?.value}c`} onPress={() => change($, h => sell(h, id))} />
+            </Box>
+          ))}
+          <Text bold color={tone.accent}>Cat book</Text>
+          <Text>Coats {home.book.coats.length}/9: {COATS.map(c => (home.book.coats.includes(c) ? c : '???')).join(' · ')}</Text>
+          <Text>Forms {home.book.forms.length}/4: {FORMS.map(f => (home.book.forms.includes(f) ? f : '???')).join(' · ')}</Text>
+          <Text>Shinies: {home.book.shinies.join(', ') || 'none yet'} · strays met: {home.book.visitors.length}</Text>
+          <Text>Photos: {home.book.photos.map(n => `📷 ${n}`).join('  ') || 'none yet (reach Best friend)'}</Text>
+          <Text italic color={tone.log}>{home.log}</Text>
+        </Box>
+      )
+    }
+
+    if (view === 'miles') {
+      const tasks = tasksFor(now)
+      const counts = home.miles.day === dayOf(now) ? home.miles.counts : {}
+      const done = home.miles.day === dayOf(now) ? home.miles.done : []
+      return (
+        <Box flexDirection="column">
+          {tabs}
+          <Text bold color={tone.title}>Paw Miles: {home.miles.total} · today's tasks reset at midnight</Text>
+          {tasks.map(t => (
+            <Text color={done.includes(t.id) ? tone.ok : undefined}>
+              {done.includes(t.id) ? '✓' : '·'} {t.text} ({Math.min(counts[t.counter] ?? 0, t.goal)}/{t.goal}) · {t.miles} miles
+            </Text>
+          ))}
+          <Text bold color={tone.accent}>
+            Achievements {Object.keys(home.achievements).length}/{ACHIEVEMENTS.length}
+          </Text>
+          {ACHIEVEMENTS.map(a => (
+            <Text color={a.id in home.achievements ? tone.ok : tone.muted}>
+              {a.id in home.achievements ? '🏆' : '· '} {a.name} — {a.text} · {a.miles} miles
+            </Text>
+          ))}
+          <Text bold color={tone.accent}>Miles shop</Text>
+          {MILES_SHOP.map(item => (
+            <Button key={`miles-${item.id}`} plain
+              label={`${home.owned.includes(item.id) || (item.id === 'charm' && home.shinyCharm) ? '✓' : ' '} ${item.name} · ${item.cost} miles · ${item.text}`}
+              onPress={() => change($, h => buyWithMiles(h, item.id))} />
+          ))}
+          <Text italic color={tone.log}>{home.log}</Text>
+        </Box>
+      )
+    }
 
     if (view === 'friends') {
       const day = dayOf(now)
@@ -244,7 +326,7 @@ export const register: Register = (on, options) => {
           {stock.map(item => (
             <Button key={`buy-${item.id}`} plain
               label={`${home.owned.includes(item.id) ? '✓' : ' '} ${item.name} · ${item.price}c · ${item.slot} · ${item.perk}`}
-              onPress={() => change($, (h, t) => buyFurniture(h, item.id, t, hourOf(t)))} />
+              onPress={() => change($, (h, t) => buyItem(h, item.id, t, hourOf(t)))} />
           ))}
           <Text italic color={tone.log}>{home.log}</Text>
         </Box>
