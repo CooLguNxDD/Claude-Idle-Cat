@@ -1,6 +1,7 @@
 import type { Cat, Home } from '../types'
 import { activeCat, moodOf, stageOf } from './game'
 import { coatPixel } from './genes'
+import { tierOf } from './home'
 import { formOf } from './skills'
 import type { Form } from './skills'
 import { dayPartOf, inkOf, mix } from './theme'
@@ -81,23 +82,28 @@ export const frameCells = ({ home, now, tick, hour, flavor: f, cols }: SceneInpu
     const sun = isDusk ? f.peach : f.yellow
     for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++) put(sx + dx, 1 + dy + (isDusk ? 2 : 0), sun)
   }
+  // Back fence: strays and spare cats sit on top of it.
+  const wood = mix(f.peach, f.surface2, 0.55)
+  for (let x = 0; x < W; x++) {
+    for (const y of [15, 18]) put(x, y, wood)
+    if (x % 6 === 0) for (let y = 14; y < FLOOR_Y; y++) put(x, y, mix(wood, f.crust, 0.25))
+  }
   for (let y = FLOOR_Y; y < H; y++) {
     for (let x = 0; x < W; x++) put(x, y, (x + y * 3) % 7 === 0 ? mix(f.peach, f.crust, 0.6) : mix(f.peach, f.crust, 0.4))
   }
 
-  // Food bowl, with a fish in it right after a feeding.
   const age = home.effect ? (now - home.effect.at) / 1000 : 99
   const fresh = (kind: string, secs: number) => home.effect?.kind === kind && age < secs
   const bx = W - 9
-  for (let x = bx; x <= bx + 5; x++) put(x, 20, f.blue)
-  for (let x = bx + 1; x <= bx + 4; x++) put(x, 21, f.blue)
-  if (fresh('fish', 3)) for (let x = bx + 1; x <= bx + 4; x++) put(x, 19, f.peach)
+  drawDecor(home, W, bx, tick, isNight, fresh('fish', 3), f, put)
 
-  // The rest of the household sits around the room.
+  // One spare cat naps on the bed; other spare cats and visiting strays sit on the fence.
   const cat = activeCat(home)
   const others = home.cats.filter(c => c.id !== cat.id)
-  const spots = [1, 26, 34, 42].filter(x => x + 6 < bx)
-  others.slice(0, spots.length).forEach((other, i) => drawMini(other, spots[i] ?? 1, FLOOR_Y - 5, tick + i * 7, f, put))
+  if (others[0]) drawMini(others[0], 1, FLOOR_Y - 5, tick, f, put)
+  const fence = [26, 33, 40, 47].filter(x => x + 6 < W - 6)
+  const sitters = [...others.slice(1), ...home.visitors]
+  sitters.slice(0, fence.length).forEach((c, i) => drawMini(c, fence[i] ?? 26, 9, tick + i * 7, f, put))
 
   // The active cat: breathing bob, blinking, mood face, stage accessories.
   const mood = moodOf(cat)
@@ -200,8 +206,51 @@ const drawFormFront = (form: Form | null, ox: number, oy: number, tick: number, 
   }
 }
 
-const drawMini = (cat: Cat, x0: number, y0: number, tick: number, f: Flavor, put: Put) => {
-  const isBlink = cat.isAsleep || tick % 40 < 2
+// Each placed item in its slot; the bowl sits at bx.
+const drawDecor = (home: Home, W: number, bx: number, tick: number, isNight: boolean, isFed: boolean, f: Flavor, put: Put) => {
+  const decor = home.decor
+  const slots = tierOf(home).slots
+  const has = (id: string) => slots.some(slot => decor[slot] === id)
+  const rect = (x0: number, y0: number, w: number, h: number, c: number) => {
+    for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) put(x, y, c)
+  }
+  // Rug under the active cat.
+  if (has('rug')) for (let x = 6; x <= 22; x++) put(x, FLOOR_Y, x % 3 ? f.pink : f.flamingo)
+  if (has('quilt')) for (let x = 5; x <= 23; x++) for (const y of [FLOOR_Y, FLOOR_Y + 1]) put(x, y, [f.teal, f.pink, f.yellow][(x + y) % 3] ?? f.teal)
+  // Bed on the left, where a spare cat naps.
+  if (has('box')) { rect(0, 17, 8, 4, mix(f.peach, f.yellow, 0.4)); rect(1, 17, 6, 1, mix(f.peach, f.crust, 0.4)) }
+  if (has('cozy')) { rect(0, 19, 8, 2, f.mauve); rect(1, 18, 6, 1, f.lavender) }
+  if (has('heated')) { rect(0, 19, 8, 2, f.red); rect(1, 18, 6, 1, tick % 16 < 8 ? f.peach : f.yellow) }
+  // Plant between the cat and the bowl.
+  const px0 = 26
+  if (px0 + 3 < bx) {
+    if (has('cactus')) { rect(px0 + 1, 15, 1, 5, f.green); put(px0, 16, f.green); put(px0 + 2, 17, f.green); rect(px0, 20, 3, 1, f.maroon) }
+    if (has('catnip')) { rect(px0, 15, 3, 3, f.green); put(px0 + 1, 14, f.teal); rect(px0, 18, 3, 3, f.maroon) }
+  }
+  // Toys.
+  const tx = Math.min(bx - 4, 30)
+  if (has('yarn')) rect(tx, 19, 2, 2, f.maroon)
+  if (has('wand')) { for (let i = 0; i < 5; i++) put(tx + Math.floor(i / 2), 20 - i, f.overlay2); rect(tx + 2, 14, 2, 2, f.pink) }
+  if (has('laser')) put(Math.abs((tick % (2 * W)) - W), FLOOR_Y + 1, f.red)
+  if (has('tree')) { rect(W - 2, 8, 2, 13, mix(f.peach, f.crust, 0.3)); rect(W - 5, 8, 5, 1, f.surface2); rect(W - 5, 14, 5, 1, f.surface2) }
+  // Bowl or feeder.
+  const bowl = has('sushi') ? f.red : f.blue
+  for (let x = bx; x <= bx + 5; x++) put(x, 20, bowl)
+  for (let x = bx + 1; x <= bx + 4; x++) put(x, 21, bowl)
+  if (has('feeder') || has('sushi')) rect(bx + 1, 15, 4, 5, has('sushi') ? f.rosewater : f.sapphire)
+  if (isFed) for (let x = bx + 1; x <= bx + 4; x++) put(x, 19, f.peach)
+  // Something hanging from above.
+  const hx = W - 16
+  if (has('birds')) {
+    rect(hx + 1, 0, 1, 4, f.overlay1); rect(hx, 4, 3, 2, f.maroon)
+    put(hx - 1 + (tick % 12 < 6 ? 0 : -1), 5, f.blue); put(hx + 3 + (tick % 10 < 5 ? 0 : 1), 4, f.yellow)
+  }
+  if (has('lantern')) { rect(hx + 1, 0, 1, 3, f.overlay1); rect(hx, 3, 3, 3, isNight ? (tick % 12 < 6 ? f.yellow : f.peach) : f.red) }
+  if (has('chime')) { rect(hx, 1, 4, 1, f.overlay1); for (const dx of [0, 1, 2, 3]) rect(hx + dx, 2, 1, 2 + ((dx + (tick >> 2)) % 3), f.sky) }
+}
+
+const drawMini = (cat: Pick<Cat, 'genes'> & { isAsleep?: boolean }, x0: number, y0: number, tick: number, f: Flavor, put: Put) => {
+  const isBlink = cat.isAsleep === true || tick % 40 < 2
   MINI.forEach((row, y) =>
     [...row].forEach((ch, x) => {
       if (ch === 'o') return put(x0 + x, y0 + y, inkOf(f))

@@ -1,8 +1,8 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Home } from '../types'
-import { DECAY_FLOOR, act, activeCat, adopt, buy, checkIn, coinRate, migrate, moodOf, newHome, priceOf, stageOf,
-  switchTo, tick } from './game'
+import { DECAY_FLOOR, act, activeCat, adopt, checkIn, coinRate, migrate, moodOf, newHome, stageOf, switchTo,
+  tick } from './game'
 import { seeded } from './rng'
 import { ROWS, frameCells } from './scene'
 import { FLAVORS } from './theme'
@@ -43,10 +43,8 @@ test('xp levels up and evolves the cat', async () => {
   expect(stageOf(10)).toBe('cat')
 })
 
-test('shop prices grow and the auto-feeder feeds every hungry cat', async () => {
-  const once = buy(rich(newHome(0)), 'feeder', 1)
-  expect(once.upgrades.feeder).toBe(1)
-  expect(priceOf(once, 'feeder')).toBeGreaterThan(priceOf(newHome(0), 'feeder'))
+test('a placed auto-feeder feeds every hungry cat', async () => {
+  const once: Home = { ...rich(newHome(0)), owned: [...newHome(0).owned, 'feeder'], decor: { ...newHome(0).decor, bowl: 'feeder' } }
   const two = adopt(once, 1, seeded(1))
   const hungry = { ...two, lastTick: 0, cats: two.cats.map(c => ({ ...c, hunger: 10 })) }
   expect(tick(hungry, 60_000, noEvents).cats.every(c => c.hunger > 30)).toBe(true)
@@ -79,15 +77,23 @@ test('a v0.2 save migrates into a household without losing progress', async () =
   }
   const home = migrate(v1, 9_000)
   const cat = activeCat(home)
-  expect(home.version).toBe(2)
+  expect(home.version).toBe(3)
   expect(home.coins).toBe(812.5)
   expect(home.streak).toBe(3)
-  expect(home.upgrades.toy).toBe(2)
+  expect(home.decor.bowl).toBe('feeder')
+  expect(home.decor.toy).toBe('wand')
+  expect(home.owned).toContain('box')
   expect(cat.name).toBe('Mochi')
   expect(cat.level).toBe(9)
   expect(cat.xp).toBe(30)
   expect(cat.genes.coat).toBe('ginger')
   expect(migrate(home, 10_000)).toEqual(home)
+  const v2 = { ...home, version: 2, maxCats: 2, upgrades: { bed: 3 } } as unknown
+  const fromV2 = migrate(v2, 10_000)
+  expect(fromV2.version).toBe(3)
+  expect(fromV2.decor.bed).toBe('heated')
+  expect(fromV2.nextId).toBe(2)
+  expect('maxCats' in fromV2).toBe(false)
   expect(migrate(undefined, 1).cats.length).toBe(1)
 })
 

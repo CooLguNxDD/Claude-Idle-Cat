@@ -1,6 +1,5 @@
-export type EffectKind = 'hearts' | 'fish' | 'yarn' | 'coins' | 'levelup' | 'evolve' | 'shop' | 'adopt'
+export type EffectKind = 'hearts' | 'fish' | 'yarn' | 'coins' | 'levelup' | 'evolve' | 'shop' | 'adopt' | 'visitor'
 export type Effect = { kind: EffectKind; at: number }
-export type Upgrades = { feeder: number; toy: number; bed: number }
 
 export type Coat = 'ginger' | 'tabby' | 'grey' | 'black' | 'white' | 'cream' | 'calico' | 'tuxedo' | 'siamese'
 export type Eyes = 'green' | 'blue' | 'yellow' | 'odd'
@@ -21,21 +20,30 @@ export type Cat = {
   skills: Record<string, number>
 }
 
-export type View = 'cat' | 'skills'
+// A stray in the yard: it stays a while, leaves a gift, and can be adopted.
+export type Visitor = { id: string; name: string; genes: Genes; arrivedAt: number; leavesAt: number; gift: number }
+
+export type Slot = 'bowl' | 'bed' | 'toy' | 'rug' | 'plant' | 'hanging'
+
+export type View = 'cat' | 'skills' | 'home'
 
 export type Home = {
-  version: 2
+  version: 3
   coins: number
   cats: Cat[]
   activeId: string
-  maxCats: number
   lastTick: number
   frame: number
   log: string
   streak: number
   lastDay: number
-  upgrades: Upgrades
   effect: Effect | null
+  tier: number
+  loan: number
+  owned: string[]
+  decor: Partial<Record<Slot, string>>
+  visitors: Visitor[]
+  nextId: number
 }
 
 declare module 'claude-code' {

@@ -19,14 +19,19 @@ Then type `/cat` to open the pane.
 | `/cat switch <name>` | bring another cat front and centre (or click its name) |
 | `/cat reset` | start over with a new household |
 | `f` `p` `e` `n` | Feed (5c) · Play · Pet · Nap/Wake |
-| `1` `2` `3` | buy Auto-feeder · Yarn toy · Cozy bed |
-| `c` `s` | switch tabs: Cat · Skills |
+| `a` | adopt from the shelter |
+| `c` `s` `h` | switch tabs: Cat · Skills · Home |
 
 How the game works:
 - Stats drop and coins build up in real time. Time while you're away counts too, up to 8 hours.
 - Being away never hurts: stats stop at 25, so cats get grumpy but never sad.
 - Every cat has genes: one of 9 coats (ginger, tabby, grey, black, white, cream, calico, tuxedo, siamese), eye color (odd eyes are rare), a personality that changes the rules, and a 1-in-64 chance of being shiny.
-- The household starts with room for 2 cats. Every cat earns coins.
+- The household starts in a Cottage with room for 2 cats. Every cat earns coins.
+- **Home tab** (`h`):
+  - Nyan's shop is open 08:00–22:00 by your clock, with 4 new items every day.
+  - Furniture goes in yard spots (bowl, bed, toy, rug, plant, something hanging) and changes the rules: an auto-feeder, sleep regen, coin boosts, slower joy decay, more AFK events, bigger gifts.
+  - Tom Mew builds a bigger house (House, then Manor) on an interest-free loan. A quarter of income pays it back, and there's no deadline.
+  - Stray cats visit the yard, drawn by your decor (each item attracts certain personalities). They sit on the fence for a few hours, leave a gift, and you can adopt them for free.
 - Claude helps: +1c for each tool call, and +3c and +2xp each time Claude finishes a reply.
 - A daily check-in bonus grows with your streak (up to 7 days). Random AFK events give extra coins.
 - Each level gives a skill point for the Skills tab (`s`). There are three branches: **Hunter** (coins, AFK finds, gifts), **Cuddler** (joy, xp) and **Dreamer** (sleep, time away). Resetting skills costs coins.
@@ -57,6 +62,8 @@ hooks/scene.ts               pixel-art scene → Raster cells (two pixels per ce
 hooks/genes.ts               coats, eyes, personalities, shiny odds, coat painting
 hooks/mods.ts                trait × skill multipliers the rules read
 hooks/skills.ts              skill tree, points, evolution forms
+hooks/home.ts                furniture catalog, daily shop, house tiers, Tom Mew loan
+hooks/visitors.ts            strays: arrivals by decor pull, gifts, departures
 hooks/rng.ts                 seeded random numbers (repeatable tests)
 hooks/theme.ts               Catppuccin palettes and flavor resolution
 hooks/art.ts                 ASCII fallback

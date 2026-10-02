@@ -3,10 +3,12 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Home, View } from '../types'
 import { catArt } from './art'
-import { SHOP, act, activeCat, adopt, adoptPrice, bar, buy, checkIn, coinRate, learnSkill, migrate, moodOf, newHome,
-  priceOf, rename, respec, reward, stageName, switchTo, tick, xpToNext } from './game'
-import type { Action, Item } from './game'
+import { act, activeCat, adopt, adoptPrice, adoptVisitor, bar, checkIn, coinRate, learnSkill, migrate, moodOf,
+  newHome, rename, respec, reward, stageName, switchTo, tick, xpToNext } from './game'
+import type { Action } from './game'
 import { PERSONALITY_INFO, describeGenes } from './genes'
+import { LOAN_SHARE, SHOP_CLOSE, SHOP_OPEN, TIERS, baitOf, buyFurniture, dailyStock, furniture, isShopOpen, maxCats,
+  payLoan, place, takeLoan, tierOf } from './home'
 import { ROWS, frameCells, sceneCols } from './scene'
 import { BRANCHES, FORM_LEVEL, SKILLS, branchPoints, canLearn, formOf, freePoints, rankOf, respecPrice } from './skills'
 import type { Branch } from './skills'
@@ -21,6 +23,7 @@ const viewRef = { plugin: 'afk-cat', key: 'view' } as const
 const TABS: { view: View; label: string; hotkey: string }[] = [
   { view: 'cat', label: 'Cat', hotkey: 'c' },
   { view: 'skills', label: 'Skills', hotkey: 's' },
+  { view: 'home', label: 'Home', hotkey: 'h' },
 ]
 
 // Latest home and scene width for the animation loop, which repaints without a render pass.
@@ -47,9 +50,6 @@ const ACTIONS: { action: Action; label: string; hotkey: string }[] = [
   { action: 'play', label: 'Play', hotkey: 'p' },
   { action: 'pet', label: 'Pet', hotkey: 'e' },
   { action: 'nap', label: 'Nap/Wake', hotkey: 'n' },
-]
-const ITEMS: { item: Item; hotkey: string }[] = [
-  { item: 'feeder', hotkey: '1' }, { item: 'toy', hotkey: '2' }, { item: 'bed', hotkey: '3' },
 ]
 
 const hourOf = (now: number) => new Date(now).getHours()
@@ -160,6 +160,57 @@ export const register: Register = (on, options) => {
       </Box>
     )
 
+    if (view === 'home') {
+      const tier = tierOf(home)
+      const next = TIERS[home.tier + 1]
+      const hour = hourOf(now)
+      const isOpen = isShopOpen(hour)
+      const stock = dailyStock(now)
+      const placed = new Set(Object.values(home.decor))
+      const spare = home.owned.filter(id => !placed.has(id) && furniture(id) && tier.slots.includes(furniture(id)!.slot))
+      return (
+        <Box flexDirection="column">
+          {tabs}
+          {scene}
+          <Text bold color={tone.title}>
+            {tier.name} · {home.cats.length}/{tier.maxCats} cats · {tier.slots.length} decor spots · Coins {Math.floor(home.coins)}
+          </Text>
+          {home.loan > 0
+            ? <Box>
+                <Text color={tone.warn}>Tom Mew loan: {Math.ceil(home.loan)}c left ({LOAN_SHARE * 100}% of income pays it) </Text>
+                <Button key="pay" plain label="Pay 100c" onPress={() => change($, h => payLoan(h, 100))} />
+              </Box>
+            : next
+              ? <Button key="loan" plain label={`Ask Tom Mew to build a ${next.name} · ${next.loan}c loan · ${next.maxCats} cats`}
+                  onPress={() => change($, h => takeLoan(h))} />
+              : <Text color={tone.muted}>The finest manor in town.</Text>}
+          <Text bold color={tone.accent}>Yard — strays drawn by your decor (pull {baitOf(home).total})</Text>
+          {home.visitors.length === 0 && <Text color={tone.muted}>No strays right now. They come and go while you work.</Text>}
+          {home.visitors.map(v => (
+            <Box>
+              <Text>{v.name} — {describeGenes(v.genes)} · leaves in {Math.max(0, Math.ceil((v.leavesAt - now) / 3_600_000))}h · gift {v.gift}c </Text>
+              <Button key={`adopt-${v.id}`} plain label={`Adopt ${v.name}`} onPress={() => change($, (h, t) => adoptVisitor(h, v.id, t))} />
+            </Box>
+          ))}
+          <Text bold color={tone.accent}>Placed</Text>
+          <Text color={tone.muted}>{tier.slots.map(slot => `${slot}: ${furniture(home.decor[slot])?.name ?? '—'}`).join(' · ')}</Text>
+          {spare.map(id => (
+            <Button key={`place-${id}`} plain label={`Place ${furniture(id)?.name} (${furniture(id)?.slot})`}
+              onPress={() => change($, h => place(h, id))} />
+          ))}
+          <Text bold color={tone.accent}>
+            Nyan's shop · {isOpen ? `open until ${SHOP_CLOSE}:00 · new stock daily` : `closed · opens at ${SHOP_OPEN}:00`}
+          </Text>
+          {stock.map(item => (
+            <Button key={`buy-${item.id}`} plain
+              label={`${home.owned.includes(item.id) ? '✓' : ' '} ${item.name} · ${item.price}c · ${item.slot} · ${item.perk}`}
+              onPress={() => change($, (h, t) => buyFurniture(h, item.id, t, hourOf(t)))} />
+          ))}
+          <Text italic color={tone.log}>{home.log}</Text>
+        </Box>
+      )
+    }
+
     if (view === 'skills') {
       const points = freePoints(cat)
       const form = formOf(cat)
@@ -224,19 +275,11 @@ export const register: Register = (on, options) => {
               onPress={() => change($, (h, t) => act(h, a.action, t))} />
           ))}
         </Box>
-        <Text color={tone.muted}>Shop</Text>
-        <Box flexDirection="column">
-          {ITEMS.map(({ item, hotkey }) => (
-            <Button key={item} hotkey={hotkey} plain
-              label={`${SHOP[item].label} lv${home.upgrades[item]} · ${priceOf(home, item)}c · ${SHOP[item].perk}`}
-              onPress={() => change($, (h, t) => buy(h, item, t))} />
-          ))}
-          <Button key="adopt" hotkey="a" plain
-            label={home.cats.length < home.maxCats
-              ? `Adopt a cat · ${adoptPrice(home)}c · random coat & personality`
-              : `House full (${home.cats.length}/${home.maxCats})`}
-            onPress={() => change($, (h, t) => adopt(h, t))} />
-        </Box>
+        <Button key="adopt" hotkey="a" plain
+          label={home.cats.length < maxCats(home)
+            ? `Adopt from the shelter · ${adoptPrice(home)}c · random coat & personality`
+            : `House full (${home.cats.length}/${maxCats(home)}) · expand it in Home (h)`}
+          onPress={() => change($, (h, t) => adopt(h, t))} />
       </Box>
     )
   })
