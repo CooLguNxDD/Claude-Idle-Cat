@@ -28,6 +28,16 @@ How the game works:
 
 Progress is saved in the plugin's `$.store`, so it carries over between sessions.
 
+## Theme
+
+Colors come from [Catppuccin](https://catppuccin.com/). Pick a flavor in `/config` → **Catppuccin flavor**:
+
+| Value | Look |
+| --- | --- |
+| `auto` (default) | Latte when Claude Code's theme is light, Mocha when it's dark |
+| `daycycle` | Latte by day, Frappé at dusk, Mocha at night, by your clock |
+| `latte` · `frappe` · `macchiato` · `mocha` | always that flavor |
+
 ## Layout
 
 ```

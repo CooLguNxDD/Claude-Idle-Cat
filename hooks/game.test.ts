@@ -2,6 +2,7 @@ import { expect, test } from 'claude-code/testing'
 
 import { act, buy, checkIn, moodOf, newCat, normalize, priceOf, stageOf, tick } from './game'
 import { COLS, ROWS, frameCells } from './sprite'
+import { FLAVORS } from './theme'
 
 const HOUR = 3_600_000
 const DAY = 24 * HOUR
@@ -58,6 +59,6 @@ test('old saves gain the new fields', async () => {
 })
 
 test('a scene frame packs every cell', async () => {
-  const cells = frameCells({ ...newCat(0), effect: { kind: 'hearts', at: 0 } }, 500, 3, 22)
+  const cells = frameCells({ ...newCat(0), effect: { kind: 'hearts', at: 0 } }, 500, 3, 22, FLAVORS.mocha)
   expect(cells.length).toBe(Math.ceil((COLS * ROWS * 12) / 3) * 4)
 })

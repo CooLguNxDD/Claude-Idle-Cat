@@ -1,5 +1,7 @@
 import type { Cat } from '../types'
 import { moodOf, stageOf } from './game'
+import { dayPartOf, inkOf, mix } from './theme'
+import type { Flavor } from './theme'
 
 // Scene is COLS x ROWS terminal cells; each cell is two stacked pixels ('▀').
 export const COLS = 34
@@ -8,10 +10,11 @@ const W = COLS
 const H = ROWS * 2
 const UPPER_HALF = 0x2580
 
-const PAL: Record<string, number> = {
-  o: 0x3b2418, f: 0xf4a259, d: 0xd9803a, w: 0xfff4e6, p: 0xff8fab,
-  E: 0x2d6a4f, n: 0xe5566f, r: 0xd62828, g: 0xffd60a, t: 0x8ecae6,
-}
+// Sprite letters → Catppuccin colors (ginger tabby for now).
+const paletteOf = (f: Flavor): Record<string, number> => ({
+  o: inkOf(f), f: f.peach, d: mix(f.peach, f.maroon, 0.5), w: f.rosewater, p: f.pink,
+  E: f.green, n: f.red, r: f.red, g: f.yellow, t: f.sky,
+})
 
 const CAT = [
   '.o..........o.',
@@ -36,14 +39,11 @@ const STARS: [number, number][] = [[2, 1], [7, 4], [12, 2], [19, 1], [24, 5], [2
 
 type Overlay = { ch: string; fg: number }
 
-const mix = (a: number, b: number, t: number) => {
-  const ch = (s: number) => Math.round(((a >> s) & 255) * (1 - t) + ((b >> s) & 255) * t) << s
-  return ch(16) | ch(8) | ch(0)
-}
-const rainbow = (i: number) => [0xff595e, 0xffca3a, 0x8ac926, 0x1982c4, 0x6a4c93][i % 5] ?? 0xffffff
 
 // Builds one animation frame: `tick` advances ~8 times a second.
-export const frameCells = (cat: Cat, now: number, tick: number, hour: number): string => {
+export const frameCells = (cat: Cat, now: number, tick: number, hour: number, f: Flavor): string => {
+  const PAL = paletteOf(f)
+  const rainbow = (i: number) => [f.red, f.peach, f.yellow, f.green, f.blue, f.mauve][i % 6] ?? f.text
   const px = new Uint32Array(W * H)
   const put = (x: number, y: number, c: number) => {
     if (x >= 0 && x < W && y >= 0 && y < H) px[y * W + x] = c
@@ -56,25 +56,27 @@ export const frameCells = (cat: Cat, now: number, tick: number, hour: number): s
   }
 
   // Sky follows the real clock: day, dusk, night.
-  const isNight = hour < 6 || hour >= 20
-  const isDusk = hour >= 17 && hour < 20
-  const [skyTop, skyLow] = isNight ? [0x0b1026, 0x1b2550] : isDusk ? [0x6d597a, 0xffb4a2] : [0x8ecae6, 0xd7f1fb]
+  const part = dayPartOf(hour)
+  const isNight = part === 'night'
+  const isDusk = part === 'dusk'
+  const [skyTop, skyLow] = isNight ? [f.crust, f.surface0] : isDusk ? [f.mauve, f.peach]
+    : [f.sapphire, mix(f.sky, f.isLight ? f.base : f.text, 0.45)]
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) put(x, y, mix(skyTop, skyLow, y / 20))
   if (isNight) {
-    STARS.forEach(([x, y], i) => put(x, y, (tick + i * 3) % 12 < 2 ? 0x555577 : 0xf8f8ff))
-    for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1], [2, 1], [1, 2]] as const) put(29 + dx, 1 + dy, 0xf1f1d0)
+    STARS.forEach(([x, y], i) => put(x, y, (tick + i * 3) % 12 < 2 ? f.overlay0 : f.text))
+    for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1], [2, 1], [1, 2]] as const) put(29 + dx, 1 + dy, f.rosewater)
   } else {
-    const sun = isDusk ? 0xff7b54 : 0xffd166
+    const sun = isDusk ? f.peach : f.yellow
     for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++) put(29 + dx, 1 + dy + (isDusk ? 2 : 0), sun)
   }
-  for (let y = 21; y < H; y++) for (let x = 0; x < W; x++) put(x, y, (x + y * 3) % 7 === 0 ? 0x6e4128 : 0x8d5a3b)
+  for (let y = 21; y < H; y++) for (let x = 0; x < W; x++) put(x, y, (x + y * 3) % 7 === 0 ? mix(f.peach, f.crust, 0.6) : mix(f.peach, f.crust, 0.4))
 
   // Food bowl, with a fish in it right after a feeding.
   const age = cat.effect ? (now - cat.effect.at) / 1000 : 99
   const fresh = (kind: string, secs: number) => cat.effect?.kind === kind && age < secs
-  for (let x = 25; x <= 30; x++) put(x, 20, 0x1d4e89)
-  for (let x = 26; x <= 29; x++) put(x, 21, 0x1d4e89)
-  if (fresh('fish', 3)) for (let x = 26; x <= 29; x++) put(x, 19, 0xf77f00)
+  for (let x = 25; x <= 30; x++) put(x, 20, f.blue)
+  for (let x = 26; x <= 29; x++) put(x, 21, f.blue)
+  if (fresh('fish', 3)) for (let x = 26; x <= 29; x++) put(x, 19, f.peach)
 
   // The cat: breathing bob, blinking, mood face, stage accessories.
   const mood = moodOf(cat)
@@ -102,12 +104,12 @@ export const frameCells = (cat: Cat, now: number, tick: number, hour: number): s
   const headRow = Math.floor(oy / 2)
   if (mood === 'sleeping') {
     const step = tick % 24
-    text(ox + 13 + (step >> 3), headRow - 1 - (step >> 3), step < 8 ? 'z' : 'Z', 0xffffff)
+    text(ox + 13 + (step >> 3), headRow - 1 - (step >> 3), step < 8 ? 'z' : 'Z', f.lavender)
   }
-  if (fresh('hearts', 2)) [0, 4, 8].forEach((dx, i) => text(ox + 2 + dx, headRow - 1 - Math.floor(age * 2 + i * 0.5) % 4, '♥', 0xff4d6d))
-  if (fresh('coins', 2.5)) [3, 10, 17, 24].forEach((x, i) => text(x, (Math.floor(age * 4) + i) % 6, (tick + i) % 2 ? '*' : '+', 0xffd60a))
-  if (fresh('fish', 1.5)) text(Math.max(25, 33 - Math.floor(age * 8)), 8, '><>', 0xf77f00)
-  if (fresh('yarn', 2)) text(2 + (Math.floor(age * 12) % 22), 10, '@', 0xe63946)
+  if (fresh('hearts', 2)) [0, 4, 8].forEach((dx, i) => text(ox + 2 + dx, headRow - 1 - Math.floor(age * 2 + i * 0.5) % 4, '♥', f.red))
+  if (fresh('coins', 2.5)) [3, 10, 17, 24].forEach((x, i) => text(x, (Math.floor(age * 4) + i) % 6, (tick + i) % 2 ? '*' : '+', f.yellow))
+  if (fresh('fish', 1.5)) text(Math.max(25, 33 - Math.floor(age * 8)), 8, '><>', f.peach)
+  if (fresh('yarn', 2)) text(2 + (Math.floor(age * 12) % 22), 10, '@', f.maroon)
   if (fresh('shop', 2)) text(10, 1, 'NEW ITEM!', rainbow(tick))
   if (fresh('levelup', 3)) [...'LEVEL UP!'].forEach((ch, i) => text(12 + i, 1, ch, rainbow(tick + i)))
 
