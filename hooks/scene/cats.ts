@@ -1,5 +1,5 @@
 import type { Cat, Home } from '../../types'
-import { CAT_ART } from '../art/cats'
+import { CAT_ART, paneArtOf } from '../art/cats'
 import { isBirthday } from '../calendar'
 import { activeCat, moodOf, stageOf } from '../game'
 import { coatPixel } from '../genes'
@@ -79,7 +79,7 @@ export const drawCats = (c: SceneCanvas, home: Home, now: number, tick: number, 
   // Small floor shadow makes the silhouette legible against rugs and quilts.
   for (let x = 7; x < 24; x++) if (x % 3 !== 0) c.put(x, FLOOR_Y, mix(f.crust, f.surface2, 0.45))
   formBack(form, ox, oy, tick, f, c)
-  CAT_ART.pane.frames[0]?.forEach((row, y) => [...row].forEach((ch, x) => {
+  paneArtOf(cat.genes).frames[0]?.forEach((row, y) => [...row].forEach((ch, x) => {
     let token = ch
     if (token === 'E' && isBlink) token = 'o'
     if (token === 'p' && mood !== 'happy') token = 'f'

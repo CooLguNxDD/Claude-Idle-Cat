@@ -1,13 +1,20 @@
 import { art } from './types'
+import type { Genes } from '../../types'
+
+const PANE_ROWS = [
+  '.o..........o.', '.oo........oo.', '.ofo......ofo.', '.offoooooooffo',
+  '.offdffffdfffo', '.offEffffEffo.', '.opfffnnfffpo.', '..offffffffo..',
+  '..ofwwwwwwfo..', '.ofwwwwwwwwfo.', '.ofwwwwwwwwfo.', '.offwwwwwwffo.',
+  '..oooooooooo..',
+]
 
 // Shared poses use semantic fur letters, so every coat and eye color remains dynamic.
 export const CAT_ART = {
-  pane: art('cat.pane', [[
-    '.o..........o.', '.oo........oo.', '.ofo......ofo.', '.offoooooooffo',
-    '.offdffffdfffo', '.offEffffEffo.', '.opfffnnfffpo.', '..offffffffo..',
-    '..ofwwwwwwfo..', '.ofwwwwwwwwfo.', '.ofwwwwwwwwfo.', '.offwwwwwwffo.',
-    '..oooooooooo..',
-  ]], [0, 0], 'actor'),
+  pane: art('cat.pane', [PANE_ROWS], [0, 0], 'actor'),
+  fluffy: art('cat.fluffy', [PANE_ROWS.map((row, y) => y >= 7 && y <= 11
+    ? (y % 2 ? 'o' : '.') + 'f' + row.slice(2, 12) + 'f' + (y % 2 ? 'o' : '.') : row)], [0, 0], 'actor'),
+  fold: art('cat.fold', [PANE_ROWS.map((row, y) => y === 0 ? '..............'
+    : y === 1 ? '..............' : y === 2 ? '.oooo....oooo.' : row)], [0, 0], 'actor'),
   mini: art('cat.mini', [[
     'o...o.', 'fffff.', 'fEfEf.', 'fwwwff', 'fwwwf.',
   ]], [0, 0], 'actor'),
@@ -36,3 +43,6 @@ export const CAT_ART = {
     '..ofwwwwfo..', '...oooooo...', '...oo..oo...',
   ]], [0, 0], 'actor'),
 } as const
+
+export const paneArtOf = (genes: Genes) => genes.silhouette === 'fluffy' ? CAT_ART.fluffy
+  : genes.silhouette === 'fold' ? CAT_ART.fold : CAT_ART.pane

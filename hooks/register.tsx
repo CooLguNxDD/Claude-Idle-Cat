@@ -17,15 +17,17 @@ import { CATCHPHRASE_LEVEL, DAILY_CAP, GIFTS, LEVELS, NICKNAME_LEVEL, PHOTO_LEVE
   levelName, toNextLevel } from './friends'
 import type { Action } from './game'
 import { PERSONALITY_INFO, describeGenes } from './genes'
-import type { Coat } from '../types'
+import { COATS, COAT_REGISTRY, RARITIES, rarityBadge, rarityOf } from './adoption/registry'
+import { revealedCat } from './adoption/state'
 import { LOAN_SHARE, SHOP_CLOSE, SHOP_OPEN, TIERS, baitOf, dailyStock, furniture, isShopOpen, maxCats, payLoan, place,
   takeLoan, tierOf } from './home'
 import { ROWS, frameCells, sceneCols } from './scene'
+import { shelterCells } from './scene/shelter'
 import { CLIP_FOR, clipAsset, powershellArgv } from './sfx'
 import type { Clip } from './sfx'
 import { BRANCHES, FORM_LEVEL, SKILLS, branchPoints, canLearn, formOf, freePoints, rankOf, respecPrice } from './skills'
 import type { Branch } from './skills'
-import { FLAVORS, resolveFlavor, uiTokens } from './theme'
+import { FLAVORS, css, resolveFlavor, uiTokens } from './theme'
 import type { Flavor } from './theme'
 import { visibleTabs } from './ui/tabs'
 import { goBack, initialRoute, navigate } from './ui/router'
@@ -42,7 +44,6 @@ const FRAME_MS = 125
 const homeRef = { plugin: 'afk-cat', key: 'home' } as const
 const routeRef = { plugin: 'afk-cat', key: 'route' } as const
 const catListRef = { plugin: 'afk-cat', key: 'isCatListOpen' } as const
-const COATS: Coat[] = ['ginger', 'tabby', 'grey', 'black', 'white', 'cream', 'calico', 'tuxedo', 'siamese']
 const FORMS = ['ninja', 'royal', 'cloud', 'chonk']
 
 // Latest home and scene width for the animation loop, which repaints without a render pass.
@@ -315,14 +316,15 @@ const weatherCommand = async ($: EngineInterface, arg: string): Promise<{ text: 
 const HELP = [
   '/cat (or /cat show) — open the pane',
   '/cat hide — close the pane (the cats keep earning)',
-  '/cat adopt [name] — adopt from the shelter',
+  '/cat shelter — open the adoption gacha',
+  '/cat adopt [name] — roll and adopt a shelter cat',
   '/cat switch [name] — change the active cat (no name: the next one)',
   '/cat rename <name> — rename the active cat',
   '/cat reset — start over (wipes everything)',
   '/cat export [file] — save a backup (default: ~/.claude-kitten/backups/)',
   '/cat import <file> — load a backup (your current save is backed up first)',
   '/cat weather <city> — real weather; system for device location, off to clear, refresh to update',
-  'In the pane: ‹ › tabs · q back · c s h r b m g t visible tab shortcuts · f e n feed/pet/nap · p arcade · w cat list · a adopt',
+  'In the pane: ‹ › tabs · q back · c s h r b m g t a visible tab shortcuts · f e n feed/pet/nap · p arcade · w cat list',
 ].join('\n')
 
 const userHome = async ($: EngineInterface) => (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
@@ -375,7 +377,7 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'cat',
-      description: 'Open your AFK cats (/cat hide, /cat adopt [name], /cat switch <name>, /cat rename <name>, /cat weather <city>, /cat export, /cat import <file>, /cat help)',
+      description: 'Open your AFK cats (/cat hide, /cat shelter, /cat adopt [name], /cat switch <name>, /cat rename <name>, /cat weather <city>, /cat export, /cat import <file>, /cat help)',
     })
     await readTheme($)
     const saved = (await $.store.get('home')) ?? (await $.store.get('cat'))
@@ -401,7 +403,9 @@ export const register: Register = (on, options) => {
       if (!latest) return
       frame += 1
       const now = await $.clock.now()
-      const cells = frameCells({ home: latest, now, tick: frame, hour: hourOf(now), flavor: flavorAt(now), cols })
+      const view = ((await read($, routeRef)) ?? initialRoute()).view
+      const cells = view === 'adopt' ? shelterCells(latest, now, frame, flavorAt(now), cols)
+        : frameCells({ home: latest, now, tick: frame, hour: hourOf(now), flavor: flavorAt(now), cols })
       await $.ui.blit({ requestId: PANE, key: SCENE, cells })
     })
     return next(e)
@@ -421,10 +425,18 @@ export const register: Register = (on, options) => {
       await $.ui.open({ id: PANE, title: 'AFK Cat' })
       return result
     }
+    if (sub === 'shelter') {
+      await routeTo($, 'adopt')
+      await $.ui.open({ id: PANE, title: 'AFK Cat' })
+      return { text: 'The adoption shelter is open. Choose Roll & adopt to welcome a mystery cat.' }
+    }
     if (sub && !['show', 'open', 'rename', 'adopt', 'switch', 'reset'].includes(sub)) return { text: HELP }
     let home: Home
     if (sub === 'rename' && arg) home = await change($, h => rename(h, arg))
-    else if (sub === 'adopt') home = await change($, (h, t) => adopt(h, t, Math.random, arg || undefined))
+    else if (sub === 'adopt') {
+      await routeTo($, 'adopt')
+      home = await change($, (h, t) => adopt(h, t, Math.random, arg || undefined))
+    }
     else if (sub === 'switch') home = await change($, h => (arg ? switchTo(h, arg) : nextCat(h)))
     else if (sub === 'reset') home = await change($, (_, t) => newHome(t))
     else home = await change($, h => h)
@@ -467,12 +479,15 @@ export const register: Register = (on, options) => {
         {label.padEnd(7)}{bar(n)} {String(Math.round(n)).padStart(3)}
       </Text>
     )
+    const view = ((await read($, routeRef)) ?? initialRoute()).view
+    const reveal = revealedCat(home)
     const scene = 'Raster' in ui
       ? <ui.Raster key={SCENE} columns={cols} rows={ROWS}
-          cells={frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols })} />
-      : <Box flexDirection="column">{catArt(mood, home.frame, formOf(cat)).map(line => <Text>{line}</Text>)}</Box>
+          cells={view === 'adopt' ? shelterCells(home, now, frame, flavor, cols)
+            : frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols })} />
+      : view === 'adopt' && !reveal ? <Text color={tone.accent}>{'   /─────\\\n   │  ?  │\n   └─────┘'}</Text>
+        : <Box flexDirection="column">{catArt(mood, home.frame, formOf(cat)).map(line => <Text>{line}</Text>)}</Box>
 
-    const view = ((await read($, routeRef)) ?? initialRoute()).view
     const isCatListOpen = (await read($, catListRef)) ?? false
     const tabs = (
       <Box key="tabs" flexDirection="row" flexWrap="nowrap" gap={1}>
@@ -489,6 +504,45 @@ export const register: Register = (on, options) => {
 
     const weatherRow = <Button key="weather-status" plain label={weatherSummary(home.weather, now)}
       onPress={() => routeTo($, 'weather')} />
+
+    if (view === 'adopt') {
+      const room = maxCats(home) - home.cats.length
+      const price = adoptPrice(home)
+      return <Box flexDirection="column">
+        {tabs}
+        {scene}
+        <Text bold color={tone.title}>Adoption shelter</Text>
+        <Text color={tone.coin}>{Math.floor(home.coins)}c · {home.cats.length}/{maxCats(home)} cats · {home.shelter.pulls} shelter pulls</Text>
+        {reveal && <Box flexDirection="column">
+          <Text bold color={css(flavor[RARITIES[rarityOf(reveal.genes)].color])}>{rarityBadge(reveal.genes)} · {reveal.name}</Text>
+          <Text color={tone.muted}>{describeGenes(reveal.genes)}</Text>
+          <Text color={tone.muted}>Last arrival · {home.shelter.last!.cost === 0 ? 'yard visitor' : `${home.shelter.last!.cost}c`}</Text>
+          <Button key="shelter-meet" plain label={`Meet ${reveal.name}`} onPress={async () => {
+            await change($, h => switchTo(h, reveal.id))
+            await routeTo($, 'cat')
+          }} />
+        </Box>}
+        <Button key="adopt" plain label={room <= 0 ? 'House full · expand in Home'
+          : home.coins < price ? `Need ${price}c to roll & adopt` : `Roll & adopt · ${price}c`}
+          onPress={() => change($, (h, t) => adopt(h, t, Math.random))} />
+        {room <= 0 && <Button key="shelter-expand" plain label="Go to Home" onPress={() => routeTo($, 'home')} />}
+        <Text color={tone.muted}>One cat per pull. The fee is charged only when adoption succeeds. No cats are replaced.</Text>
+        {home.shinyCharm && <Text color={tone.accent}>Shiny charm ready · your next shelter cat will sparkle.</Text>}
+        <Text bold color={tone.title}>Rarity odds</Text>
+        {Object.entries(RARITIES).map(([key, r]) => <Text key={`odds-${key}`} color={css(flavor[r.color])}>
+          {r.label} {r.odds}% · {COATS.filter(coat => COAT_REGISTRY[coat].rarity === key).map(coat => COAT_REGISTRY[coat].label).join(', ')}
+        </Text>)}
+        <Text color={tone.muted}>Coats within each tier have equal odds. Markings and silhouettes vary independently. Shiny: 1/64, in any tier.</Text>
+        <Text color={tone.muted}>Rarity is cosmetic. Personality keeps its usual bonuses.</Text>
+        {home.visitors.length > 0 && <Text bold color={tone.title}>Yard visitors · free adoption</Text>}
+        {home.visitors.map(v => <Box key={`shelter-${v.id}`} flexDirection="column">
+          <Text color={css(flavor[RARITIES[rarityOf(v.genes)].color])}>{rarityBadge(v.genes)} · {v.name}</Text>
+          <Text color={tone.muted}>{describeGenes(v.genes)}</Text>
+          <Button key={`shelter-adopt-${v.id}`} plain label={`Welcome ${v.name}`} onPress={() => change($, (h, t) => adoptVisitor(h, v.id, t))} />
+        </Box>)}
+        <Text italic color={tone.log}>{home.log}</Text>
+      </Box>
+    }
 
     if (view === 'weather') {
       const reading = liveWeather(home.weather, now)
@@ -596,7 +650,7 @@ export const register: Register = (on, options) => {
             </Box>
           ))}
           <Text bold color={tone.accent}>Cat book</Text>
-          <Text>Coats {home.book.coats.length}/9: {COATS.map(c => (home.book.coats.includes(c) ? c : '???')).join(' · ')}</Text>
+          <Text>Coats {home.book.coats.length}/{COATS.length}: {COATS.map(c => (home.book.coats.includes(c) ? c : '???')).join(' · ')}</Text>
           <Text>Forms {home.book.forms.length}/4: {FORMS.map(f => (home.book.forms.includes(f) ? f : '???')).join(' · ')}</Text>
           <Text>Shinies: {home.book.shinies.join(', ') || 'none yet'} · strays met: {home.book.visitors.length}</Text>
           <Text>Photos: {home.book.photos.map(n => `📷 ${n}`).join('  ') || 'none yet (reach Best friend)'}</Text>
@@ -796,14 +850,14 @@ export const register: Register = (on, options) => {
           onPress={() => update($, catListRef, open => !open)} />
         {isCatListOpen && home.cats.map(c => (
           <Button key={`cat-${c.id}`} plain
-            label={`   ${c.id === cat.id ? '●' : '○'} ${c.name} · Lv${c.level} ${stageName(c)} · ${moodOf(c)}`}
+            label={`   ${c.id === cat.id ? '●' : '○'} ${c.name} · ${RARITIES[rarityOf(c.genes)].label} · Lv${c.level} ${stageName(c)} · ${moodOf(c)}`}
             onPress={async () => {
               await change($, h => switchTo(h, c.id))
               await update($, catListRef, () => false)
             }} />
         ))}
         {isCatListOpen && home.cats.length < maxCats(home) && (
-          <Text color={tone.muted}>{'   '}+ room for {maxCats(home) - home.cats.length} more · adopt (a)</Text>
+          <Text color={tone.muted}>{'   '}+ room for {maxCats(home) - home.cats.length} more · visit the Adopt tab</Text>
         )}
         {stat('Hunger', cat.hunger)}
         {stat('Joy', cat.joy)}
@@ -826,11 +880,6 @@ export const register: Register = (on, options) => {
               }} />
           ))}
         </Box>
-        <Button key="adopt" hotkey="a" plain
-          label={home.cats.length < maxCats(home)
-            ? `Adopt from the shelter · ${adoptPrice(home)}c · random coat & personality`
-            : `House full (${home.cats.length}/${maxCats(home)}) · expand it in Home (h)`}
-          onPress={() => change($, (h, t) => adopt(h, t))} />
       </Box>
     )
   })

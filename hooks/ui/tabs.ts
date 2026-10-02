@@ -9,6 +9,7 @@ export const TABS: { view: View; label: string; hotkey: string }[] = [
   { view: 'miles', label: 'Miles', hotkey: 'm' },
   { view: 'arcade', label: 'Arcade', hotkey: 'g' },
   { view: 'weather', label: 'Weather', hotkey: 't' },
+  { view: 'adopt', label: 'Adopt', hotkey: 'a' },
 ]
 
 export const adjacentTab = (view: View, step: number): View =>

@@ -19,7 +19,7 @@ test('tab arrows wrap and Back follows visits, including command navigation', as
       await ui.press({ key: 'tabs-back' })
       await check('pet', 'empty history')
       await ui.press({ key: 'tabs-prev' })
-      await check('weather-system', 'previous wraps to weather')
+      await check('adopt', 'previous wraps to adoption')
       await ui.press({ key: 'tabs-back' })
       await check('pet', 'back from weather')
       await ui.press({ key: 'tabs-next' })

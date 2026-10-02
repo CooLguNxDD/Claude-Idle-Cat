@@ -1,4 +1,6 @@
 import type { Cat, EffectKind, Genes, Home, Slot } from '../types'
+import { RARITIES, rarityOf } from './adoption/registry'
+import { emptyShelter, normalizeShelter } from './adoption/state'
 import { celebrate, spoil } from './calendar'
 import { EMPTY_BOOK, EMPTY_MILES, track } from './collection'
 import type { Counter } from './collection'
@@ -53,7 +55,7 @@ export const newHome = (now: number, cat: Cat = newCat('c1', 'Mochi', GINGER, no
   tier: 0, loan: 0, owned: [...STARTER], decor: { ...STARTER_DECOR }, visitors: [], nextId: 2,
   book: EMPTY_BOOK, pocket: {}, museum: [], miles: EMPTY_MILES, achievements: {}, shinyCharm: false,
   celebrated: [], catnip: { week: 0, qty: 0, paid: 0 }, arcade: { day: 0, plays: {}, best: {}, golds: 0, open: null },
-  rev: 0, prefs: { glow: true, crt: false }, weather: emptyWeather(),
+  rev: 0, prefs: { glow: true, crt: false }, weather: emptyWeather(), shelter: emptyShelter(),
 })
 
 type OldUpgrades = Partial<{ feeder: number; toy: number; bed: number }>
@@ -87,13 +89,13 @@ export const migrate = (saved: unknown, now: number): Home => {
     const home = saved as Home
     // A round left open by a closed session is dropped (its energy stays spent).
     return { ...base, ...home, cats: home.cats.map(normalizeCat), arcade: { ...base.arcade, ...home.arcade, open: null },
-      weather: normalizeWeather(home.weather, now) }
+      weather: normalizeWeather(home.weather, now), shelter: normalizeShelter(home.shelter, home.cats) }
   }
   if (version === 2) {
     const { upgrades, maxCats: _old, ...v2 } = saved as V2Home & { maxCats?: number }
     const nextId = Math.max(0, ...v2.cats.map(c => Number(c.id.slice(1)) || 0)) + 1
     return { ...base, ...v2, cats: v2.cats.map(normalizeCat), version: 3, ...furnitureFromUpgrades(upgrades), nextId,
-      weather: normalizeWeather(v2.weather, now) }
+      weather: normalizeWeather(v2.weather, now), shelter: normalizeShelter(v2.shelter, v2.cats) }
   }
   const v1 = saved as V1Cat
   const cat: Cat = {
@@ -249,8 +251,8 @@ export const adopt = (home: Home, now: number, rng: Rng = Math.random, name?: st
   const genes = { ...rollGenes(rng), ...(home.shinyCharm ? { isShiny: true } : {}) }
   const cat = newCat(`c${home.nextId}`, name?.slice(0, 20) || pick(rng, free.length ? free : NAMES), genes, now)
   return { ...home, coins: home.coins - price, cats: [...home.cats, cat], activeId: cat.id, nextId: home.nextId + 1,
-    shinyCharm: false,
-    effect: fx('adopt', now), log: `Welcome home, ${cat.name}!${cat.genes.isShiny ? ' ✨ A shiny cat!' : ''}` }
+    shinyCharm: false, shelter: { pulls: home.shelter.pulls + 1, last: { catId: cat.id, at: now, cost: price } },
+    effect: fx('adopt', now), log: `Welcome home, ${cat.name}! ${RARITIES[rarityOf(genes)].label} ${genes.coat}.${genes.isShiny ? ' ✨ A shiny cat!' : ''}` }
 }
 
 // A stray in the yard moves in for free (if there's room) and keeps its gift for later.
@@ -261,6 +263,7 @@ export const adoptVisitor = (home: Home, visitorId: string, now: number): Home =
   const cat = newCat(`c${home.nextId}`, visitor.name, visitor.genes, now)
   return { ...home, cats: [...home.cats, cat], activeId: cat.id, nextId: home.nextId + 1,
     visitors: home.visitors.filter(v => v.id !== visitorId), coins: home.coins + visitor.gift,
+    shelter: { ...home.shelter, last: { catId: cat.id, at: now, cost: 0 } },
     effect: fx('adopt', now), log: `${visitor.name} decided to stay! (+${visitor.gift}c gift)` }
 }
 

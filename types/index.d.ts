@@ -2,9 +2,14 @@ export type EffectKind = 'hearts' | 'fish' | 'yarn' | 'coins' | 'levelup' | 'evo
 export type Effect = { kind: EffectKind; at: number }
 
 export type Coat = 'ginger' | 'tabby' | 'grey' | 'black' | 'white' | 'cream' | 'calico' | 'tuxedo' | 'siamese'
+  | 'chocolate' | 'cinnamon' | 'silver' | 'smoke' | 'tortoiseshell' | 'ragdoll' | 'bengal' | 'lynx' | 'nebula'
+export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'
+export type Marking = 'classic' | 'socks' | 'blaze' | 'mask' | 'spots'
+export type Silhouette = 'classic' | 'fluffy' | 'fold'
 export type Eyes = 'green' | 'blue' | 'yellow' | 'odd'
 export type Personality = 'lazy' | 'playful' | 'greedy' | 'shy' | 'cuddly' | 'curious'
-export type Genes = { coat: Coat; eyes: Eyes; personality: Personality; isShiny: boolean }
+export type Genes = { coat: Coat; eyes: Eyes; personality: Personality; isShiny: boolean
+  marking?: Marking; silhouette?: Silhouette }
 
 export type Cat = {
   id: string
@@ -29,8 +34,9 @@ export type Visitor = { id: string; name: string; genes: Genes; arrivedAt: numbe
 
 export type Slot = 'bowl' | 'bed' | 'toy' | 'rug' | 'plant' | 'hanging'
 
-export type View = 'cat' | 'skills' | 'home' | 'friends' | 'book' | 'miles' | 'arcade' | 'weather'
+export type View = 'cat' | 'skills' | 'home' | 'friends' | 'book' | 'miles' | 'arcade' | 'weather' | 'adopt'
 export type Route = { view: View; history: View[] }
+export type Shelter = { pulls: number; last: { catId: string; at: number; cost: number } | null }
 
 export type WeatherCondition = 'clear' | 'partly-cloudy' | 'cloudy' | 'fog' | 'drizzle' | 'rain' | 'snow' | 'storm'
 export type WeatherLocation = { label: string; latitude: number; longitude: number; source: 'city' | 'coordinates' | 'device' }
@@ -91,6 +97,7 @@ export type Home = {
   // Browser arcade display settings.
   prefs: { glow: boolean; crt: boolean }
   weather: WeatherState
+  shelter: Shelter
 }
 
 declare module 'claude-code' {

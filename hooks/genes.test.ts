@@ -6,6 +6,7 @@ import { modsOf } from './mods'
 import { newCat } from './game'
 import { seeded } from './rng'
 import { FLAVORS } from './theme'
+import { COATS } from './adoption/registry'
 
 test('rolls cover every coat and land near the shiny odds', async () => {
   const rng = seeded(42)
@@ -17,7 +18,7 @@ test('rolls cover every coat and land near the shiny odds', async () => {
     coats.add(g.coat)
     if (g.isShiny) shiny++
   }
-  expect(coats.size).toBe(9)
+  expect(coats.size).toBe(COATS.length)
   expect(shiny / n).toBeGreaterThan(SHINY_ODDS * 0.6)
   expect(shiny / n).toBeLessThan(SHINY_ODDS * 1.4)
 })

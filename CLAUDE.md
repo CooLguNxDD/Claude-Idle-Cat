@@ -43,6 +43,7 @@ On this machine `~/.claude/settings.json` sets `env.CLAUDE_CODE_PLUGIN_DIRS` to 
   Never write the store any other way.
 - A new field on `Home` needs a default in `newHome` and must survive `migrate` (`hooks/game.ts`, currently `version: 3`). Old saves don't have it.
 - `Home.weather` stores a rounded location, display units and checked current conditions. Weather is off by default; all HTTP wiring stays in `register.tsx`, and stale or unavailable data falls back to the seasonal yard.
+- `Home.shelter` stores successful paid pulls and the latest arrival receipt. Rarity comes from the coat registry. Optional markings/silhouettes default to classic, preserving old cat appearances. Failed adoptions never spend coins, consume RNG, or use a shiny charm.
 - Award arcade rounds only through `finishGame` in `hooks/arcade/rewards.ts`. It pays a round only if the mod started it (`arcade.open`), and it clamps both the time and the score, because browser input can't be trusted.
 - `/cat export` and `/cat import` (`hooks/backup.ts`) write to `~/.claude-kitten/backups/`. Import backs up the current save first; keep that behaviour.
 

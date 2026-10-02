@@ -8,7 +8,8 @@ import type { PixelArt } from './types'
 
 test('art registry has complete sprite frames and themed backgrounds', async () => {
   const assets: PixelArt[] = [
-    ...Object.values(ART.cats), ...Object.values(ART.weather), ...Object.values(ART.furniture).map(item => item.sprite),
+    ...Object.values(ART.cats), ...Object.values(ART.weather), ...Object.values(ART.shelter),
+    ...Object.values(ART.furniture).map(item => item.sprite),
     ...Object.values(ART.games).flatMap(group => Object.values(group)),
   ]
   expect(new Set(assets.map(a => a.id)).size).toBe(assets.length)

@@ -17,7 +17,8 @@ Then type `/cat` to open the pane.
 | `/cat hide` | close the pane (the cats keep earning) |
 | `/cat help` | list the commands |
 | `/cat rename <name>` | rename the active cat |
-| `/cat adopt [name]` | adopt a new cat with random genes (also `a` in the pane) |
+| `/cat shelter` | open the Adopt tab without spending coins |
+| `/cat adopt [name]` | roll and adopt a shelter cat, optionally with a chosen name |
 | `/cat switch [name]` | bring another cat front and centre; no name cycles to the next (or pick it from the cat list, `w` in the pane) |
 | `/cat reset` | start over with a new household |
 | `/cat export [file]` | save a backup; default `~/.claude-kitten/backups/afk-cat-<date>.json` |
@@ -32,11 +33,10 @@ Then type `/cat` to open the pane.
 | `f` `e` `n` | Feed (5c) · Pet · Nap/Wake |
 | `p` | Play: opens the Arcade in your browser |
 | `o` | (Arcade tab) open or reopen the browser arcade |
-| `a` | adopt from the shelter |
 | `w` | open/close the cat list |
 | `‹` / `›` in the top bar | previous / next tab; wraps at either end, with tabs fitting on one line |
 | `q` / `↶` in the top bar | go back to the previously visited tab |
-| `c` `s` `h` `r` `b` `m` `g` `t` | shortcuts for visible tabs: Cat · Skills · Home · Friends · Book · Miles · Arcade · Weather |
+| `c` `s` `h` `r` `b` `m` `g` `t` `a` | shortcuts for visible tabs: Cat · Skills · Home · Friends · Book · Miles · Arcade · Weather · Adopt |
 | Arcade Display menu / Fullscreen | fit the 320×180 art canvas to the window, choose a 1×–6× size (up to 1080p), or fill the screen |
 
 Saves:
@@ -47,8 +47,14 @@ Saves:
 How the game works:
 - Stats drop and coins build up in real time. Time while you're away counts too, up to 8 hours.
 - Being away never hurts: stats stop at 25, so cats get grumpy but never sad.
-- Every cat has genes: one of 9 coats (ginger, tabby, grey, black, white, cream, calico, tuxedo, siamese), eye color (odd eyes are rare), a personality that changes the rules, and a 1-in-64 chance of being shiny.
+- Every cat has genes: one of 18 coats, five possible markings, three silhouettes (classic, fluffy, folded ears), eye color, a personality that changes the rules, and a 1-in-64 chance of being shiny. Existing cats retain their original appearance.
 - The household starts in a Cottage with room for 2 cats. Every cat earns coins.
+- **Adopt tab** (top-bar arrows, or `/cat shelter`):
+  - Roll & adopt opens a pixel parcel and reveals one cat, its rarity and genes. The fee stays at 100c per cat already in your household. It is charged only on success; full houses and insufficient coins consume no roll or shiny charm.
+  - Rarity odds: **Common 60%**, **Uncommon 25%**, **Rare 10%**, **Epic 4%**, **Legendary 1%**. Coats within a tier have equal odds; the full pool is visible in the tab. Rarity describes appearance and does not change stats or income.
+  - New coats include chocolate, cinnamon, silver, smoke, tortoiseshell, ragdoll, bengal, lynx and the starry Nebula. Markings and silhouettes roll independently. Duplicate coats are possible, and every successful pull adds a cat; cats are never replaced.
+  - Shiny is a separate 1/64 roll in every rarity tier. The Paw Miles shiny charm guarantees the next successful shelter adoption is shiny.
+  - The tab keeps your latest arrival card, a Meet button, shelter-pull count, house expansion link and free adoption of yard visitors. `q` returns to the tab you came from.
 - **Home tab** (`h`):
   - Nyan's shop is open 08:00–22:00 by your clock, with 4 new items every day.
   - Furniture goes in yard spots (bowl, bed, toy, rug, plant, something hanging) and changes the rules: an auto-feeder, sleep regen, coin boosts, slower joy decay, more AFK events, bigger gifts.
@@ -71,7 +77,7 @@ How the game works:
   - The cat book records every coat, form, shiny, stray and best-friend photo you've seen.
 - **Miles tab** (`m`):
   - Five Paw Miles tasks a day, such as "pet 3 times" or "Claude runs 10 tools".
-  - 19 achievements, three of them from the arcade.
+  - 20 achievements, three of them from the arcade, plus a Full palette reward for seeing all 18 coats.
   - A Miles shop with exclusive furniture and a shiny charm.
 - **Arcade tab** (`g`, or Play `p`):
   - The games run in your browser. `p` (or a game in the Arcade tab) starts a small local server and opens a tab at `http://localhost:<port>`. The pane keeps the game list, the round in progress and the results.
@@ -144,6 +150,9 @@ hooks/weather/              location search, API parsing, condition mapping and 
 hooks/scene/weather/        registered sky, ground and foreground weather layers
 hooks/scene/season.ts        seasonal particles when live weather permits them
 hooks/genes.ts               coats, eyes, personalities, shiny odds, coat painting
+hooks/genes/paint.ts         themed coat colors and deterministic markings
+hooks/adoption/             rarity/coat registry and shelter receipts
+hooks/scene/shelter.ts       parcel opening and adoption reveal scene
 hooks/mods.ts                trait × skill multipliers the rules read
 hooks/skills.ts              skill tree, points, evolution forms
 hooks/home.ts                furniture catalog, daily shop, house tiers, Tom Mew loan
