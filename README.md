@@ -58,6 +58,9 @@ How the game works:
 - **Arcade tab** (`g`, or Play `p`):
   - Mini-games that run in the pane at about 30 fps, starring the active cat in its own coat. Click the game to give it the keys; `q` quits a round.
   - **Rooftop Dash**: jump flowerpots (space/↑), duck pigeons (↓) and grab fish treats while the rooftops speed up.
+  - **Fish Catch**: slide the bowl (←/→ or mouse) under falling fish. Boots cost points; three cucumbers end the round.
+  - **Laser Chase**: click the darting red dot (or aim with the arrows and press space) to pounce. Catches in a row multiply.
+  - **Whack-a-Mouse**: bop mice as they pop out of a 3×3 board (keys 1–9 or click), and leave the slipper alone.
   - A round costs 10 energy. Bronze, silver and gold medals pay a few minutes of the household's income plus xp, for 3 paid plays per game a day. Every round adds joy and friendship. One featured game a day pays 2×.
   - Skills make games easier rather than paying more. For example, Dreamer points slow Dash's speed-up.
   - Quick play is still there: it tosses the yarn ball for instant joy.
