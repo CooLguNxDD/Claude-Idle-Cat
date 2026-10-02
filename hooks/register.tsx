@@ -25,6 +25,7 @@ import { CLIP_FOR, clipAsset, powershellArgv } from './sfx'
 import type { Clip } from './sfx'
 import { BRANCHES, FORM_LEVEL, SKILLS, branchPoints, canLearn, formOf, freePoints, rankOf, respecPrice } from './skills'
 import type { Branch } from './skills'
+import { RUN_MAX_COLS, RUN_ROWS, nextX, runFrame } from './runner'
 import { catHint, doneWord, hintTail, pawPrefix, skinLevel, spinnerWord, walkFrame } from './skin'
 import { FLAVORS, FLAVOR_NAMES, resolveFlavor, themeOptionFor, uiTokens } from './theme'
 import type { Flavor } from './theme'
@@ -32,6 +33,7 @@ import type { SkinLevel } from './skin'
 
 const PANE = 'afk-cat'
 const SCENE = 'scene'
+const RUNNER = 'runner'
 const SERVER = 'server/arcade.mjs'
 const SERVER_START_MS = 10_000
 const TICK_MS = 10_000
@@ -59,8 +61,11 @@ let frame = 0
 let claudeTheme = 'dark'
 let isSoundOn = true
 let skin: SkinLevel = 'full'
-// True while the walking band is on screen; the frame loop repaints it only then.
-let isBandShown = false
+// The running-cat band above the prompt: its render instance, width and how it is drawn; the frame loop repaints it.
+let band = { id: '', cols: 0, mode: 'off' as 'off' | 'raster' | 'text' }
+let runX = 0
+// Frame number until which the cat sprints; a tool call starts it.
+let sprintUntil = 0
 let flavorNow: (now: number) => Flavor = () => FLAVORS.mocha
 // The browser arcade's server: started on first use, killed with the module; the token guards it.
 const arcade = { port: 0, token: newToken(Math.random), starting: null as Promise<number> | null, pushed: '', isOpened: false }
@@ -294,7 +299,7 @@ export const register: Register = (on, options) => {
         .catch(() => undefined)
     })
     $.clock.every(500, () => {
-      if (isBandShown) $.ui.invalidate('ui.render')
+      if (band.mode === 'text') $.ui.invalidate('ui.render')
     })
     $.clock.every(FRAME_MS, async () => {
       if (!latest) return
@@ -302,6 +307,11 @@ export const register: Register = (on, options) => {
       const now = await $.clock.now()
       const cells = frameCells({ home: latest, now, tick: frame, hour: hourOf(now), flavor: flavorAt(now), cols })
       await $.ui.blit({ requestId: PANE, key: SCENE, cells })
+      if (band.mode !== 'raster') return
+      const isSprint = frame < sprintUntil
+      runX = nextX(runX, band.cols, isSprint)
+      const run = { cat: activeCat(latest), flavor: flavorAt(now), tick: frame, x: runX, cols: band.cols, isSprint }
+      await $.ui.blit({ requestId: band.id, key: RUNNER, cells: runFrame(run) })
     })
     return next(e)
   })
@@ -342,6 +352,7 @@ export const register: Register = (on, options) => {
   })
 
   on('tool.call', async ($, e, next) => {
+    sprintUntil = frame + 16
     const ran = await next(e)
     void change($, (h, t) => track(reward(h, 1), 'tools', 1, t))
     return ran
@@ -714,12 +725,18 @@ export const register: Register = (on, options) => {
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    isBandShown = false
+    band.mode = 'off'
     if (skin !== 'full' || e.props.hasSurvey || !e.props.isWorking) return next(e)
-    isBandShown = true
-    const { Text } = $.ui.resolve(e)
-    const flavor = flavorAt(await $.clock.now())
-    return <Text color={uiTokens(flavor).accent}>{walkFrame(frame, e.props.bodyColumns)}</Text>
+    const ui = $.ui.resolve(e)
+    const now = await $.clock.now()
+    const width = Math.min(e.props.bodyColumns, RUN_MAX_COLS)
+    if ('Raster' in ui && latest && width >= 30 && e.props.maxRows >= RUN_ROWS) {
+      band = { id: e.requestId, cols: width, mode: 'raster' }
+      const run = { cat: activeCat(latest), flavor: flavorAt(now), tick: frame, x: runX, cols: width, isSprint: frame < sprintUntil }
+      return <ui.Raster key={RUNNER} columns={width} rows={RUN_ROWS} cells={runFrame(run)} />
+    }
+    band.mode = 'text'
+    return <ui.Text color={uiTokens(flavorAt(now)).accent}>{walkFrame(frame, e.props.bodyColumns)}</ui.Text>
   })
 
   on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {

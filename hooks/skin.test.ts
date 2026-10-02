@@ -53,11 +53,11 @@ test('the engine components are redrawn with cat words, a tail and a walking ban
   expect(await hint.find({ type: 'Text', text: /🐱/ })).toBeDefined()
   const base = { hasSurvey: false, maxRows: 5, bodyColumns: 40, scroll: { offset: 0, bodyRows: 5 }, view: {} }
   const band = await mountSkin($, 'AbovePrompt', { ...base, isWorking: true })
-  expect(await band.find({ type: 'Text', text: /=\^\.\^=/ })).toBeDefined()
+  expect(await band.find({ key: 'runner' })).toBeDefined()
   const idle = await mountSkin($, 'AbovePrompt', { ...base, isWorking: false })
-  expect(await idle.find({ type: 'Text', text: /=\^\.\^=/ })).toBeUndefined()
+  expect(await idle.find({ key: 'runner' })).toBeUndefined()
   const survey = await mountSkin($, 'AbovePrompt', { ...base, isWorking: true, hasSurvey: true })
-  expect(await survey.find({ type: 'Text', text: /=\^\.\^=/ })).toBeUndefined()
+  expect(await survey.find({ key: 'runner' })).toBeUndefined()
 })
 
 test('/cat theme sets the Catppuccin theme Claude Code lists, or says how to get it', async ($, on) => {

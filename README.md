@@ -114,7 +114,9 @@ Claude Code's own screen gets a cat skin. Pick a level in `/config` → **Cat in
 | `light` | the spinner word ("Purring…", "Pouncing…"), the turn line ("Napped for 3s") and a hint tail (`🐱 Mochi · happy · 120c`) |
 | `off` | Claude Code looks as it always does |
 
-`full` also adds a `=^.^=` that pads across a band above the prompt while Claude works, a paw on each tool row (🐟 Read/Grep, 🧶 Edit/Write, 🐭 Bash, 🐾 other) and a reworded ctrl+b pill. The band gives way to surveys, and your own key binding stays.
+`full` also adds:
+- **Running cat**: a pixel-art cat in the active cat's coat gallops along a band above the prompt while Claude works, kicking up dust, and wraps when it catches the fish. It sprints for a couple of seconds on every tool call. The band needs 5 free rows and a terminal at least 30 columns wide; otherwise a small `=^.^=` walks along one row. The band gives way to surveys.
+- A paw on each tool row (🐟 Read/Grep, 🧶 Edit/Write, 🐭 Bash, 🐾 other) and a reworded ctrl+b pill; your own key binding stays.
 
 ## Sound
 
@@ -144,6 +146,7 @@ hooks/critters.ts            seasonal critters, finding, museum donations, selli
 hooks/collection.ts          cat book, Paw Miles tasks, achievements, miles shop
 hooks/calendar.ts            seasons, festivals, birthdays, catnip market
 hooks/time.ts                local-midnight day numbers
+hooks/runner.ts              the running-cat band: sprite frames, track, Raster cells
 hooks/skin.ts                cat skin: spinner words, hint tail, walking band, tool paws
 hooks/sfx.ts                 which moments make a sound, clip paths, Windows playback argv
 hooks/arcade/engine.ts       pixel framebuffer, half-block runs, particles, shake, easing

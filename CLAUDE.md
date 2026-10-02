@@ -36,7 +36,7 @@ On this machine `~/.claude/settings.json` sets `env.CLAUDE_CODE_PLUGIN_DIRS` to 
 
 ## Cat skin (`hooks/skin.ts`)
 
-The `ui.render` hooks on Claude Code's own components pass with `next(e)` when `skin` is `off`. The `ToolUse` hook wraps `await next(e)` and never rebuilds the row.
+The `ui.render` hooks on Claude Code's own components pass with `next(e)` when `skin` is `off`. The `ToolUse` hook wraps `await next(e)` and never rebuilds the row. The running-cat band (`hooks/runner.ts`) is repainted by the frame timer in `register.tsx` through `$.ui.blit`; its `toBase64` copies the one in `scene.ts` so the two can change separately.
 
 ## Rules for the save (`Home` in `types/index.d.ts`)
 
