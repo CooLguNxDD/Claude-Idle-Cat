@@ -20,6 +20,7 @@ Then type `/cat` to open the pane.
 | `/cat reset` | start over with a new household |
 | `f` `p` `e` `n` | Feed (5c) · Play · Pet · Nap/Wake |
 | `1` `2` `3` | buy Auto-feeder · Yarn toy · Cozy bed |
+| `c` `s` | switch tabs: Cat · Skills |
 
 How the game works:
 - Stats drop and coins build up in real time. Time while you're away counts too, up to 8 hours.
@@ -28,7 +29,8 @@ How the game works:
 - The household starts with room for 2 cats. Every cat earns coins.
 - Claude helps: +1c for each tool call, and +3c and +2xp each time Claude finishes a reply.
 - A daily check-in bonus grows with your streak (up to 7 days). Random AFK events give extra coins.
-- The cat evolves from kitten to cat (red collar) at level 5, and to chonk (gold crown) at level 10.
+- Each level gives a skill point for the Skills tab (`s`). There are three branches: **Hunter** (coins, AFK finds, gifts), **Cuddler** (joy, xp) and **Dreamer** (sleep, time away). Resetting skills costs coins.
+- Cats grow from kitten to cat (red collar) at level 5. At level 10 they evolve into the form of their strongest branch: **Ninja** (headband), **Royal** (crown and cape) or **Cloud** (halo and wings). A cat with no skills becomes a **Chonk**.
 - The terminal shows an animated pixel-art scene with a day, dusk and night sky that follows your clock. Other surfaces show an ASCII cat.
 
 Progress is saved in the plugin's `$.store`, so it carries over between sessions.
@@ -53,7 +55,8 @@ hooks/register.tsx           wiring: session.start, /cat, tool.call, turn.comple
 hooks/game.ts                pure rules: tick, act, buy, checkIn, evolution
 hooks/scene.ts               pixel-art scene → Raster cells (two pixels per cell, '▀')
 hooks/genes.ts               coats, eyes, personalities, shiny odds, coat painting
-hooks/mods.ts                trait multipliers the rules read
+hooks/mods.ts                trait × skill multipliers the rules read
+hooks/skills.ts              skill tree, points, evolution forms
 hooks/rng.ts                 seeded random numbers (repeatable tests)
 hooks/theme.ts               Catppuccin palettes and flavor resolution
 hooks/art.ts                 ASCII fallback

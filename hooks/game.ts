@@ -2,6 +2,7 @@ import type { Cat, EffectKind, Genes, Home, Upgrades } from '../types'
 import { GINGER, rollGenes } from './genes'
 import { modsOf } from './mods'
 import { pick } from './rng'
+import { FORM_LEVEL, canLearn, formOf, learn, respecPrice } from './skills'
 import type { Rng } from './rng'
 
 const MINUTE = 60_000
@@ -15,7 +16,7 @@ const START_MAX_CATS = 2
 export type Action = 'feed' | 'play' | 'pet' | 'nap'
 export type Item = keyof Upgrades
 export type Mood = 'sleeping' | 'grumpy' | 'happy' | 'ok'
-export type Stage = 'kitten' | 'cat' | 'chonk'
+export type Stage = 'kitten' | 'cat'
 
 export const SHOP: Record<Item, { label: string; base: number; perk: string }> = {
   feeder: { label: 'Auto-feeder', base: 40, perk: 'feeds hungry cats' },
@@ -77,24 +78,27 @@ const withCat = (home: Home, id: string, fn: (cat: Cat) => Cat): Home =>
   ({ ...home, cats: home.cats.map(c => (c.id === id ? fn(c) : c)) })
 
 export const xpToNext = (level: number) => level * 50
-export const stageOf = (level: number): Stage => (level < 5 ? 'kitten' : level < 10 ? 'cat' : 'chonk')
+export const stageOf = (level: number): Stage => (level < 5 ? 'kitten' : 'cat')
+// What the cat is called now: its evolved form from FORM_LEVEL, else its stage.
+export const stageName = (cat: Cat): string => formOf(cat) ?? stageOf(cat.level)
 export const priceOf = (home: Home, item: Item) => Math.round(SHOP[item].base * 1.8 ** home.upgrades[item])
 export const adoptPrice = (home: Home) => 100 * home.cats.length
 export const catRate = (home: Home, cat: Cat) =>
-  cat.level * modsOf(cat).coin * (1 + 0.25 * home.upgrades.toy) * (cat.hunger < 35 ? 0.75 : 1)
+  cat.level * modsOf(cat).coin * (1 + 0.25 * home.upgrades.toy) * (cat.hunger < 35 ? 0.75 : 1) *
+  (cat.isAsleep ? modsOf(cat).sleepCoin : 1)
 export const coinRate = (home: Home) => home.cats.reduce((sum, cat) => sum + catRate(home, cat), 0)
 
 const gainXp = (home: Home, id: string, xp: number, now: number): Home => {
   let log = home.log
   let effect = home.effect
   const next = withCat(home, id, cat => {
-    let c = { ...cat, xp: cat.xp + xp }
+    let c = { ...cat, xp: cat.xp + Math.round(xp * modsOf(cat).xp) }
     while (c.xp >= xpToNext(c.level)) {
       const level = c.level + 1
-      const evolved = stageOf(level) !== stageOf(c.level)
-      effect = fx('levelup', now)
-      log = evolved ? `${c.name} evolved into a ${stageOf(level)}!` : `${c.name} reached level ${level}!`
       c = { ...c, xp: c.xp - xpToNext(c.level), level }
+      effect = fx(level === FORM_LEVEL ? 'evolve' : 'levelup', now)
+      log = level === FORM_LEVEL ? `${c.name} evolved into a ${formOf(c)}!`
+        : level === 5 ? `${c.name} grew into a cat! +1 skill point` : `${c.name} reached level ${level}! +1 skill point`
     }
     return c
   })
@@ -103,12 +107,12 @@ const gainXp = (home: Home, id: string, xp: number, now: number): Home => {
 
 const tickCat = (home: Home, cat: Cat, min: number): Cat => {
   const m = modsOf(cat)
-  const regen = 3 * (1 + 0.5 * home.upgrades.bed)
+  const regen = 3 * (1 + 0.5 * home.upgrades.bed) * m.regen
   const energy = cat.isAsleep ? clamp(cat.energy + regen * min) : decay(cat.energy, 0.2 * m.energyDecay * min)
   return {
     ...cat,
     hunger: decay(cat.hunger, 0.5 * min),
-    joy: decay(cat.joy, 0.3 * min),
+    joy: decay(cat.joy, 0.3 * m.joyDecay * min),
     energy,
     isAsleep: cat.isAsleep && energy < 100,
   }
@@ -116,7 +120,8 @@ const tickCat = (home: Home, cat: Cat, min: number): Cat => {
 
 // Advances real time since lastTick for every cat; offline time is capped at 8h.
 export const tick = (home: Home, now: number, rng: Rng = Math.random): Home => {
-  const min = Math.min(Math.max(0, now - home.lastTick), MAX_AFK_MS) / MINUTE
+  const cap = MAX_AFK_MS + Math.max(...home.cats.map(c => modsOf(c).offlineHours)) * 60 * MINUTE
+  const min = Math.min(Math.max(0, now - home.lastTick), cap) / MINUTE
   let next: Home = {
     ...home,
     cats: home.cats.map(cat => tickCat(home, cat, min)),
@@ -217,6 +222,26 @@ export const rename = (home: Home, name: string): Home => {
   const cat = activeCat(home)
   const clean = name.slice(0, 20)
   return withCat({ ...home, log: `${cat.name} is now ${clean}!` }, cat.id, c => ({ ...c, name: clean }))
+}
+
+// Spends one of the active cat's skill points.
+export const learnSkill = (home: Home, id: string): Home => {
+  const cat = activeCat(home)
+  const check = canLearn(cat, id)
+  if (!check.ok) return { ...home, log: `Can't learn that: ${check.reason}.` }
+  const next = learn(cat, id)
+  const form = formOf(next)
+  const changed = form !== formOf(cat) ? ` ${cat.name} is now a ${form}!` : ''
+  return withCat({ ...home, log: `${cat.name} learned a skill.${changed}` }, cat.id, () => next)
+}
+
+// Refunds every skill point of the active cat, for a fee.
+export const respec = (home: Home, now: number): Home => {
+  const cat = activeCat(home)
+  const price = respecPrice(cat)
+  if (home.coins < price) return { ...home, log: `Resetting skills costs ${price}c.` }
+  return withCat({ ...home, coins: home.coins - price, effect: fx('shop', now),
+    log: `${cat.name} forgot every skill. Points refunded.` }, cat.id, c => ({ ...c, skills: {} }))
 }
 
 // Claude's work tips the household; xp goes to the active cat.

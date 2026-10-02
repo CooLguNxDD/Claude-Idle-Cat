@@ -1,13 +1,15 @@
 import { read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Home } from '../types'
+import type { Home, View } from '../types'
 import { catArt } from './art'
-import { SHOP, act, activeCat, adopt, adoptPrice, bar, buy, checkIn, coinRate, migrate, moodOf, newHome, priceOf,
-  rename, reward, stageOf, switchTo, tick, xpToNext } from './game'
+import { SHOP, act, activeCat, adopt, adoptPrice, bar, buy, checkIn, coinRate, learnSkill, migrate, moodOf, newHome,
+  priceOf, rename, respec, reward, stageName, switchTo, tick, xpToNext } from './game'
 import type { Action, Item } from './game'
 import { PERSONALITY_INFO, describeGenes } from './genes'
 import { ROWS, frameCells, sceneCols } from './scene'
+import { BRANCHES, FORM_LEVEL, SKILLS, branchPoints, canLearn, formOf, freePoints, rankOf, respecPrice } from './skills'
+import type { Branch } from './skills'
 import { resolveFlavor, uiTokens } from './theme'
 
 const PANE = 'afk-cat'
@@ -15,6 +17,11 @@ const SCENE = 'scene'
 const TICK_MS = 10_000
 const FRAME_MS = 125
 const homeRef = { plugin: 'afk-cat', key: 'home' } as const
+const viewRef = { plugin: 'afk-cat', key: 'view' } as const
+const TABS: { view: View; label: string; hotkey: string }[] = [
+  { view: 'cat', label: 'Cat', hotkey: 'c' },
+  { view: 'skills', label: 'Skills', hotkey: 's' },
+]
 
 // Latest home and scene width for the animation loop, which repaints without a render pass.
 let latest: Home | null = null
@@ -132,15 +139,65 @@ export const register: Register = (on, options) => {
     const scene = 'Raster' in ui
       ? <ui.Raster key={SCENE} columns={cols} rows={ROWS}
           cells={frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols })} />
-      : <Box flexDirection="column">{catArt(mood, home.frame).map(line => <Text>{line}</Text>)}</Box>
+      : <Box flexDirection="column">{catArt(mood, home.frame, formOf(cat)).map(line => <Text>{line}</Text>)}</Box>
 
-    return (
+    const view = (await read($, viewRef)) ?? 'cat'
+    const tabs = (
+      <Box>
+        {TABS.map(t => (
+          <Button key={`tab-${t.view}`} hotkey={t.hotkey} label={t.view === view ? `▸${t.label}` : t.label}
+            variant={t.view === view ? 'primary' : undefined} onPress={() => update($, viewRef, () => t.view)} />
+        ))}
+      </Box>
+    )
+    const header = (
       <Box flexDirection="column">
         <Text bold color={tone.title}>
-          {cat.name} · Lv {cat.level} {stageOf(cat.level)} · {mood}
+          {cat.name} · Lv {cat.level} {stageName(cat)} · {mood}
           {home.streak > 1 ? ` · 🔥${home.streak}d` : ''}
         </Text>
         <Text color={tone.muted}>{describeGenes(cat.genes)} — {PERSONALITY_INFO[cat.genes.personality]}</Text>
+      </Box>
+    )
+
+    if (view === 'skills') {
+      const points = freePoints(cat)
+      const form = formOf(cat)
+      return (
+        <Box flexDirection="column">
+          {tabs}
+          {header}
+          <Text color={points > 0 ? tone.ok : tone.muted}>
+            Skill points: {points} · one per level · {form ? `form: ${form}` : `evolves at Lv${FORM_LEVEL} by its strongest branch`}
+          </Text>
+          {(Object.keys(BRANCHES) as Branch[]).map(branch => (
+            <Box flexDirection="column">
+              <Text bold color={tone.accent}>
+                {BRANCHES[branch].title} ({branchPoints(cat, branch)}) — {BRANCHES[branch].blurb} → {BRANCHES[branch].form}
+              </Text>
+              {SKILLS.filter(sk => sk.branch === branch).map(sk => {
+                const rank = rankOf(cat, sk.id)
+                const check = canLearn(cat, sk.id)
+                const mark = rank >= sk.maxRank ? '■' : rank > 0 ? '▣' : check.ok ? '□' : '·'
+                const why = !check.ok && check.reason !== 'maxed' && check.reason !== 'no skill points' ? ` (${check.reason})` : ''
+                return (
+                  <Button key={`skill-${sk.id}`} plain label={`${mark} ${sk.name} ${rank}/${sk.maxRank} · ${sk.perk}${why}`}
+                    onPress={() => change($, h => learnSkill(h, sk.id))} />
+                )
+              })}
+            </Box>
+          ))}
+          <Text italic color={tone.log}>{home.log}</Text>
+          <Button key="respec" plain label={`Reset skills · ${respecPrice(cat)}c`}
+            onPress={() => change($, (h, t) => respec(h, t))} />
+        </Box>
+      )
+    }
+
+    return (
+      <Box flexDirection="column">
+        {tabs}
+        {header}
         {scene}
         {home.cats.length > 1 && (
           <Box>
@@ -156,7 +213,10 @@ export const register: Register = (on, options) => {
         <Text color={tone.accent}>
           XP {bar((cat.xp / xpToNext(cat.level)) * 100, 10)} {cat.xp}/{xpToNext(cat.level)}
         </Text>
-        <Text color={tone.coin}>Coins {Math.floor(home.coins)} (+{coinRate(home).toFixed(1)}/min)</Text>
+        <Text color={tone.coin}>
+          Coins {Math.floor(home.coins)} (+{coinRate(home).toFixed(1)}/min)
+          {freePoints(cat) > 0 ? ` · ${freePoints(cat)} skill point${freePoints(cat) > 1 ? 's' : ''} to spend (s)` : ''}
+        </Text>
         <Text italic color={tone.log}>{home.log}</Text>
         <Box>
           {ACTIONS.map(a => (

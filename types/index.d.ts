@@ -1,4 +1,4 @@
-export type EffectKind = 'hearts' | 'fish' | 'yarn' | 'coins' | 'levelup' | 'shop' | 'adopt'
+export type EffectKind = 'hearts' | 'fish' | 'yarn' | 'coins' | 'levelup' | 'evolve' | 'shop' | 'adopt'
 export type Effect = { kind: EffectKind; at: number }
 export type Upgrades = { feeder: number; toy: number; bed: number }
 
@@ -21,6 +21,8 @@ export type Cat = {
   skills: Record<string, number>
 }
 
+export type View = 'cat' | 'skills'
+
 export type Home = {
   version: 2
   coins: number
@@ -38,6 +40,6 @@ export type Home = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'afk-cat': { home: Home | null }
+    'afk-cat': { home: Home | null; view: View }
   }
 }

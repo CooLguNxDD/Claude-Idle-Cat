@@ -1,6 +1,8 @@
 import type { Cat, Home } from '../types'
 import { activeCat, moodOf, stageOf } from './game'
 import { coatPixel } from './genes'
+import { formOf } from './skills'
+import type { Form } from './skills'
 import { dayPartOf, inkOf, mix } from './theme'
 import type { Flavor } from './theme'
 
@@ -101,11 +103,13 @@ export const frameCells = ({ home, now, tick, hour, flavor: f, cols }: SceneInpu
   const mood = moodOf(cat)
   const stage = stageOf(cat.level)
   const bob = mood === 'sleeping' ? 1 : tick % 16 < 8 ? 0 : 1
-  const jump = fresh('yarn', 1.2) || fresh('levelup', 1.5) || fresh('adopt', 1.5)
+  const jump = fresh('yarn', 1.2) || fresh('levelup', 1.5) || fresh('adopt', 1.5) || fresh('evolve', 1.5)
     ? -Math.round(3 * Math.sin((age / 1.2) * Math.PI)) : 0
   const ox = 8
   const oy = 8 + bob + Math.min(0, jump)
   const isBlink = mood === 'sleeping' || tick % 40 < 2
+  const form = formOf(cat)
+  drawFormBack(form, ox, oy, tick, f, put)
   CAT.forEach((row, y) =>
     [...row].forEach((ch, x) => {
       let c = ch
@@ -123,7 +127,7 @@ export const frameCells = ({ home, now, tick, hour, flavor: f, cols }: SceneInpu
   if (mood === 'grumpy') for (const x of [3, 4, 8, 9]) put(ox + x, oy + 4, ink)
   const tailColor = coatPixel(cat.genes, f, 'f', 12, 10) ?? f.peach
   for (const [x, y] of TAIL[mood === 'sleeping' ? 0 : Math.floor(tick / 4) % 2] ?? []) put(ox + x, oy + y, tailColor)
-  if (stage === 'chonk') for (const x of [4, 6, 8, 10]) put(ox + x - 1, oy - 1, f.yellow)
+  drawFormFront(form, ox, oy, tick, f, put)
 
   // Particles drawn as characters over the pixels.
   const headRow = Math.floor(oy / 2)
@@ -142,6 +146,7 @@ export const frameCells = ({ home, now, tick, hour, flavor: f, cols }: SceneInpu
   if (fresh('yarn', 2)) text(2 + (Math.floor(age * 12) % 22), 10, '@', f.maroon)
   if (fresh('shop', 2)) text(10, 1, 'NEW ITEM!', rainbow(tick))
   if (fresh('adopt', 3)) [...'WELCOME!'].forEach((ch, i) => text(11 + i, 1, ch, rainbow(tick + i)))
+  if (fresh('evolve', 3)) [...'EVOLVED!'].forEach((ch, i) => text(12 + i, 1, ch, rainbow(tick + i)))
   if (fresh('levelup', 3)) [...'LEVEL UP!'].forEach((ch, i) => text(12 + i, 1, ch, rainbow(tick + i)))
 
   const cells = new Uint32Array(cols * ROWS * 3)
@@ -159,7 +164,43 @@ export const frameCells = ({ home, now, tick, hour, flavor: f, cols }: SceneInpu
   return toBase64(new Uint8Array(cells.buffer))
 }
 
-const drawMini = (cat: Cat, x0: number, y0: number, tick: number, f: Flavor, put: (x: number, y: number, c: number) => void) => {
+type Put = (x: number, y: number, c: number) => void
+
+// Behind the body: cape (royal), wings (cloud), extra belly (chonk).
+const drawFormBack = (form: Form | null, ox: number, oy: number, tick: number, f: Flavor, put: Put) => {
+  if (form === 'royal') for (let y = 8; y <= 12; y++) for (const x of [0, 1, 12, 13]) put(ox + x, oy + y, f.mauve)
+  if (form === 'cloud') {
+    const lift = tick % 8 < 4 ? 0 : 1
+    for (const [x, y] of [[-2, 7], [-1, 7], [-3, 8], [-2, 8], [-1, 8], [-2, 9]] as const) {
+      put(ox + x, oy + y - lift, f.lavender)
+      put(ox + 13 - x, oy + y - lift, f.lavender)
+    }
+  }
+  if (form === 'chonk') for (let y = 8; y <= 11; y++) for (const x of [0, 13]) put(ox + x, oy + y, inkOf(f))
+}
+
+// In front: headband and flapping ribbon (ninja), crown (royal), halo (cloud).
+const drawFormFront = (form: Form | null, ox: number, oy: number, tick: number, f: Flavor, put: Put) => {
+  if (form === 'ninja') {
+    for (let x = 2; x <= 11; x++) put(ox + x, oy + 3, f.red)
+    const flap = tick % 6 < 3 ? 0 : 1
+    put(ox + 13, oy + 3 + flap, f.red)
+    put(ox + 14, oy + 4 - flap, f.red)
+  }
+  if (form === 'royal') {
+    for (let x = 3; x <= 10; x++) put(ox + x, oy - 1, f.yellow)
+    for (const x of [3, 6, 7, 10]) put(ox + x, oy - 2, f.yellow)
+    put(ox + 6, oy - 1, f.red)
+  }
+  if (form === 'cloud') {
+    const glow = tick % 16 < 8 ? f.yellow : f.peach
+    for (let x = 4; x <= 9; x++) put(ox + x, oy - 2, glow)
+    put(ox + 3, oy - 1, glow)
+    put(ox + 10, oy - 1, glow)
+  }
+}
+
+const drawMini = (cat: Cat, x0: number, y0: number, tick: number, f: Flavor, put: Put) => {
   const isBlink = cat.isAsleep || tick % 40 < 2
   MINI.forEach((row, y) =>
     [...row].forEach((ch, x) => {

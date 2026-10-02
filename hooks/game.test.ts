@@ -40,7 +40,7 @@ test('xp levels up and evolves the cat', async () => {
   for (let i = 0; i < 10; i++) home = act({ ...home, cats: home.cats.map(c => ({ ...c, energy: 100 })) }, 'play', 1)
   expect(activeCat(home).level).toBe(2)
   expect(stageOf(5)).toBe('cat')
-  expect(stageOf(10)).toBe('chonk')
+  expect(stageOf(10)).toBe('cat')
 })
 
 test('shop prices grow and the auto-feeder feeds every hungry cat', async () => {

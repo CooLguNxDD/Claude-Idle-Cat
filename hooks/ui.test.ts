@@ -19,6 +19,11 @@ test('the pane draws the scene and its buttons work on each surface', async ($, 
     expect(await ui.find({ key: 'adopt' })).toBeDefined()
     await ui.press({ key: 'pet' })
     expect(await ui.find({ type: 'Text', text: /purrs/ })).toBeDefined()
+    await ui.press({ key: 'tab-skills' })
+    expect(await ui.find({ type: 'Text', text: /Skill points: 0/ })).toBeDefined()
+    await ui.press({ key: 'skill-claws' })
+    expect(await ui.find({ type: 'Text', text: /no skill points/ })).toBeDefined()
+    await ui.press({ key: 'tab-cat' })
     await ui.unmount()
   }
 })
