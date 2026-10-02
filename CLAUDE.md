@@ -2,13 +2,14 @@
 
 `afk-cat`: an AFK virtual-pet cat game that runs as a Claude Code mod, a plugin of function hooks. `README.md` covers gameplay and the file layout. This file covers what you need to know before changing code.
 
-## Checks: run all four before committing
+## Checks: run before committing
 
 ```bash
 claude plugin validate .            # manifest, hooks, $.state keys vs types/index.d.ts
 npx -y -p typescript tsc -p .       # the mod (extends .claude-plugin/types/tsconfig.json)
 npx -y -p typescript tsc -p web     # the browser runtime (DOM lib)
 claude plugin test .                # every hooks/**/*.test.ts
+node --test server/arcade.test.mjs   # local routes and browser-location permission flow
 ```
 
 `.claude-plugin/types/` is written by the engine when the mod loads and is git-ignored. If it's missing, load the mod once (see below) before running `tsc -p .`.
@@ -27,6 +28,7 @@ On this machine `~/.claude/settings.json` sets `env.CLAUDE_CODE_PLUGIN_DIRS` to 
   - `server/public/art/*.png` is generated from `tools/build-art.mjs`; regenerate it after changing its source art or theme palettes. The browser draws at 320×180 from a 112×64 simulation world.
   - The games in `hooks/arcade/games/*.ts` are shared: the mod reads their medals and `maxScore`, and the browser runs them.
   - `server/arcade.mjs` is plain Node with no dependencies. The mod spawns it with an `ARCADE_TOKEN`.
+    - It also serves the token-protected `/location` page; device coordinates return as a validated `location` stdout message. Browser geolocation runs only after the user clicks its button.
     - Append `&canvas=1` to an authorized arcade URL to inspect the Canvas fallback.
     - The first stdout line is `{"kind":"ready","port":N}`. After that, browser actions arrive as JSON lines; `parseLine` in `hooks/arcade/bridge.ts` reads them.
     - The mod pushes state to `POST /api/state`.
@@ -40,6 +42,7 @@ On this machine `~/.claude/settings.json` sets `env.CLAUDE_CODE_PLUGIN_DIRS` to 
 
   Never write the store any other way.
 - A new field on `Home` needs a default in `newHome` and must survive `migrate` (`hooks/game.ts`, currently `version: 3`). Old saves don't have it.
+- `Home.weather` stores a rounded location, display units and checked current conditions. Weather is off by default; all HTTP wiring stays in `register.tsx`, and stale or unavailable data falls back to the seasonal yard.
 - Award arcade rounds only through `finishGame` in `hooks/arcade/rewards.ts`. It pays a round only if the mod started it (`arcade.open`), and it clamps both the time and the score, because browser input can't be trusted.
 - `/cat export` and `/cat import` (`hooks/backup.ts`) write to `~/.claude-kitten/backups/`. Import backs up the current save first; keep that behaviour.
 

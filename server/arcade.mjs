@@ -13,6 +13,9 @@ const STATIC = {
   '/': ['index.html', 'text/html; charset=utf-8'],
   '/arcade.js': ['arcade.js', 'text/javascript; charset=utf-8'],
   '/arcade.css': ['arcade.css', 'text/css; charset=utf-8'],
+  '/location': ['location.html', 'text/html; charset=utf-8'],
+  '/location.js': ['location.js', 'text/javascript; charset=utf-8'],
+  '/location.css': ['location.css', 'text/css; charset=utf-8'],
 }
 const GAME_IDS = new Set(['dash', 'catch', 'laser', 'whack', 'tank', 'lanes'])
 const FLAVORS = new Set(['latte', 'frappe', 'macchiato', 'mocha'])
@@ -55,6 +58,9 @@ const broadcast = () => {
 
 // The browser forwards only what a player can do; the mod checks every round against what it started.
 const FROM_BROWSER = {
+  '/api/location': b => typeof b.latitude === 'number' && Number.isFinite(b.latitude) && Math.abs(b.latitude) <= 90
+    && typeof b.longitude === 'number' && Number.isFinite(b.longitude) && Math.abs(b.longitude) <= 180
+    && { kind: 'location', latitude: Math.round(b.latitude * 100) / 100, longitude: Math.round(b.longitude * 100) / 100 },
   '/api/start': b => typeof b.game === 'string' && { kind: 'start', game: b.game },
   '/api/result': b => typeof b.game === 'string' && Number.isFinite(b.score) && Number.isFinite(b.ms)
     && { kind: 'result', game: b.game, score: b.score, ms: b.ms },
@@ -71,7 +77,8 @@ const server = createServer(async (req, res) => {
   const png = artFile(url.pathname)
   const asset = STATIC[url.pathname] ?? (png ? [png, 'image/png'] : null)
   if (req.method === 'GET' && asset) {
-    if (url.pathname === '/' && token !== TOKEN) return send(res, 403, 'Open the arcade from the cat pane.', 'text/plain')
+    if ((url.pathname === '/' || url.pathname === '/location') && token !== TOKEN)
+      return send(res, 403, 'Open this page from the cat pane.', 'text/plain')
     try {
       return send(res, 200, await readFile(join(PUBLIC, asset[0]), asset[1] === 'image/png' ? undefined : 'utf8'), asset[1])
     } catch {
@@ -89,6 +96,7 @@ const server = createServer(async (req, res) => {
   if (req.method !== 'POST') return send(res, 404, { error: 'not found' })
   let body
   try { body = await readBody(req) } catch { return send(res, 400, { error: 'body' }) }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return send(res, 400, { error: 'body' })
   if (url.pathname === '/api/state') {
     state = { menu: body.menu ?? null, round: body.round ?? null }
     lastPing = Date.now()

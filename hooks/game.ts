@@ -12,6 +12,7 @@ import { FORM_LEVEL, canLearn, formOf, learn, respecPrice } from './skills'
 import type { Rng } from './rng'
 import { localDay } from './time'
 import { stepVisitors } from './visitors'
+import { emptyWeather, normalizeWeather } from './weather/state'
 
 const MINUTE = 60_000
 const DAY = 24 * 60 * MINUTE
@@ -52,7 +53,7 @@ export const newHome = (now: number, cat: Cat = newCat('c1', 'Mochi', GINGER, no
   tier: 0, loan: 0, owned: [...STARTER], decor: { ...STARTER_DECOR }, visitors: [], nextId: 2,
   book: EMPTY_BOOK, pocket: {}, museum: [], miles: EMPTY_MILES, achievements: {}, shinyCharm: false,
   celebrated: [], catnip: { week: 0, qty: 0, paid: 0 }, arcade: { day: 0, plays: {}, best: {}, golds: 0, open: null },
-  rev: 0, prefs: { glow: true, crt: false },
+  rev: 0, prefs: { glow: true, crt: false }, weather: emptyWeather(),
 })
 
 type OldUpgrades = Partial<{ feeder: number; toy: number; bed: number }>
@@ -85,12 +86,14 @@ export const migrate = (saved: unknown, now: number): Home => {
   if (version === 3) {
     const home = saved as Home
     // A round left open by a closed session is dropped (its energy stays spent).
-    return { ...base, ...home, cats: home.cats.map(normalizeCat), arcade: { ...base.arcade, ...home.arcade, open: null } }
+    return { ...base, ...home, cats: home.cats.map(normalizeCat), arcade: { ...base.arcade, ...home.arcade, open: null },
+      weather: normalizeWeather(home.weather, now) }
   }
   if (version === 2) {
     const { upgrades, maxCats: _old, ...v2 } = saved as V2Home & { maxCats?: number }
     const nextId = Math.max(0, ...v2.cats.map(c => Number(c.id.slice(1)) || 0)) + 1
-    return { ...base, ...v2, cats: v2.cats.map(normalizeCat), version: 3, ...furnitureFromUpgrades(upgrades), nextId }
+    return { ...base, ...v2, cats: v2.cats.map(normalizeCat), version: 3, ...furnitureFromUpgrades(upgrades), nextId,
+      weather: normalizeWeather(v2.weather, now) }
   }
   const v1 = saved as V1Cat
   const cat: Cat = {

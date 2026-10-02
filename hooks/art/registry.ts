@@ -8,6 +8,7 @@ import { LANES_ART } from '../arcade/art/lanes'
 import { CAT_ART } from './cats'
 import { FURNITURE_ART } from './furniture'
 import { COLOR_TOKENS } from '../theme'
+import { WEATHER_ART, WEATHER_PALETTES } from './weather'
 import type { PixelArt } from './types'
 
 export const DRAW_ORDER = ['back', 'world', 'actor', 'front', 'effect'] as const satisfies readonly PixelArt['layer'][]
@@ -18,4 +19,4 @@ export const GAME_ART = {
 } as const satisfies Record<GameId, Record<string, PixelArt>>
 
 export const ART = { cats: CAT_ART, furniture: FURNITURE_ART, games: GAME_ART,
-  colorTokens: COLOR_TOKENS, drawOrder: DRAW_ORDER } as const
+  weather: WEATHER_ART, weatherPalettes: WEATHER_PALETTES, colorTokens: COLOR_TOKENS, drawOrder: DRAW_ORDER } as const

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:">
+  <title>Cat Weather · Device location</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/location.css">
+</head>
+<body>
+  <main>
+    <div class="cat" aria-hidden="true">/\_/\<br>( o.o )<br>&gt; ^ &lt;</div>
+    <h1>Weather for your cat’s yard</h1>
+    <p>Your browser can use this device’s location when you grant permission.</p>
+    <p>The coordinates are rounded to two decimal places, saved with your cats, and sent to <a href="https://open-meteo.com/">Open-Meteo</a> for weather.</p>
+    <button id="locate" type="button">Use device location</button>
+    <p id="status" role="status" aria-live="polite">Choose the button to request location.</p>
+    <p class="hint">Prefer a city? Return to the pane’s Weather tab, or type <code>/cat weather London, GB</code>.</p>
+  </main>
+  <script src="/location.js"></script>
+</body>
+</html>

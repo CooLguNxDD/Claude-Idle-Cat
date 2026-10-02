@@ -1,7 +1,7 @@
 import { read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Home, View } from '../types'
+import type { Home, View, WeatherLocation, WeatherReading } from '../types'
 import { arcadeUrl, browserArgv, newToken, parseLine, snapshotOf, splitLines } from './arcade/bridge'
 import { GAMES, gameOf } from './arcade/games'
 import { ENERGY_COST, PAID_PLAYS, featured, finishGame, playsLeft, quitGame, startGame } from './arcade/rewards'
@@ -27,6 +27,9 @@ import { BRANCHES, FORM_LEVEL, SKILLS, branchPoints, canLearn, formOf, freePoint
 import type { Branch } from './skills'
 import { FLAVORS, resolveFlavor, uiTokens } from './theme'
 import type { Flavor } from './theme'
+import { parseCurrent } from './weather/conditions'
+import { coordinates, forecastUrl, geocodingUrl, locationKey, locationUrl, parseLocations } from './weather/location'
+import { acceptWeather, emptyWeather, liveWeather, refreshDue, setLocation, weatherSummary } from './weather/state'
 
 const PANE = 'afk-cat'
 const SCENE = 'scene'
@@ -45,6 +48,7 @@ const TABS: { view: View; label: string; hotkey: string }[] = [
   { view: 'book', label: 'Book', hotkey: 'b' },
   { view: 'miles', label: 'Miles', hotkey: 'm' },
   { view: 'arcade', label: 'Arcade', hotkey: 'g' },
+  { view: 'weather', label: 'Weather', hotkey: 't' },
 ]
 const COATS: Coat[] = ['ginger', 'tabby', 'grey', 'black', 'white', 'cream', 'calico', 'tuxedo', 'siamese']
 const FORMS = ['ninja', 'royal', 'cloud', 'chonk']
@@ -59,6 +63,8 @@ let isSoundOn = true
 let flavorNow: (now: number) => Flavor = () => FLAVORS.mocha
 // The browser arcade's server: started on first use, killed with the module; the token guards it.
 const arcade = { port: 0, token: newToken(Math.random), starting: null as Promise<number> | null, pushed: '', isOpened: false }
+let weatherJob: { key: string; task: Promise<void> } | null = null
+let searchSerial = 0
 
 // Plays a clip: $.audio.play where the host has a player, PowerShell on Windows.
 const playClip = async ($: EngineInterface, clip: Clip) => {
@@ -110,6 +116,15 @@ const pushArcade = async ($: EngineInterface, home: Home, now: number) => {
 const onArcadeLine = async ($: EngineInterface, line: string) => {
   const msg = parseLine(line)
   if (!msg || msg.kind === 'ready') return
+  if (msg.kind === 'location') {
+    const location = coordinates(msg.latitude, msg.longitude, 'device')
+    if (!location) return
+    searchSerial++
+    await change($, h => ({ ...h, weather: setLocation(h.weather, location) }))
+    $.ui.toast('Device location saved. Checking the weather…')
+    void refreshWeather($)
+    return
+  }
   if (msg.kind === 'start') {
     await change($, (h, t) => startGame(h, msg.game, t))
     return
@@ -190,6 +205,118 @@ const ACTIONS: { action: Action; label: string; hotkey: string }[] = [
 
 const hourOf = (now: number) => new Date(now).getHours()
 
+const weatherJson = async ($: EngineInterface, url: string): Promise<unknown> => {
+  const response = await Promise.race([
+    $.http.fetch(url),
+    $.clock.sleep(12_000).then(() => { throw new Error('Weather request timed out') }),
+  ])
+  if (!response.ok) throw new Error('Weather service unavailable')
+  return JSON.parse(response.text)
+}
+
+const refreshWeather = async ($: EngineInterface, force = false): Promise<void> => {
+  const now = await $.clock.now()
+  const state = latest?.weather
+  if (!state?.location || !refreshDue(state, now, force)) return
+  const location = state.location
+  const key = locationKey(location)
+  if (weatherJob?.key === key) {
+    await weatherJob.task
+    return refreshWeather($, force)
+  }
+  const task = (async () => {
+    const home = await change($, h => locationKey(h.weather.location) === key
+      ? { ...h, weather: { ...h.weather, attemptedAt: now } } : h)
+    if (locationKey(home.weather.location) !== key) return
+    let reading: WeatherReading | null = null
+    let error: string | null = null
+    try {
+      reading = parseCurrent(await weatherJson($, forecastUrl(location)), await $.clock.now())
+      if (!reading) error = 'Weather data was incomplete or out of date. Retrying in 5 minutes.'
+    } catch {
+      error = 'Could not reach Open-Meteo. Retrying in 5 minutes.'
+    }
+    await change($, h => h.weather.attemptedAt !== now ? h
+      : { ...h, weather: acceptWeather(h.weather, key, reading, error) })
+  })()
+  weatherJob = { key, task }
+  try { await task } finally { if (weatherJob?.task === task) weatherJob = null }
+}
+
+const selectWeather = async ($: EngineInterface, location: WeatherLocation) => {
+  searchSerial++
+  await change($, h => ({ ...h, weather: setLocation(h.weather, location) }))
+  await refreshWeather($)
+  return { text: `${latest?.weather.location?.label ?? location.label}\n${weatherSummary(latest!.weather, await $.clock.now())}` }
+}
+
+const searchWeather = async ($: EngineInterface, query: string): Promise<{ text: string }> => {
+  const name = query.trim()
+  if (name.length < 2 || name.length > 100) {
+    const text = 'Enter a city name (2–100 characters), e.g. /cat weather London, GB.'
+    await change($, h => ({ ...h, weather: { ...h.weather, candidates: [], notice: text } }))
+    return { text }
+  }
+  const serial = ++searchSerial
+  await change($, h => ({ ...h, weather: { ...h.weather, candidates: [], notice: `Searching for ${name}…` } }))
+  let candidates: WeatherLocation[] = []
+  let notice = ''
+  try {
+    candidates = parseLocations(await weatherJson($, geocodingUrl(name)))
+    notice = candidates.length ? 'Choose your city below.' : 'No city found. Try a nearby city or use latitude and longitude.'
+  } catch {
+    notice = 'City search is unavailable. Try again, or use /cat weather at <latitude> <longitude>.'
+  }
+  if (serial !== searchSerial) return { text: 'Location search superseded by your newer choice.' }
+  if (candidates.length === 1) return selectWeather($, candidates[0]!)
+  await change($, h => ({ ...h, weather: { ...h.weather, candidates, notice } }))
+  return { text: [notice, ...candidates.map((l, i) => `${i + 1}. ${l.label}`),
+    candidates.length ? 'Choose in the Weather tab or /cat weather choose <number>.' : ''].filter(Boolean).join('\n') }
+}
+
+const openWeatherLocation = async ($: EngineInterface): Promise<{ text: string }> => {
+  const port = await ensureArcade($)
+  if (!port) return { text: 'Device location needs Node.js on your PATH. You can still enter a city in the Weather tab.' }
+  const isWindows = (await $.env.get('OS')) === 'Windows_NT'
+  for (const argv of browserArgv(isWindows, locationUrl(port, arcade.token))) {
+    const ran = await $.process.run(argv, { timeoutMs: 5000 }).catch(() => null)
+    if (ran?.exitCode === 0) return { text: 'Opened Cat Weather. Choose “Use device location” and allow your browser to access location.' }
+  }
+  return { text: `Open ${locationUrl(port, arcade.token)} to use device location, or enter a city in the Weather tab.` }
+}
+
+const weatherCommand = async ($: EngineInterface, arg: string): Promise<{ text: string }> => {
+  await change($, h => h)
+  const [sub = '', ...rest] = arg.trim().split(/\s+/)
+  if (!sub) return { text: `${weatherSummary(latest!.weather, await $.clock.now())}\nSet a city: /cat weather <city> · device: /cat weather system · stop: /cat weather off` }
+  if (sub === 'off') {
+    searchSerial++
+    await change($, h => ({ ...h, weather: emptyWeather(h.weather.units) }))
+    return { text: 'Weather disabled and the saved location cleared. The yard follows the seasons.' }
+  }
+  if (sub === 'system') return openWeatherLocation($)
+  if (sub === 'refresh') {
+    await refreshWeather($, true)
+    return { text: weatherSummary(latest!.weather, await $.clock.now()) }
+  }
+  if (sub === 'units') {
+    const units = rest[0]?.toLowerCase()
+    if (units !== 'c' && units !== 'f') return { text: 'Usage: /cat weather units c|f' }
+    await change($, h => ({ ...h, weather: { ...h.weather, units } }))
+    return { text: weatherSummary(latest!.weather, await $.clock.now()) }
+  }
+  if (sub === 'choose') {
+    const n = Number(rest[0])
+    const location = Number.isInteger(n) && rest.length === 1 ? latest!.weather.candidates[n - 1] : undefined
+    return location ? selectWeather($, location) : { text: 'Search for a city first, then /cat weather choose <number>.' }
+  }
+  if (sub === 'at') {
+    const location = rest.length === 2 ? coordinates(Number(rest[0]), Number(rest[1])) : null
+    return location ? selectWeather($, location) : { text: 'Usage: /cat weather at <latitude -90…90> <longitude -180…180>' }
+  }
+  return searchWeather($, arg)
+}
+
 const HELP = [
   '/cat (or /cat show) — open the pane',
   '/cat hide — close the pane (the cats keep earning)',
@@ -199,7 +326,8 @@ const HELP = [
   '/cat reset — start over (wipes everything)',
   '/cat export [file] — save a backup (default: ~/.claude-kitten/backups/)',
   '/cat import <file> — load a backup (your current save is backed up first)',
-  'In the pane: c s h r b m g tabs · f e n feed/pet/nap · p arcade in the browser · w cat list · a adopt',
+  '/cat weather <city> — real weather; system for device location, off to clear, refresh to update',
+  'In the pane: c s h r b m g t tabs · f e n feed/pet/nap · p arcade in the browser · w cat list · a adopt',
 ].join('\n')
 
 const userHome = async ($: EngineInterface) => (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
@@ -252,7 +380,7 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'cat',
-      description: 'Open your AFK cats (/cat hide, /cat adopt [name], /cat switch <name>, /cat rename <name>, /cat export, /cat import <file>, /cat help)',
+      description: 'Open your AFK cats (/cat hide, /cat adopt [name], /cat switch <name>, /cat rename <name>, /cat weather <city>, /cat export, /cat import <file>, /cat help)',
     })
     await readTheme($)
     const saved = (await $.store.get('home')) ?? (await $.store.get('cat'))
@@ -265,6 +393,8 @@ export const register: Register = (on, options) => {
     })
     if (home.effect?.kind === 'welcome') $.ui.toast(home.log)
     if (bonus > 0) $.ui.toast(`Day ${home.streak} streak bonus: +${bonus}c`)
+    void refreshWeather($)
+    $.clock.every(60_000, () => { void refreshWeather($) })
     $.clock.every(TICK_MS, () => void readTheme($).then(() => change($, (h, t) => tick(h, t))))
     // Keeps the arcade server alive; it shuts itself down two minutes after the pings stop.
     $.clock.every(30_000, () => {
@@ -290,6 +420,12 @@ export const register: Register = (on, options) => {
       return { text: 'The cats will keep earning while the pane is closed. /cat brings it back.' }
     }
     if (sub === 'export' || sub === 'import') return backupCommand($, sub, arg)
+    if (sub === 'weather') {
+      await update($, viewRef, (): View => 'weather')
+      const result = await weatherCommand($, arg)
+      await $.ui.open({ id: PANE, title: 'AFK Cat' })
+      return result
+    }
     if (sub && !['show', 'open', 'rename', 'adopt', 'switch', 'reset'].includes(sub)) return { text: HELP }
     let home: Home
     if (sub === 'rename' && arg) home = await change($, h => rename(h, arg))
@@ -344,13 +480,48 @@ export const register: Register = (on, options) => {
     const view = (await read($, viewRef)) ?? 'cat'
     const isCatListOpen = (await read($, catListRef)) ?? false
     const tabs = (
-      <Box>
-        {TABS.map(t => (
+      <Box flexDirection="column">
+        {[TABS.slice(0, 4), TABS.slice(4)].map((row, i) => <Box key={`tabs-${i}`}>{row.map(t => (
           <Button key={`tab-${t.view}`} hotkey={t.hotkey} label={t.view === view ? `▸${t.label}` : t.label}
             variant={t.view === view ? 'primary' : undefined} onPress={() => update($, viewRef, () => t.view)} />
-        ))}
+        ))}</Box>)}
       </Box>
     )
+
+    const weatherRow = <Button key="weather-status" plain label={weatherSummary(home.weather, now)}
+      onPress={() => update($, viewRef, (): View => 'weather')} />
+
+    if (view === 'weather') {
+      const reading = liveWeather(home.weather, now)
+      return <Box flexDirection="column">
+        {tabs}
+        {scene}
+        <Text bold color={tone.title}>Yard weather</Text>
+        <Text color={tone.accent}>{weatherSummary(home.weather, now)}</Text>
+        {home.weather.location && <Text color={tone.muted}>{home.weather.location.label}</Text>}
+        {reading && <Text color={tone.muted}>Updated {Math.max(0, Math.floor((now - reading.fetchedAt) / 60_000))} min ago · refreshes every 15 minutes</Text>}
+        {home.weather.error && <Text color={tone.warn}>{home.weather.error}{!reading ? ' Using the seasonal yard.' : ''}</Text>}
+        {'Input' in ui ? <ui.Input key="weather-city" label="City" placeholder="London, GB" submitLabel="search"
+          onSubmit={async value => { await searchWeather($, value) }} />
+          : <Text>Choose a city: /cat weather London, GB</Text>}
+        {home.weather.notice && <Text color={tone.muted}>{home.weather.notice}</Text>}
+        {home.weather.candidates.map((location, i) => <Button key={`weather-city-${i + 1}`} plain
+          label={`${i + 1}. ${location.label}`} onPress={async () => { await selectWeather($, location) }} />)}
+        <Button key="weather-system" plain label="Use device location…" onPress={async () => {
+          const result = await openWeatherLocation($)
+          await change($, h => ({ ...h, weather: { ...h.weather, notice: result.text } }))
+        }} />
+        <Text color={tone.muted}>Opens your browser for location permission. The rounded location is saved with your cats and sent to Open-Meteo.</Text>
+        <Box>
+          <Button key="weather-refresh" label="Refresh" onPress={() => refreshWeather($, true)} />
+          <Button key="weather-units" label={home.weather.units === 'c' ? 'Use °F' : 'Use °C'}
+            onPress={() => change($, h => ({ ...h, weather: { ...h.weather, units: h.weather.units === 'c' ? 'f' : 'c' } }))} />
+          <Button key="weather-off" label="Off" onPress={async () => { await weatherCommand($, 'off') }} />
+        </Box>
+        <Text color={tone.muted}>Coordinates: /cat weather at 51.50 -0.12</Text>
+        <Text color={tone.muted}>Weather: <ui.Link href="https://open-meteo.com/">Open-Meteo</ui.Link> · city search: <ui.Link href="https://www.geonames.org/">GeoNames</ui.Link></Text>
+      </Box>
+    }
     const header = (
       <Box flexDirection="column">
         <Text bold color={tone.title}>
@@ -517,6 +688,7 @@ export const register: Register = (on, options) => {
         <Box flexDirection="column">
           {tabs}
           {scene}
+          {weatherRow}
           <Text bold color={tone.title}>
             {tier.name} · {home.cats.length}/{tier.maxCats} cats · {tier.slots.length} decor spots · Coins {Math.floor(home.coins)}
           </Text>
@@ -619,6 +791,7 @@ export const register: Register = (on, options) => {
         {tabs}
         {header}
         {scene}
+        {weatherRow}
         <Text italic color={tone.title}>{cat.name}: "{dialogue(cat, now, hourOf(now))}"</Text>
         <Button key="cat-list" hotkey="w" plain
           label={`${isCatListOpen ? '▾' : '▸'} Cats ${home.cats.length}/${maxCats(home)} · ${cat.name} (w)`}

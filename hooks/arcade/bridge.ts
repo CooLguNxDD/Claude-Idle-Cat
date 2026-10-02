@@ -6,6 +6,7 @@ import type { GameMods } from './game'
 import { GAMES, isGameId } from './games'
 import { PAID_PLAYS, featured, modsFor, parseMessage, playsLeft } from './rewards'
 import type { ArcadeMessage } from './rewards'
+import { validCoordinates } from '../weather/location'
 
 export type MenuGame = { id: GameId; name: string; blurb: string; controls: string; best: number; left: number; medals: number[] }
 export type Prefs = Home['prefs']
@@ -29,7 +30,8 @@ export const snapshotOf = (home: Home, now: number, flavor: FlavorName): Snapsho
   }
 }
 
-export type ServerLine = { kind: 'ready'; port: number } | ArcadeMessage | { kind: 'start'; game: GameId } | { kind: 'prefs'; prefs: Prefs }
+export type ServerLine = { kind: 'ready'; port: number } | ArcadeMessage | { kind: 'start'; game: GameId }
+  | { kind: 'prefs'; prefs: Prefs } | { kind: 'location'; latitude: number; longitude: number }
 
 // One stdout line from the server; anything else it prints is ignored.
 export const parseLine = (line: string): ServerLine | null => {
@@ -37,6 +39,8 @@ export const parseLine = (line: string): ServerLine | null => {
   try { data = JSON.parse(line) } catch { return null }
   if (!data || typeof data !== 'object') return null
   const d = data as Record<string, unknown>
+  if (d.kind === 'location') return validCoordinates(d.latitude, d.longitude)
+    ? { kind: 'location', latitude: d.latitude as number, longitude: d.longitude as number } : null
   if (d.kind === 'ready') return Number.isInteger(d.port) && (d.port as number) > 0 ? { kind: 'ready', port: d.port as number } : null
   if (d.kind === 'start') return isGameId(d.game) ? { kind: 'start', game: d.game } : null
   if (d.kind === 'prefs') return typeof d.glow === 'boolean' && typeof d.crt === 'boolean' ? { kind: 'prefs', prefs: { glow: d.glow, crt: d.crt } } : null

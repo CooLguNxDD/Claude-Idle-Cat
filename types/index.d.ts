@@ -29,7 +29,18 @@ export type Visitor = { id: string; name: string; genes: Genes; arrivedAt: numbe
 
 export type Slot = 'bowl' | 'bed' | 'toy' | 'rug' | 'plant' | 'hanging'
 
-export type View = 'cat' | 'skills' | 'home' | 'friends' | 'book' | 'miles' | 'arcade'
+export type View = 'cat' | 'skills' | 'home' | 'friends' | 'book' | 'miles' | 'arcade' | 'weather'
+
+export type WeatherCondition = 'clear' | 'partly-cloudy' | 'cloudy' | 'fog' | 'drizzle' | 'rain' | 'snow' | 'storm'
+export type WeatherLocation = { label: string; latitude: number; longitude: number; source: 'city' | 'coordinates' | 'device' }
+export type WeatherReading = {
+  code: number; condition: WeatherCondition; temperatureC: number; windKph: number; windDegrees: number
+  cloudPercent: number; precipitationMm: number; isDay: boolean; observedAt: number; fetchedAt: number; utcOffset: number
+}
+export type WeatherState = {
+  location: WeatherLocation | null; units: 'c' | 'f'; current: WeatherReading | null
+  attemptedAt: number | null; error: string | null; candidates: WeatherLocation[]; notice: string | null
+}
 
 export type GameId = 'dash' | 'catch' | 'laser' | 'whack' | 'tank' | 'lanes'
 // Mini-games: today's paid plays, best scores, and the round in progress (paid only if it was started).
@@ -78,6 +89,7 @@ export type Home = {
   rev: number
   // Browser arcade display settings.
   prefs: { glow: boolean; crt: boolean }
+  weather: WeatherState
 }
 
 declare module 'claude-code' {

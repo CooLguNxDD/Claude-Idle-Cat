@@ -22,6 +22,9 @@ test('only well-formed server lines are read', async () => {
   expect(parseLine('{"kind":"result","game":"dash","score":5,"ms":100}')).toEqual({ kind: 'result', game: 'dash', score: 5, ms: 100 })
   expect(parseLine('{"kind":"prefs","glow":false,"crt":true}')).toEqual({ kind: 'prefs', prefs: { glow: false, crt: true } })
   expect(parseLine('{"kind":"prefs","glow":"yes","crt":true}')).toBeNull()
+  expect(parseLine('{"kind":"location","latitude":51.5,"longitude":-0.12}')).toEqual({ kind: 'location', latitude: 51.5, longitude: -0.12 })
+  expect(parseLine('{"kind":"location","latitude":91,"longitude":0}')).toBeNull()
+  expect(parseLine('{"kind":"location","latitude":"51.5","longitude":0}')).toBeNull()
 })
 
 test('the snapshot carries the menu and the open round, and the token is 128-bit hex', async () => {
