@@ -82,6 +82,8 @@ const onState = (next: State) => {
   if (menu) {
     theme(FLAVORS[menu.flavor] ?? FLAVORS.mocha)
     drawMenu(menu)
+    renderer?.set('glow', menu.prefs.glow)
+    renderer?.set('crt', menu.prefs.crt)
   }
   if (next.round && next.round.id !== live?.round.id) start(next.round)
   if (!next.round && live) {
@@ -163,8 +165,12 @@ const boot = () => {
       }
       return
     }
-    if (e.key === 'g' && !e.repeat) renderer?.toggle('glow')
-    if (e.key === 'c' && !e.repeat) renderer?.toggle('crt')
+    // Display settings are kept by the mod, so they come back next session.
+    if ((e.key === 'g' || e.key === 'c') && !e.repeat && renderer?.kind === 'webgl') {
+      const effect = e.key === 'g' ? 'glow' : 'crt'
+      renderer.set(effect, !renderer.isOn(effect))
+      void post('/api/prefs', { glow: renderer.isOn('glow'), crt: renderer.isOn('crt') })
+    }
     const key = KEYS[e.key] ?? (e.key === ' ' ? ' ' : e.key.length === 1 ? e.key.toLowerCase() : '')
     if (!key) return
     e.preventDefault()

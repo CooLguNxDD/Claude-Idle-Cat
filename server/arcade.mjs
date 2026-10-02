@@ -49,6 +49,7 @@ const FROM_BROWSER = {
   '/api/result': b => typeof b.game === 'string' && Number.isFinite(b.score) && Number.isFinite(b.ms)
     && { kind: 'result', game: b.game, score: b.score, ms: b.ms },
   '/api/quit': b => typeof b.game === 'string' && { kind: 'quit', game: b.game },
+  '/api/prefs': b => typeof b.glow === 'boolean' && typeof b.crt === 'boolean' && { kind: 'prefs', glow: b.glow, crt: b.crt },
 }
 
 const server = createServer(async (req, res) => {

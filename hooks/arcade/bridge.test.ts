@@ -20,6 +20,8 @@ test('only well-formed server lines are read', async () => {
   expect(parseLine('{"kind":"ready","port":-1}')).toBeNull()
   expect(parseLine('Debugger listening…')).toBeNull()
   expect(parseLine('{"kind":"result","game":"dash","score":5,"ms":100}')).toEqual({ kind: 'result', game: 'dash', score: 5, ms: 100 })
+  expect(parseLine('{"kind":"prefs","glow":false,"crt":true}')).toEqual({ kind: 'prefs', prefs: { glow: false, crt: true } })
+  expect(parseLine('{"kind":"prefs","glow":"yes","crt":true}')).toBeNull()
 })
 
 test('the snapshot carries the menu and the open round, and the token is 128-bit hex', async () => {

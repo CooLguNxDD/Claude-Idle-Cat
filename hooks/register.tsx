@@ -6,6 +6,7 @@ import { arcadeUrl, browserArgv, newToken, parseLine, snapshotOf, splitLines } f
 import { GAMES, gameOf } from './arcade/games'
 import { ENERGY_COST, PAID_PLAYS, featured, finishGame, playsLeft, quitGame, startGame } from './arcade/rewards'
 import { catArt } from './art'
+import { backupDir, backupName, inDir, parseBackup, pickBase, toBackup } from './backup'
 import { buyCatnip, marketNow, seasonOf, sellCatnip, weekOf } from './calendar'
 import { ACHIEVEMENTS, MILES_SHOP, buyWithMiles, settle, tasksFor, track } from './collection'
 import { CRITTERS, critter, isAvailable, sell } from './critters'
@@ -71,11 +72,12 @@ const playClip = async ($: EngineInterface, clip: Clip) => {
 // Applies a change to the household, then saves it so it survives restarts.
 const change = async ($: EngineInterface, fn: (home: Home, now: number) => Home) => {
   const now = await $.clock.now()
+  const stored = await $.store.get('home')
   let home!: Home
   let before!: Home
   await update($, homeRef, prev => {
-    before = prev ?? newHome(now)
-    return (home = settle(fn(before, now), now))
+    before = pickBase(stored, prev ?? newHome(now), now)
+    return (home = { ...settle(fn(before, now), now), rev: before.rev + 1 })
   })
   latest = home
   const clip = home.effect && home.effect !== before.effect ? CLIP_FOR[home.effect.kind] : undefined
@@ -110,6 +112,10 @@ const onArcadeLine = async ($: EngineInterface, line: string) => {
   if (!msg || msg.kind === 'ready') return
   if (msg.kind === 'start') {
     await change($, (h, t) => startGame(h, msg.game, t))
+    return
+  }
+  if (msg.kind === 'prefs') {
+    await change($, h => ({ ...h, prefs: msg.prefs }))
     return
   }
   let wasOpen = false
@@ -191,8 +197,47 @@ const HELP = [
   '/cat switch [name] — change the active cat (no name: the next one)',
   '/cat rename <name> — rename the active cat',
   '/cat reset — start over (wipes everything)',
+  '/cat export [file] — save a backup (default: ~/.claude-kitten/backups/)',
+  '/cat import <file> — load a backup (your current save is backed up first)',
   'In the pane: c s h r b m g tabs · f e n feed/pet/nap · p arcade in the browser · w cat list · a adopt',
 ].join('\n')
+
+const userHome = async ($: EngineInterface) => (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
+
+// /cat export writes a dated backup; /cat import checks one, backs up the current save, then loads it.
+const backupCommand = async ($: EngineInterface, sub: 'export' | 'import', arg: string): Promise<{ text: string }> => {
+  const dir = backupDir(await userHome($))
+  const now = await $.clock.now()
+  if (sub === 'export') {
+    const home = await change($, h => h)
+    const path = arg || inDir(dir, backupName(now))
+    try {
+      await $.fs.write(path, toBackup(home, now))
+    } catch {
+      return { text: `Could not write ${path}.` }
+    }
+    return { text: `Saved ${home.cats.map(c => c.name).join(', ')} and ${Math.floor(home.coins)}c to ${path}` }
+  }
+  if (!arg) return { text: 'Usage: /cat import <file>  (backups live in ' + dir + ')' }
+  let text: string
+  try {
+    text = String(await $.fs.read(arg))
+  } catch {
+    return { text: `Could not read ${arg}.` }
+  }
+  const parsed = parseBackup(text, now)
+  if ('error' in parsed) return { text: `Not imported: ${parsed.error}.` }
+  const current = await change($, h => h)
+  const safety = inDir(dir, backupName(now, '-before-import'))
+  try {
+    await $.fs.write(safety, toBackup(current, now))
+  } catch {
+    return { text: `Not imported: could not back up the current save to ${safety} first.` }
+  }
+  const home = await change($, () => ({ ...parsed.home, rev: current.rev, log: `Welcome back, ${parsed.home.cats.map(c => c.name).join(' and ')}!` }))
+  await $.ui.open({ id: PANE, title: 'AFK Cat' })
+  return { text: `Imported ${home.cats.length} cats and ${Math.floor(home.coins)}c. Your previous save is at ${safety}` }
+}
 
 const readTheme = async ($: EngineInterface) => {
   const row = (await $.config.list()).find(r => r.key === 'theme')
@@ -207,7 +252,7 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'cat',
-      description: 'Open your AFK cats (/cat hide, /cat adopt [name], /cat switch <name>, /cat rename <name>, /cat reset, /cat help)',
+      description: 'Open your AFK cats (/cat hide, /cat adopt [name], /cat switch <name>, /cat rename <name>, /cat export, /cat import <file>, /cat help)',
     })
     await readTheme($)
     const saved = (await $.store.get('home')) ?? (await $.store.get('cat'))
@@ -244,6 +289,7 @@ export const register: Register = (on, options) => {
       await $.ui.close({ id: PANE })
       return { text: 'The cats will keep earning while the pane is closed. /cat brings it back.' }
     }
+    if (sub === 'export' || sub === 'import') return backupCommand($, sub, arg)
     if (sub && !['show', 'open', 'rename', 'adopt', 'switch', 'reset'].includes(sub)) return { text: HELP }
     let home: Home
     if (sub === 'rename' && arg) home = await change($, h => rename(h, arg))

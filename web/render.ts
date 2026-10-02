@@ -6,7 +6,8 @@ export type Renderer = {
   kind: 'webgl' | 'canvas'
   draw: (f: Frame) => void
   resize: (width: number, height: number) => void
-  toggle: (effect: Effect) => void
+  set: (effect: Effect, isOn: boolean) => void
+  isOn: (effect: Effect) => boolean
 }
 
 const VERTEX = `#version 300 es
@@ -114,7 +115,8 @@ const webgl = (canvas: HTMLCanvasElement, w: number, h: number): Renderer | null
         canvas.height = Math.round(height)
         gl.viewport(0, 0, canvas.width, canvas.height)
       },
-      toggle: effect => { effects[effect] = !effects[effect] },
+      set: (effect, isOn) => { effects[effect] = isOn },
+      isOn: effect => effects[effect],
     }
   } catch {
     return null
@@ -142,7 +144,8 @@ const plain = (canvas: HTMLCanvasElement, w: number, h: number): Renderer => {
       canvas.width = Math.round(width)
       canvas.height = Math.round(height)
     },
-    toggle: () => undefined,
+    set: () => undefined,
+    isOn: () => false,
   }
 }
 

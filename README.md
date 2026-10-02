@@ -20,12 +20,19 @@ Then type `/cat` to open the pane.
 | `/cat adopt [name]` | adopt a new cat with random genes (also `a` in the pane) |
 | `/cat switch [name]` | bring another cat front and centre; no name cycles to the next (or pick it from the cat list, `w` in the pane) |
 | `/cat reset` | start over with a new household |
+| `/cat export [file]` | save a backup; default `~/.claude-kitten/backups/afk-cat-<date>.json` |
+| `/cat import <file>` | load a backup; your current save is backed up first (`…-before-import.json`) |
 | `f` `e` `n` | Feed (5c) · Pet · Nap/Wake |
 | `p` | Play: opens the Arcade in your browser |
 | `o` | (Arcade tab) open or reopen the browser arcade |
 | `a` | adopt from the shelter |
 | `w` | open/close the cat list |
 | `c` `s` `h` `r` `b` `m` `g` | switch tabs: Cat · Skills · Home · Friends · Book · Miles · Arcade |
+
+Saves:
+- The household is one JSON save in the mod's store, written on every change.
+- Each save carries a revision number. With Claude Code open in two places, a session first loads a newer save the other one wrote, so progress isn't overwritten.
+- `/cat export` and `/cat import` move the cats between machines or plugin installs.
 
 How the game works:
 - Stats drop and coins build up in real time. Time while you're away counts too, up to 8 hours.
@@ -59,7 +66,7 @@ How the game works:
 - **Arcade tab** (`g`, or Play `p`):
   - The games run in your browser. `p` (or a game in the Arcade tab) starts a small local server and opens a tab at `http://localhost:<port>`. The pane keeps the game list, the round in progress and the results.
   - The games are drawn with WebGL: crisp pixel art scaled to fit, with a glow on bright pixels. `C` turns on a CRT look (curved screen, scanlines) and `G` toggles the glow. Without WebGL the page falls back to a plain canvas.
-  - The active cat stars in its own coat. Esc quits a round. The simulation runs at a fixed 60 Hz.
+  - The active cat stars in its own coat. Esc quits a round. The simulation runs at a fixed 60 Hz. Glow and CRT choices are saved with your cats.
   - Needs Node.js on your PATH. The server listens on 127.0.0.1 only, needs a per-session token, and shuts down two minutes after Claude Code goes away.
   - **Rooftop Dash**: jump flowerpots (space/↑), duck pigeons (↓) and grab fish treats while the rooftops speed up.
   - **Fish Catch**: slide the bowl (←/→ or mouse) under falling fish. Boots cost points; three cucumbers end the round.

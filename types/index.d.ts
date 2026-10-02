@@ -74,6 +74,10 @@ export type Home = {
   // Catnip bought from Daisy Meow this week; it spoils after Saturday.
   catnip: { week: number; qty: number; paid: number }
   arcade: Arcade
+  // Bumped on every save, so a session can tell when another one saved after it.
+  rev: number
+  // Browser arcade display settings.
+  prefs: { glow: boolean; crt: boolean }
 }
 
 declare module 'claude-code' {

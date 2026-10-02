@@ -52,6 +52,7 @@ export const newHome = (now: number, cat: Cat = newCat('c1', 'Mochi', GINGER, no
   tier: 0, loan: 0, owned: [...STARTER], decor: { ...STARTER_DECOR }, visitors: [], nextId: 2,
   book: EMPTY_BOOK, pocket: {}, museum: [], miles: EMPTY_MILES, achievements: {}, shinyCharm: false,
   celebrated: [], catnip: { week: 0, qty: 0, paid: 0 }, arcade: { day: 0, plays: {}, best: {}, golds: 0, open: null },
+  rev: 0, prefs: { glow: true, crt: false },
 })
 
 type OldUpgrades = Partial<{ feeder: number; toy: number; bed: number }>
