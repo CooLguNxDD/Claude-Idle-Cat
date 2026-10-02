@@ -62,6 +62,7 @@ How the game works:
   - **Laser Chase**: click the darting red dot (or aim with the arrows and press space) to pounce. Catches in a row multiply.
   - **Whack-a-Mouse**: bop mice as they pop out of a 3×3 board (keys 1–9 or click), and leave the slipper alone.
   - **Cat Tank**: click the water to drop food. Fed fry grow into fish and then golden fish, which drop silver and gold coins; click them before they settle. `b` spends 20 on another fry. A crow raids twice a round after a red flash; click it to swat it before it takes a fish.
+  - **Cats vs Mice**: a Plants vs Zombies-style lane defence. Spend catnip on cards (keys 1–3, then click a cell): yarn throwers shoot, napping cats block and dream up catnip, and box traps catch the first mouse in. Click falling catnip. Two waves, then a flag wave with rats; every lane you hold pays a bonus.
   - A round costs 10 energy. Bronze, silver and gold medals pay a few minutes of the household's income plus xp, for 3 paid plays per game a day. Every round adds joy and friendship. One featured game a day pays 2×.
   - Skills make games easier rather than paying more. For example, Dreamer points slow Dash's speed-up.
   - Quick play is still there: it tosses the yarn ball for instant joy.

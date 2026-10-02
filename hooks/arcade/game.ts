@@ -28,6 +28,8 @@ export type Game<S> = {
   draw: (s: S, f: Frame, look: Look) => void
   isOver: (s: S) => boolean
   score: (s: S) => number
+  // Extra HUD text, such as a currency the canvas has no room for.
+  status?: (s: S) => string
   // The most a fair round of `ms` could score: posted scores above it are clamped.
   maxScore: (ms: number) => number
 }

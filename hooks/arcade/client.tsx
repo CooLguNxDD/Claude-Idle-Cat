@@ -75,7 +75,7 @@ const Arcade: ClientModule<ArcadeProps, ArcadeState> = (props, surface) => {
   const medal = medalOf(game, score)
   const hud = game.isOver(live.s)
     ? `Round over · ${score} pts${medal ? ` · ${medal} medal!` : ''}${score > props.best ? ' · new best!' : ''}`
-    : `${game.name} · ${score} pts · ${left}s · best ${props.best}`
+    : `${game.name} · ${score} pts · ${left}s · best ${props.best}${game.status ? ` · ${game.status(live.s)}` : ''}`
 
   return (
     <Box flexDirection="column">
