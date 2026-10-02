@@ -20,6 +20,7 @@ Then type `/cat` to open the pane.
 | `/cat adopt [name]` | adopt a new cat with random genes (also `a` in the pane) |
 | `/cat switch [name]` | bring another cat front and centre; no name cycles to the next (or pick it from the cat list, `w` in the pane) |
 | `/cat reset` | start over with a new household |
+| `/cat theme <flavor>` | switch Claude Code itself to the Catppuccin theme (`latte` · `frappe` · `macchiato` · `mocha`); see Claude Code theme |
 | `/cat export [file]` | save a backup; default `~/.claude-kitten/backups/afk-cat-<date>.json` |
 | `/cat import <file>` | load a backup; your current save is backed up first (`…-before-import.json`) |
 | `f` `e` `n` | Feed (5c) · Pet · Nap/Wake |
@@ -97,6 +98,12 @@ Colors come from [Catppuccin](https://catppuccin.com/). Pick a flavor in `/confi
 | `daycycle` | Latte by day, Frappé at dusk, Mocha at night, by your clock |
 | `latte` · `frappe` · `macchiato` · `mocha` | always that flavor |
 
+## Claude Code theme
+
+The plugin also ships four Claude Code color themes, `themes/catppuccin-<flavor>.json`, which recolor the whole interface: accent, prompt border, diffs, message backgrounds and subagent colors. Pick one with `/theme` (or `/cat theme mocha`). Restart Claude Code once after installing so it loads them. With the flavor on `auto`, the cats then follow the theme you picked.
+
+Regenerate the files after changing a palette: `node tools/build-themes.mjs`.
+
 ## Cat interface
 
 Claude Code's own screen gets a cat skin. Pick a level in `/config` → **Cat interface**:
@@ -148,6 +155,8 @@ hooks/arcade/games/*.ts      the six mini-games (pure: init, step, draw, score)
 hooks/arcade/rewards.ts      energy cost, medals, daily paid plays, featured game, score checks
 assets/sfx/*.wav             the clips
 tools/gen-sfx.mjs            regenerates the clips
+tools/build-themes.mjs       writes themes/*.json (Claude Code custom themes) from hooks/theme.ts
+themes/*.json                the four Catppuccin Claude Code themes (generated, committed)
 hooks/rng.ts                 seeded random numbers (repeatable tests)
 hooks/theme.ts               Catppuccin palettes and flavor resolution
 hooks/art.ts                 ASCII fallback

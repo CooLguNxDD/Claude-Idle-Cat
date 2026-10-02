@@ -26,7 +26,7 @@ import type { Clip } from './sfx'
 import { BRANCHES, FORM_LEVEL, SKILLS, branchPoints, canLearn, formOf, freePoints, rankOf, respecPrice } from './skills'
 import type { Branch } from './skills'
 import { catHint, doneWord, hintTail, pawPrefix, skinLevel, spinnerWord, walkFrame } from './skin'
-import { FLAVORS, resolveFlavor, uiTokens } from './theme'
+import { FLAVORS, FLAVOR_NAMES, resolveFlavor, themeOptionFor, uiTokens } from './theme'
 import type { Flavor } from './theme'
 import type { SkinLevel } from './skin'
 
@@ -204,8 +204,23 @@ const HELP = [
   '/cat reset — start over (wipes everything)',
   '/cat export [file] — save a backup (default: ~/.claude-kitten/backups/)',
   '/cat import <file> — load a backup (your current save is backed up first)',
+  '/cat theme <latte|frappe|macchiato|mocha> — switch Claude Code to that Catppuccin theme',
   'In the pane: c s h r b m g tabs · f e n feed/pet/nap · p arcade in the browser · w cat list · a adopt',
 ].join('\n')
+
+// Sets Claude Code's own theme to one of this mod's Catppuccin themes, found in the theme row's options.
+const themeCommand = async ($: EngineInterface, arg: string) => {
+  const flavor = arg.trim().toLowerCase().replace(/é/g, 'e')
+  if (!(FLAVOR_NAMES as readonly string[]).includes(flavor)) return { text: `Usage: /cat theme <${FLAVOR_NAMES.join('|')}>` }
+  const row = (await $.config.list()).find(r => r.key === 'theme')
+  const option = themeOptionFor(row?.options ?? [], flavor)
+  if (!option) return { text: `Claude Code doesn't list a Catppuccin ${flavor} theme yet. Restart it once so the plugin's themes load, or pick one with /theme.` }
+  const set = await $.config.set({ key: 'theme', value: option })
+  if ('deny' in set && set.deny) return { text: `Couldn't change the theme: ${set.deny}` }
+  await readTheme($)
+  $.ui.invalidate('ui.render')
+  return { text: `Theme set to ${option}.` }
+}
 
 const userHome = async ($: EngineInterface) => (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
 
@@ -299,6 +314,7 @@ export const register: Register = (on, options) => {
       return { text: 'The cats will keep earning while the pane is closed. /cat brings it back.' }
     }
     if (sub === 'export' || sub === 'import') return backupCommand($, sub, arg)
+    if (sub === 'theme') return themeCommand($, arg)
     if (sub && !['show', 'open', 'rename', 'adopt', 'switch', 'reset'].includes(sub)) return { text: HELP }
     let home: Home
     if (sub === 'rename' && arg) home = await change($, h => rename(h, arg))

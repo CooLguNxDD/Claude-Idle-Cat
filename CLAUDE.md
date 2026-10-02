@@ -30,6 +30,10 @@ On this machine `~/.claude/settings.json` sets `env.CLAUDE_CODE_PLUGIN_DIRS` to 
     - The mod pushes state to `POST /api/state`.
     - The server listens on 127.0.0.1 only. It checks the token and the Host header and caps request bodies. Keep all of that when adding routes.
 
+## Themes
+
+`themes/*.json` are generated from `hooks/theme.ts` (`claudeThemeOf`). After any palette or token change run `node tools/build-themes.mjs` and commit them.
+
 ## Cat skin (`hooks/skin.ts`)
 
 The `ui.render` hooks on Claude Code's own components pass with `next(e)` when `skin` is `off`. The `ToolUse` hook wraps `await next(e)` and never rebuilds the row.

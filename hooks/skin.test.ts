@@ -59,3 +59,18 @@ test('the engine components are redrawn with cat words, a tail and a walking ban
   const survey = await mountSkin($, 'AbovePrompt', { ...base, isWorking: true, hasSurvey: true })
   expect(await survey.find({ type: 'Text', text: /=\^\.\^=/ })).toBeUndefined()
 })
+
+test('/cat theme sets the Catppuccin theme Claude Code lists, or says how to get it', async ($, on) => {
+  mock.clock(on, { now: 1_700_000_000_000 })
+  mock.store(on)
+  let options = ['dark', 'light']
+  const set: unknown[] = []
+  on('config.list', () => ({ value: [{ key: 'theme', options, value: 'dark' }] as never }))
+  on('config.set', (_$, e) => { set.push(e.value); return { value: e.value } as never })
+  const run = (args: string) => $.command.run({ command: 'cat', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } })
+  expect((await run('theme')).text).toMatch(/Usage/)
+  expect((await run('theme mocha')).text).toMatch(/doesn't list/)
+  options = ['dark', 'custom:catppuccin-mocha']
+  expect((await run('theme mocha')).text).toMatch(/Theme set to custom:catppuccin-mocha/)
+  expect(set).toEqual(['custom:catppuccin-mocha'])
+})
