@@ -54,6 +54,8 @@ const FORMS = ['ninja', 'royal', 'cloud', 'chonk']
 let latest: Home | null = null
 let cols = 34
 let frame = 0
+// What the frame loop paints: the pane's view and last cells, whether the scene is mounted, and an in-flight guard.
+const paint = { view: 'cat' as View, cells: '', isMounted: false, isBusy: false }
 // Claude Code's own theme row, read for the `auto` flavor.
 let claudeTheme = 'dark'
 let isSoundOn = true
@@ -429,18 +431,29 @@ export const register: Register = (on, options) => {
       if (band.mode === 'text') $.ui.invalidate('ui.render')
     })
     $.clock.every(FRAME_MS, async () => {
-      if (!latest) return
-      frame += 1
-      const now = await $.clock.now()
-      const view = ((await read($, routeRef)) ?? initialRoute()).view
-      const cells = view === 'adopt' ? shelterCells(latest, now, frame, flavorAt(now), cols)
-        : frameCells({ home: latest, now, tick: frame, hour: hourOf(now), flavor: flavorAt(now), cols })
-      await $.ui.blit({ requestId: PANE, key: SCENE, cells })
-      if (band.mode !== 'raster') return
-      const isSprint = frame < sprintUntil
-      runX = nextX(runX, band.cols, isSprint)
-      const run = { cat: activeCat(latest), flavor: flavorAt(now), tick: frame, x: runX, cols: band.cols, isSprint }
-      await $.ui.blit({ requestId: band.id, key: RUNNER, cells: runFrame(run) })
+      if (!latest || paint.isBusy) return
+      paint.isBusy = true
+      try {
+        frame += 1
+        const now = await $.clock.now()
+        const flavor = flavorAt(now)
+        // Skips the scene while the pane is closed and when a frame would repaint the same cells.
+        if (paint.isMounted) {
+          const cells = paint.view === 'adopt' ? shelterCells(latest, now, frame, flavor, cols)
+            : frameCells({ home: latest, now, tick: frame, hour: hourOf(now), flavor, cols })
+          if (cells !== paint.cells) {
+            paint.cells = cells
+            if ((await $.ui.blit({ requestId: PANE, key: SCENE, cells })).deny) paint.isMounted = false
+          }
+        }
+        if (band.mode !== 'raster') return
+        const isSprint = frame < sprintUntil
+        runX = nextX(runX, band.cols, isSprint)
+        const run = { cat: activeCat(latest), flavor, tick: frame, x: runX, cols: band.cols, isSprint }
+        if ((await $.ui.blit({ requestId: band.id, key: RUNNER, cells: runFrame(run) })).deny) band.mode = 'off'
+      } finally {
+        paint.isBusy = false
+      }
     })
     return next(e)
   })
@@ -524,10 +537,13 @@ export const register: Register = (on, options) => {
     )
     const view = ((await read($, routeRef)) ?? initialRoute()).view
     const reveal = revealedCat(home)
+    const sceneCells = 'Raster' in ui ? view === 'adopt' ? shelterCells(home, now, frame, flavor, cols)
+      : frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols }) : ''
+    paint.view = view
+    paint.cells = sceneCells
+    paint.isMounted = sceneCells !== ''
     const scene = 'Raster' in ui
-      ? <ui.Raster key={SCENE} columns={cols} rows={ROWS}
-          cells={view === 'adopt' ? shelterCells(home, now, frame, flavor, cols)
-            : frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols })} />
+      ? <ui.Raster key={SCENE} columns={cols} rows={ROWS} cells={sceneCells} />
       : view === 'adopt' && !reveal ? <Text color={tone.accent}>{'   /─────\\\n   │  ?  │\n   └─────┘'}</Text>
         : <Box flexDirection="column">{catArt(mood, home.frame, formOf(cat)).map(line => <Text>{line}</Text>)}</Box>
 
