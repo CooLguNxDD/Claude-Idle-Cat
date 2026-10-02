@@ -164,8 +164,10 @@ Claude Code's own screen gets a cat skin. Pick a level in `/config` → **Cat in
 | Value | What changes |
 | --- | --- |
 | `full` (default) | everything below |
-| `light` | the spinner word ("Purring…", "Pouncing…"), the turn line ("Napped for 3s") and a hint tail (`🐱 Mochi · happy · 120c`) |
+| `light` | the spinner word ("Purring…", "Pouncing…"), the turn line ("Napped for 3s") and a cat badge on the hint line (`ᓚᘏᗢ Mochi ∝▆ ♥▇ ϟ▅ ¢120`) |
 | `off` | Claude Code looks as it always does |
+
+The **cat badge** draws the active cat as `ᓚᘏᗢ` in its own coat colors (a calico is patchy, a siamese has dark points), with `✧` if it's shiny and `ᶻᶻ` while it naps. Its needs show as tiny meters instead of words: `∝` food, `♥` joy and `ϟ` energy, each bar green, yellow or red as it drops. Coins come last.
 
 `full` also adds:
 - **Running cat**: a pixel-art cat in the active cat's coat gallops along a band above the prompt while Claude works, kicking up dust, and wraps when it catches the fish. It sprints for a couple of seconds on every tool call. The band needs 5 free rows and a terminal at least 30 columns wide; otherwise a small `=^.^=` walks along one row. The band gives way to surveys.

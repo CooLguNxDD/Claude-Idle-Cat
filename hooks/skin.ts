@@ -1,5 +1,8 @@
 import type { Home } from '../types'
-import { activeCat, moodOf } from './game'
+import { activeCat } from './game'
+import { coatPixel } from './genes'
+import { css } from './theme'
+import type { Flavor } from './theme'
 
 export type SpinnerMode = 'requesting' | 'responding' | 'thinking' | 'tool-input' | 'tool-use'
 export type SkinLevel = 'full' | 'light' | 'off'
@@ -25,10 +28,29 @@ export const doneWord = (engineWord: string): string => DONE_WORDS[hashOf(engine
 
 export const skinLevel = (setting: unknown): SkinLevel => (setting === 'light' || setting === 'off' ? setting : 'full')
 
-export const hintTail = (home: Home | null | undefined): string => {
-  if (!home) return ''
+export type Span = { text: string; color?: string; isBold?: boolean }
+
+// Coat sample points (pane sprite coordinates) for the badge's tail, body and head glyphs.
+const TAIL: [number, number] = [2, 8]
+const BODY: [number, number] = [6, 7]
+const HEAD: [number, number] = [10, 2]
+const LEVELS = '▁▂▃▄▅▆▇█'
+export const meterGlyph = (n: number) => LEVELS[Math.min(7, Math.max(0, Math.floor(n / 12.5)))] as string
+const meterColor = (n: number, f: Flavor) => css(n < 35 ? f.red : n < 70 ? f.yellow : f.green)
+
+// The prompt-line badge: the active cat drawn in its own coat, then its needs as tiny meters.
+export const catBadge = (home: Home | null | undefined, f: Flavor): Span[] => {
+  if (!home) return []
   const cat = activeCat(home)
-  return `🐱 ${cat.name} · ${moodOf(cat)} · ${Math.floor(home.coins)}c`
+  const fur = ([x, y]: [number, number], ch: string) => css(coatPixel(cat.genes, f, ch, x, y) ?? f.peach)
+  const spans: Span[] = [{ text: 'ᓚ', color: fur(TAIL, 'd') }, { text: 'ᘏ', color: fur(BODY, 'f') }, { text: 'ᗢ', color: fur(HEAD, 'f') }]
+  if (cat.genes.isShiny) spans.push({ text: '✧', color: css(f.mauve) })
+  spans.push({ text: ` ${cat.name}`, isBold: true })
+  if (cat.isAsleep) spans.push({ text: ' ᶻᶻ', color: css(f.lavender) })
+  const needs: [string, number, number][] = [['∝', cat.hunger, f.peach], ['♥', cat.joy, f.pink], ['ϟ', cat.energy, f.yellow]]
+  for (const [icon, n, color] of needs) spans.push({ text: ` ${icon}`, color: css(color) }, { text: meterGlyph(n), color: meterColor(n, f) })
+  spans.push({ text: ` ¢${Math.floor(home.coins)}`, color: css(f.yellow) })
+  return spans
 }
 
 const CAT = '=^.^='

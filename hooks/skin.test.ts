@@ -1,7 +1,8 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { newHome } from './game'
-import { SPINNER_WORDS, catHint, doneWord, hintTail, pawPrefix, skinLevel, spinnerWord, walkFrame } from './skin'
+import { activeCat, newHome } from './game'
+import { FLAVORS } from './theme'
+import { SPINNER_WORDS, catBadge, catHint, doneWord, meterGlyph, pawPrefix, skinLevel, spinnerWord, walkFrame } from './skin'
 import type { SpinnerMode } from './skin'
 
 test('spinner words are stable per engine word and come from the mode list', () => {
@@ -25,21 +26,50 @@ test('the walking band is exactly as wide as asked and wraps', () => {
   expect(walkFrame(3, 2)).toHaveLength(2)
 })
 
-test('the hint tail names the active cat and tool rows get paws', () => {
-  const home = newHome(1_700_000_000_000)
-  expect(hintTail(home)).toMatch(/^🐱 .+ · \w+ · \d+c$/)
-  expect(hintTail(undefined)).toBe('')
+test('tool rows get paws and unknown skin levels fall back to full', () => {
   expect(pawPrefix('Bash')).toBe('🐭')
   expect(pawPrefix('Whatever')).toBe('🐾')
   expect(skinLevel('light')).toBe('light')
   expect(skinLevel('nonsense')).toBe('full')
 })
 
-type Dollar = Parameters<Extract<Parameters<typeof test>[1], (...a: never[]) => unknown>>[0]
-const mountSkin = async ($: Dollar, component: string, props: Record<string, unknown>) =>
-  $.ui.mount({ plugin: 'afk-cat', surface: 'terminal', component, props } as never)
+const textOf = (spans: { text: string }[]) => spans.map(s => s.text).join('')
 
-test('the engine components are redrawn with cat words, a tail and a walking band', async ($, on) => {
+test('the badge draws the active cat in its coat with need meters instead of words', () => {
+  const home = newHome(1_700_000_000_000)
+  const f = FLAVORS.mocha
+  const text = textOf(catBadge(home, f))
+  expect(text).toMatch(/^ᓚᘏᗢ .+ ∝. ♥. ϟ. ¢\d+$/)
+  expect(text).not.toMatch(/🐱|happy|ok|grumpy/)
+  expect(catBadge(undefined, f)).toEqual([])
+})
+
+test('badge colors follow the coat, shiny sparkles and sleep shows', () => {
+  const home = newHome(1_700_000_000_000)
+  const f = FLAVORS.mocha
+  const withCoat = (coat: string, extra: object = {}) => ({ ...home, cats: home.cats.map(c => c.id === home.activeId
+    ? { ...c, ...extra, genes: { ...c.genes, coat, isShiny: false, marking: 'classic' } } : c) }) as typeof home
+  const faceOf = (h: typeof home) => catBadge(h, f).slice(0, 3).map(s => s.color)
+  expect(faceOf(withCoat('ginger'))).not.toEqual(faceOf(withCoat('black')))
+  expect(new Set(faceOf(withCoat('calico'))).size).toBeGreaterThan(1)
+  expect(faceOf(withCoat('siamese'))[2]).not.toBe(faceOf(withCoat('siamese'))[1])
+  const cat = activeCat(home)
+  const shiny = { ...home, cats: home.cats.map(c => c.id === cat.id ? { ...c, isAsleep: true, genes: { ...c.genes, isShiny: true } } : c) }
+  expect(textOf(catBadge(shiny, f))).toMatch(/^ᓚᘏᗢ✧ .+ ᶻᶻ ∝/)
+})
+
+test('meters run from an empty to a full block', () => {
+  expect(meterGlyph(0)).toBe('▁')
+  expect(meterGlyph(50)).toBe('▅')
+  expect(meterGlyph(100)).toBe('█')
+  expect(meterGlyph(-5)).toBe('▁')
+})
+
+type Dollar = Parameters<Extract<Parameters<typeof test>[1], (...a: never[]) => unknown>>[0]
+const mountSkin = async ($: Dollar, component: string, props: Record<string, unknown>, surface = 'terminal') =>
+  $.ui.mount({ plugin: 'afk-cat', surface, component, props } as never)
+
+test('the engine components are redrawn with cat words, a coat badge and a walking band', async ($, on) => {
   mock.clock(on, { now: 1_700_000_000_000 })
   mock.store(on)
   on('ui.status', () => ({ value: undefined }))
@@ -50,7 +80,10 @@ test('the engine components are redrawn with cat words, a tail and a walking ban
   const spinner = await mountSkin($, 'Spinner', { word: 'Sauteing', message: null, suffix: '…', mode: 'thinking' })
   expect(await spinner.find({ type: 'Text', text: new RegExp(SPINNER_WORDS.thinking.join('|')) })).toBeDefined()
   const hint = await mountSkin($, 'PromptHint', { isDraft: false, isWorking: false, hint: '? for shortcuts' })
-  expect(await hint.find({ type: 'Text', text: /🐱/ })).toBeDefined()
+  expect(await hint.find({ type: 'Text', text: 'ᗢ' })).toBeDefined()
+  expect(await hint.find({ type: 'Text', text: /♥/ })).toBeDefined()
+  const desktopHint = await mountSkin($, 'PromptHint', { isDraft: false, isWorking: false, hint: '? for shortcuts' }, 'desktop')
+  expect(await desktopHint.find({ type: 'Text', text: 'ᗢ' })).toBeDefined()
   const base = { hasSurvey: false, maxRows: 5, bodyColumns: 40, scroll: { offset: 0, bodyRows: 5 }, view: {} }
   const band = await mountSkin($, 'AbovePrompt', { ...base, isWorking: true })
   expect(await band.find({ key: 'runner' })).toBeDefined()
