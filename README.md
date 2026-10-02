@@ -18,10 +18,11 @@ Then type `/cat` to open the pane.
 | `/cat help` | list the commands |
 | `/cat rename <name>` | rename the active cat |
 | `/cat adopt [name]` | adopt a new cat with random genes (also `a` in the pane) |
-| `/cat switch <name>` | bring another cat front and centre (or click its name) |
+| `/cat switch [name]` | bring another cat front and centre; no name cycles to the next (or click its name / `w` in the pane) |
 | `/cat reset` | start over with a new household |
 | `f` `p` `e` `n` | Feed (5c) · Play · Pet · Nap/Wake |
 | `a` | adopt from the shelter |
+| `w` | next cat |
 | `c` `s` `h` `r` `b` `m` | switch tabs: Cat · Skills · Home · Friends · Book · Miles |
 
 How the game works:

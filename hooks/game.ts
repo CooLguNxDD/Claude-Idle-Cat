@@ -266,6 +266,13 @@ export const switchTo = (home: Home, nameOrId: string): Home => {
     : { ...home, log: `No cat named ${nameOrId}.` }
 }
 
+// Cycles the active cat through the household in adoption order.
+export const nextCat = (home: Home): Home => {
+  if (home.cats.length < 2) return { ...home, log: `${activeCat(home).name} is the only cat here. Adopt (a) a friend!` }
+  const at = home.cats.findIndex(c => c.id === home.activeId)
+  return switchTo(home, home.cats[(at + 1) % home.cats.length]!.id)
+}
+
 export const rename = (home: Home, name: string): Home => {
   const cat = activeCat(home)
   const clean = name.slice(0, 20)

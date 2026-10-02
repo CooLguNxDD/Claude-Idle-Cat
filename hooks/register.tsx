@@ -7,7 +7,7 @@ import { buyCatnip, marketNow, seasonOf, sellCatnip, weekOf } from './calendar'
 import { ACHIEVEMENTS, MILES_SHOP, buyWithMiles, settle, tasksFor, track } from './collection'
 import { CRITTERS, critter, isAvailable, sell } from './critters'
 import { act, activeCat, adopt, adoptPrice, adoptVisitor, bar, buyItem, checkIn, coinRate, donateCritter, giveGift,
-  learnSkill, migrate, moodOf, newHome, rename, respec, reward, stageName, switchTo, tick, welcomeBack,
+  learnSkill, migrate, moodOf, newHome, nextCat, rename, respec, reward, stageName, switchTo, tick, welcomeBack,
   xpToNext } from './game'
 import { CATCHPHRASE_LEVEL, DAILY_CAP, GIFTS, LEVELS, NICKNAME_LEVEL, PHOTO_LEVEL, dayOf, dialogue, friendLevel,
   levelName, toNextLevel } from './friends'
@@ -94,10 +94,10 @@ const HELP = [
   '/cat (or /cat show) — open the pane',
   '/cat hide — close the pane (the cats keep earning)',
   '/cat adopt [name] — adopt from the shelter',
-  '/cat switch <name> — change the active cat',
+  '/cat switch [name] — change the active cat (no name: the next one)',
   '/cat rename <name> — rename the active cat',
   '/cat reset — start over (wipes everything)',
-  'In the pane: c s h r b m tabs · f p e n feed/play/pet/nap · a adopt',
+  'In the pane: c s h r b m tabs · f p e n feed/play/pet/nap · w next cat · a adopt',
 ].join('\n')
 
 const readTheme = async ($: EngineInterface) => {
@@ -144,12 +144,14 @@ export const register: Register = (on, options) => {
       return { text: 'The cats will keep earning while the pane is closed. /cat brings it back.' }
     }
     if (sub && !['show', 'open', 'rename', 'adopt', 'switch', 'reset'].includes(sub)) return { text: HELP }
-    if (sub === 'rename' && arg) await change($, h => rename(h, arg))
-    else if (sub === 'adopt') await change($, (h, t) => adopt(h, t, Math.random, arg || undefined))
-    else if (sub === 'switch' && arg) await change($, h => switchTo(h, arg))
-    else if (sub === 'reset') await change($, (_, t) => newHome(t))
-    else await change($, h => h)
+    let home: Home
+    if (sub === 'rename' && arg) home = await change($, h => rename(h, arg))
+    else if (sub === 'adopt') home = await change($, (h, t) => adopt(h, t, Math.random, arg || undefined))
+    else if (sub === 'switch') home = await change($, h => (arg ? switchTo(h, arg) : nextCat(h)))
+    else if (sub === 'reset') home = await change($, (_, t) => newHome(t))
+    else home = await change($, h => h)
     await $.ui.open({ id: PANE, title: 'AFK Cat' })
+    if (sub === 'switch') return { text: `${home.log} Cats: ${home.cats.map(c => c.name).join(', ')}.` }
     return { text: 'Your cats are in the pane.' }
   })
 
@@ -428,14 +430,15 @@ export const register: Register = (on, options) => {
         {header}
         {scene}
         <Text italic color={tone.title}>{cat.name}: "{dialogue(cat, now, hourOf(now))}"</Text>
-        {home.cats.length > 1 && (
-          <Box>
-            {home.cats.map(c => (
-              <Button key={`cat-${c.id}`} plain label={c.id === cat.id ? `▸${c.name}` : c.name}
-                onPress={() => change($, h => switchTo(h, c.id))} />
-            ))}
-          </Box>
-        )}
+        <Box>
+          <Text color={tone.muted}>Cats {home.cats.length}/{maxCats(home)}: </Text>
+          {home.cats.map(c => (
+            <Button key={`cat-${c.id}`} plain label={c.id === cat.id ? `▸${c.name}` : c.name}
+              onPress={() => change($, h => switchTo(h, c.id))} />
+          ))}
+          <Button key="next-cat" hotkey="w" plain label="Next cat (w)"
+            onPress={() => change($, h => nextCat(h))} />
+        </Box>
         {stat('Hunger', cat.hunger)}
         {stat('Joy', cat.joy)}
         {stat('Energy', cat.energy)}

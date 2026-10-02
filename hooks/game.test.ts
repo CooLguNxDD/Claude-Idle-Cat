@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Home } from '../types'
-import { DECAY_FLOOR, act, activeCat, adopt, checkIn, coinRate, migrate, moodOf, newHome, stageOf, switchTo,
+import { DECAY_FLOOR, act, activeCat, adopt, checkIn, coinRate, migrate, moodOf, newHome, nextCat, stageOf, switchTo,
   tick } from './game'
 import { seeded } from './rng'
 import { ROWS, frameCells } from './scene'
@@ -58,6 +58,9 @@ test('adoption rolls genes, picks a free name and respects the house size', asyn
   expect(adopt(two, 6, seeded(8)).cats.length).toBe(2)
   expect(adopt(newHome(0), 5, seeded(7)).log).toMatch(/costs/)
   expect(activeCat(switchTo(two, 'mochi')).name).toBe('Mochi')
+  expect(activeCat(nextCat(two)).name).toBe('Mochi')
+  expect(activeCat(nextCat(nextCat(two))).id).toBe('c2')
+  expect(nextCat(newHome(0)).log).toMatch(/only cat/)
   expect(coinRate(two)).toBeGreaterThan(coinRate(newHome(0)))
 })
 
