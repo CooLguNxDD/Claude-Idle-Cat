@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
+import { settle } from '../collection'
 import { activeCat, newHome } from '../game'
 import { ENERGY_COST, PAID_PLAYS, finishGame, parseMessage, playsLeft, quitGame, startGame } from './rewards'
 
@@ -17,6 +18,9 @@ test('a round costs energy and pays a medal only for the round that was started'
   expect(done.coins).toBeGreaterThan(home.coins)
   expect(done.arcade.best.dash).toBe(900)
   expect(done.log).toMatch(/gold medal/)
+  expect(done.arcade.golds).toBe(1)
+  expect(done.miles.counts.games).toBe(1)
+  expect('gold' in settle(done, t).achievements).toBe(true)
 })
 
 test('a forged score is clamped to what the time allows', async () => {

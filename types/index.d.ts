@@ -1,4 +1,4 @@
-export type EffectKind = 'hearts' | 'fish' | 'yarn' | 'coins' | 'levelup' | 'evolve' | 'shop' | 'adopt' | 'visitor' | 'welcome' | 'gift' | 'catch' | 'award' | 'birthday'
+export type EffectKind = 'hearts' | 'fish' | 'yarn' | 'coins' | 'levelup' | 'evolve' | 'shop' | 'adopt' | 'visitor' | 'welcome' | 'gift' | 'catch' | 'award' | 'birthday' | 'medal'
 export type Effect = { kind: EffectKind; at: number }
 
 export type Coat = 'ginger' | 'tabby' | 'grey' | 'black' | 'white' | 'cream' | 'calico' | 'tuxedo' | 'siamese'
@@ -37,6 +37,7 @@ export type Arcade = {
   day: number
   plays: Partial<Record<GameId, number>>
   best: Partial<Record<GameId, number>>
+  golds: number
   open: { game: GameId; at: number } | null
 }
 

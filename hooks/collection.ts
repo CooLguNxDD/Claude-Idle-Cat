@@ -28,7 +28,7 @@ export const record = (home: Home): Home => {
   return same ? home : { ...home, book }
 }
 
-export type Counter = 'pet' | 'feed' | 'play' | 'gift' | 'buy' | 'tools' | 'turns' | 'donate' | 'visitor' | 'catch'
+export type Counter = 'pet' | 'feed' | 'play' | 'gift' | 'buy' | 'tools' | 'turns' | 'donate' | 'visitor' | 'catch' | 'games'
 export type Task = { id: string; text: string; counter: Counter; goal: number; miles: number }
 const TASKS: readonly Task[] = [
   { id: 'pet3', text: 'Pet a cat 3 times', counter: 'pet', goal: 3, miles: 50 },
@@ -42,6 +42,7 @@ const TASKS: readonly Task[] = [
   { id: 'donate1', text: 'Donate to the museum', counter: 'donate', goal: 1, miles: 100 },
   { id: 'visitor1', text: 'Get a visit from a stray', counter: 'visitor', goal: 1, miles: 100 },
   { id: 'catch2', text: 'Cats bring home 2 critters', counter: 'catch', goal: 2, miles: 80 },
+  { id: 'games2', text: 'Play 2 arcade rounds', counter: 'games', goal: 2, miles: 80 },
 ]
 export const TASKS_PER_DAY = 5
 
@@ -93,6 +94,10 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   { id: 'debtfree', name: 'Debt free', text: 'Pay off a Tom Mew loan', miles: 300, test: h => h.tier >= 1 && h.loan === 0 },
   { id: 'streak7', name: 'Regular', text: 'Visit 7 days in a row', miles: 400, test: h => h.streak >= 7 },
   { id: 'rich', name: 'Fat stacks', text: 'Hold 5,000 coins', miles: 300, test: h => h.coins >= 5000 },
+  { id: 'gold', name: 'Gold medal', text: 'Win a gold medal in the arcade', miles: 300, test: h => h.arcade.golds > 0 },
+  { id: 'arcade6', name: 'Arcade regular', text: 'Play all 6 arcade games', miles: 400,
+    test: h => Object.keys(h.arcade.best).length >= 6 },
+  { id: 'dash1000', name: 'Roof runner', text: 'Score 1,000 in Rooftop Dash', miles: 500, test: h => (h.arcade.best.dash ?? 0) >= 1000 },
 ]
 
 // Unlocks every achievement whose test now passes, paying its miles once.

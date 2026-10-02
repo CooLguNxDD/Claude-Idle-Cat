@@ -1,5 +1,6 @@
 // Arcade economy: rounds cost energy, medals pay minutes of idle income, three paid plays per game a day.
 import type { Arcade, Cat, GameId, Home } from '../../types'
+import { track } from '../collection'
 import { befriend, dayOf } from '../friends'
 import { activeCat, coinRate, reward } from '../game'
 import { seeded } from '../rng'
@@ -86,9 +87,9 @@ export const finishGame = (home: Home, game: GameId, posted: number, postedMs: n
   const next: Home = withActive({
     ...home,
     arcade: { ...arcade, open: null, plays: { ...arcade.plays, [game]: (arcade.plays[game] ?? 0) + 1 },
-      best: isBest ? { ...arcade.best, [game]: score } : arcade.best },
-    effect: { kind: medal === 'gold' ? 'award' : coins ? 'coins' : 'yarn', at: now },
+      best: { ...arcade.best, [game]: Math.max(score, arcade.best[game] ?? 0) }, golds: arcade.golds + (medal === 'gold' ? 1 : 0) },
+    effect: { kind: medal === 'gold' ? 'award' : medal ? 'medal' : 'yarn', at: now },
     log: parts.join(' · ').replace(/([^!])$/, '$1.'),
   }, c => befriend({ ...c, joy: clamp(c.joy + joy) }, medal ? 3 : 1, now))
-  return reward(next, coins, xp, now)
+  return track(reward(next, coins, xp, now), 'games', 1, now)
 }

@@ -4,7 +4,7 @@ export type Clip = 'levelup' | 'evolve' | 'adopt' | 'award' | 'coin'
 
 // Which moments make a sound; everyday effects stay quiet.
 export const CLIP_FOR: Partial<Record<EffectKind, Clip>> = {
-  levelup: 'levelup', evolve: 'evolve', adopt: 'adopt', award: 'award', birthday: 'award', gift: 'coin', catch: 'coin',
+  levelup: 'levelup', evolve: 'evolve', adopt: 'adopt', award: 'award', birthday: 'award', gift: 'coin', catch: 'coin', medal: 'coin',
 }
 
 export const clipAsset = (clip: Clip) => `assets/sfx/${clip}.wav`

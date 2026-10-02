@@ -53,7 +53,7 @@ How the game works:
   - The cat book records every coat, form, shiny, stray and best-friend photo you've seen.
 - **Miles tab** (`m`):
   - Five Paw Miles tasks a day, such as "pet 3 times" or "Claude runs 10 tools".
-  - 16 achievements.
+  - 19 achievements, three of them from the arcade.
   - A Miles shop with exclusive furniture and a shiny charm.
 - **Arcade tab** (`g`, or Play `p`):
   - Mini-games that run in the pane at about 30 fps, starring the active cat in its own coat. Click the game to give it the keys; `q` quits a round.
@@ -115,6 +115,10 @@ hooks/collection.ts          cat book, Paw Miles tasks, achievements, miles shop
 hooks/calendar.ts            seasons, festivals, birthdays, catnip market
 hooks/time.ts                local-midnight day numbers
 hooks/sfx.ts                 which moments make a sound, clip paths, Windows playback argv
+hooks/arcade/engine.ts       pixel framebuffer, half-block runs, particles, shake, easing
+hooks/arcade/client.tsx      surface module: runs a game at ~30 fps, posts the score back
+hooks/arcade/games/*.ts      the six mini-games (pure: init, step, draw, score)
+hooks/arcade/rewards.ts      energy cost, medals, daily paid plays, featured game, score checks
 assets/sfx/*.wav             the clips
 tools/gen-sfx.mjs            regenerates the clips
 hooks/rng.ts                 seeded random numbers (repeatable tests)
