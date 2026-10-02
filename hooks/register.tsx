@@ -28,7 +28,7 @@ import type { Clip } from './sfx'
 import { BRANCHES, FORM_LEVEL, SKILLS, branchPoints, canLearn, formOf, freePoints, rankOf, respecPrice } from './skills'
 import type { Branch } from './skills'
 import { RUN_MAX_COLS, RUN_ROWS, nextX, runFrame } from './runner'
-import { catHint, doneWord, hintTail, pawPrefix, skinLevel, spinnerWord, walkFrame } from './skin'
+import { catBadge, catHint, doneWord, pawPrefix, skinLevel, spinnerWord, walkFrame } from './skin'
 import { FLAVORS, FLAVOR_NAMES, css, resolveFlavor, themeOptionFor, uiTokens } from './theme'
 import type { Flavor } from './theme'
 import type { SkinLevel } from './skin'
@@ -940,8 +940,15 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'PromptHint' }, async ($, e, next) => {
     if (skin === 'off' || e.props.isDraft) return next(e)
-    const tail = [e.props.tail, hintTail(await read($, homeRef))].filter(Boolean).join(' ')
-    return next({ ...e, props: { ...e.props, tail } })
+    const badge = catBadge(await read($, homeRef), flavorAt(await $.clock.now()))
+    if (!badge.length) return next(e)
+    const { Box, Text } = $.ui.resolve(e)
+    return (
+      <Box>
+        {await next(e)}
+        <Text key="cat-badge"> {badge.map((s, i) => <Text key={`cat-badge-${i}`} color={s.color} bold={s.isBold}>{s.text}</Text>)}</Text>
+      </Box>
+    )
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
