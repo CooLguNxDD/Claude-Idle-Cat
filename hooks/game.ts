@@ -1,4 +1,5 @@
 import type { Cat, EffectKind, Genes, Home, Slot } from '../types'
+import { NEW_FRIEND, befriend, giftById, levelName, receiveGift } from './friends'
 import { GINGER, rollGenes } from './genes'
 import { STARTER, homeMods, maxCats, repayFromIncome } from './home'
 import { modsOf } from './mods'
@@ -32,7 +33,11 @@ const fx = (kind: EffectKind, at: number) => ({ kind, at })
 
 export const newCat = (id: string, name: string, genes: Genes, now: number): Cat => ({
   id, name, genes, bornAt: now, hunger: 80, joy: 80, energy: 80, xp: 0, level: 1, isAsleep: false, skills: {},
+  ...NEW_FRIEND,
 })
+
+// Fills fields older saves lack on a cat.
+const normalizeCat = (cat: Cat): Cat => ({ ...NEW_FRIEND, ...cat })
 
 const STARTER_DECOR: Partial<Record<Slot, string>> = { bowl: 'bowl', bed: 'box', toy: 'yarn' }
 
@@ -69,11 +74,14 @@ export const migrate = (saved: unknown, now: number): Home => {
   if (!saved || typeof saved !== 'object') return newHome(now)
   const base = newHome(now)
   const version = (saved as { version?: number }).version
-  if (version === 3) return { ...base, ...(saved as Home) }
+  if (version === 3) {
+    const home = saved as Home
+    return { ...base, ...home, cats: home.cats.map(normalizeCat) }
+  }
   if (version === 2) {
     const { upgrades, maxCats: _old, ...v2 } = saved as V2Home & { maxCats?: number }
     const nextId = Math.max(0, ...v2.cats.map(c => Number(c.id.slice(1)) || 0)) + 1
-    return { ...base, ...v2, version: 3, ...furnitureFromUpgrades(upgrades), nextId }
+    return { ...base, ...v2, cats: v2.cats.map(normalizeCat), version: 3, ...furnitureFromUpgrades(upgrades), nextId }
   }
   const v1 = saved as V1Cat
   const cat: Cat = {
@@ -190,17 +198,17 @@ export const act = (home: Home, action: Action, now: number): Home => {
   if (action === 'feed') {
     if (home.coins < 5) return { ...home, log: 'Not enough coins for fish (5).' }
     const fed = withCat({ ...home, coins: home.coins - 5, effect: fx('fish', now),
-      log: `${cat.name} munches a fish. Nom. +2xp` }, cat.id, c => ({ ...c, hunger: clamp(c.hunger + 30) }))
+      log: `${cat.name} munches a fish. Nom. +2xp` }, cat.id, c => befriend({ ...c, hunger: clamp(c.hunger + 30) }, 1, now))
     return gainXp(fed, cat.id, 2, now)
   }
   if (action === 'play') {
     if (cat.energy < 10) return { ...home, log: `${cat.name} is too tired to play.` }
     const played = withCat({ ...home, effect: fx('yarn', now), log: `${cat.name} chases the yarn ball! +5xp` }, cat.id,
-      c => ({ ...c, energy: clamp(c.energy - 10), joy: clamp(c.joy + 25 * m.playJoy), hunger: clamp(c.hunger - 5) }))
+      c => befriend({ ...c, energy: clamp(c.energy - 10), joy: clamp(c.joy + 25 * m.playJoy), hunger: clamp(c.hunger - 5) }, 2, now))
     return gainXp(played, cat.id, 5, now)
   }
   const petted = withCat({ ...home, effect: fx('hearts', now), log: `${cat.name} purrs. +1xp` }, cat.id,
-    c => ({ ...c, joy: clamp(c.joy + 5 * m.petJoy) }))
+    c => befriend({ ...c, joy: clamp(c.joy + 5 * m.petJoy) }, 2, now))
   return gainXp(petted, cat.id, 1, now)
 }
 
@@ -258,6 +266,35 @@ export const respec = (home: Home, now: number): Home => {
   if (home.coins < price) return { ...home, log: `Resetting skills costs ${price}c.` }
   return withCat({ ...home, coins: home.coins - price, effect: fx('shop', now),
     log: `${cat.name} forgot every skill. Points refunded.` }, cat.id, c => ({ ...c, skills: {} }))
+}
+
+// One gift a day per cat, bought on the spot; favorites count much more.
+export const giveGift = (home: Home, giftId: string, now: number): Home => {
+  const gift = giftById(giftId)
+  const cat = activeCat(home)
+  if (!gift) return { ...home, log: 'No such gift.' }
+  if (home.coins < gift.price) return { ...home, log: `A ${gift.name} costs ${gift.price}c.` }
+  const result = receiveGift(cat, gift, now)
+  if ('reason' in result) return { ...home, log: result.reason }
+  const before = levelName(cat.friendship)
+  const after = levelName(result.cat.friendship)
+  const loved = gift.loves === cat.genes.personality ? ' It was their favorite!' : ''
+  const up = after !== before ? ` You are now: ${after}.` : ''
+  return withCat({ ...home, coins: home.coins - gift.price, effect: fx('gift', now),
+    log: `${cat.name} got a ${gift.name} (+${result.points}).${loved}${up}` }, cat.id, () => result.cat)
+}
+
+// Coming back after a while: the cats greet you and report what happened.
+export const WELCOME_AFTER_MS = 30 * MINUTE
+export const welcomeBack = (before: Home, after: Home, now: number): Home => {
+  const away = now - before.lastTick
+  if (away < WELCOME_AFTER_MS) return after
+  const hours = Math.round((away / 3_600_000) * 10) / 10
+  const earned = Math.floor(after.coins - before.coins)
+  const strays = after.nextId - before.nextId
+  const parts = [`+${earned}c`, strays > 0 ? `${strays} stray${strays > 1 ? 's' : ''} came by` : '']
+  return { ...after, effect: fx('welcome', now),
+    log: `Welcome back! You were away ${hours}h: ${parts.filter(Boolean).join(', ')}.` }
 }
 
 // Claude's work tips the household; xp goes to the active cat.

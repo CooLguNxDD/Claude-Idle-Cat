@@ -1,4 +1,4 @@
-export type EffectKind = 'hearts' | 'fish' | 'yarn' | 'coins' | 'levelup' | 'evolve' | 'shop' | 'adopt' | 'visitor'
+export type EffectKind = 'hearts' | 'fish' | 'yarn' | 'coins' | 'levelup' | 'evolve' | 'shop' | 'adopt' | 'visitor' | 'welcome' | 'gift'
 export type Effect = { kind: EffectKind; at: number }
 
 export type Coat = 'ginger' | 'tabby' | 'grey' | 'black' | 'white' | 'cream' | 'calico' | 'tuxedo' | 'siamese'
@@ -18,6 +18,10 @@ export type Cat = {
   level: number
   isAsleep: boolean
   skills: Record<string, number>
+  friendship: number
+  // Today's friendship: points earned (capped) and whether a gift was given.
+  daily: { day: number; points: number; gifted: boolean }
+  lastGift: { id: string; day: number } | null
 }
 
 // A stray in the yard: it stays a while, leaves a gift, and can be adopted.
@@ -25,7 +29,7 @@ export type Visitor = { id: string; name: string; genes: Genes; arrivedAt: numbe
 
 export type Slot = 'bowl' | 'bed' | 'toy' | 'rug' | 'plant' | 'hanging'
 
-export type View = 'cat' | 'skills' | 'home'
+export type View = 'cat' | 'skills' | 'home' | 'friends'
 
 export type Home = {
   version: 3

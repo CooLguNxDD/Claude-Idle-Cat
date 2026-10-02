@@ -3,8 +3,10 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Home, View } from '../types'
 import { catArt } from './art'
-import { act, activeCat, adopt, adoptPrice, adoptVisitor, bar, checkIn, coinRate, learnSkill, migrate, moodOf,
-  newHome, rename, respec, reward, stageName, switchTo, tick, xpToNext } from './game'
+import { act, activeCat, adopt, adoptPrice, adoptVisitor, bar, checkIn, coinRate, giveGift, learnSkill, migrate,
+  moodOf, newHome, rename, respec, reward, stageName, switchTo, tick, welcomeBack, xpToNext } from './game'
+import { CATCHPHRASE_LEVEL, DAILY_CAP, GIFTS, LEVELS, NICKNAME_LEVEL, PHOTO_LEVEL, dayOf, dialogue, friendLevel,
+  levelName, toNextLevel } from './friends'
 import type { Action } from './game'
 import { PERSONALITY_INFO, describeGenes } from './genes'
 import { LOAN_SHARE, SHOP_CLOSE, SHOP_OPEN, TIERS, baitOf, buyFurniture, dailyStock, furniture, isShopOpen, maxCats,
@@ -24,6 +26,7 @@ const TABS: { view: View; label: string; hotkey: string }[] = [
   { view: 'cat', label: 'Cat', hotkey: 'c' },
   { view: 'skills', label: 'Skills', hotkey: 's' },
   { view: 'home', label: 'Home', hotkey: 'h' },
+  { view: 'friends', label: 'Friends', hotkey: 'r' },
 ]
 
 // Latest home and scene width for the animation loop, which repaints without a render pass.
@@ -69,15 +72,14 @@ export const register: Register = (on, options) => {
     })
     await readTheme($)
     const saved = (await $.store.get('home')) ?? (await $.store.get('cat'))
-    const before = (saved as { coins?: number } | undefined)?.coins ?? 0
     let bonus = 0
     const home = await change($, (_, t) => {
-      const day = checkIn(tick(migrate(saved, t), t), t)
+      const loaded = migrate(saved, t)
+      const day = checkIn(tick(loaded, t), t)
       bonus = day.bonus
-      return day.home
+      return saved ? welcomeBack(loaded, day.home, t) : day.home
     })
-    const earned = Math.floor(home.coins - before - bonus)
-    if (saved && earned > 0) $.ui.toast(`The cats earned ${earned}c while you were away`)
+    if (home.effect?.kind === 'welcome') $.ui.toast(home.log)
     if (bonus > 0) $.ui.toast(`Day ${home.streak} streak bonus: +${bonus}c`)
     $.clock.every(TICK_MS, () => void readTheme($).then(() => change($, (h, t) => tick(h, t))))
     $.clock.every(FRAME_MS, async () => {
@@ -159,6 +161,44 @@ export const register: Register = (on, options) => {
         <Text color={tone.muted}>{describeGenes(cat.genes)} — {PERSONALITY_INFO[cat.genes.personality]}</Text>
       </Box>
     )
+
+    if (view === 'friends') {
+      const day = dayOf(now)
+      return (
+        <Box flexDirection="column">
+          {tabs}
+          {header}
+          <Text italic color={tone.title}>{cat.name}: "{dialogue(cat, now, hourOf(now))}"</Text>
+          {home.cats.map(c => {
+            const next = toNextLevel(c.friendship)
+            const points = c.daily.day === day ? c.daily.points : 0
+            const gifted = c.daily.day === day && c.daily.gifted
+            const level = friendLevel(c.friendship)
+            return (
+              <Box flexDirection="column">
+                <Button key={`friend-${c.id}`} plain label={`${c.id === cat.id ? '▸' : ' '} ${c.name} · ${levelName(c.friendship)} (${level}/${LEVELS.length})`}
+                  onPress={() => change($, h => switchTo(h, c.id))} />
+                <Text color={tone.accent}>
+                  {'   '}{next ? `${bar(((c.friendship - (LEVELS[level - 1]?.at ?? 0)) / (next.at - (LEVELS[level - 1]?.at ?? 0))) * 100, 10)} ${next.need} to go` : '★ best friends'}
+                  {' · '}today {points}/{DAILY_CAP}{gifted ? ' · gifted ✓' : ''}
+                </Text>
+                <Text color={tone.muted}>
+                  {'   '}{level >= NICKNAME_LEVEL ? '✓' : '·'} nickname  {level >= CATCHPHRASE_LEVEL ? '✓' : '·'} catchphrase  {level >= PHOTO_LEVEL ? '✓ photo' : '· photo'}
+                </Text>
+              </Box>
+            )
+          })}
+          <Text bold color={tone.accent}>Give {cat.name} a gift (once a day; favorites count more)</Text>
+          <Box flexDirection="column">
+            {GIFTS.map(g => (
+              <Button key={`gift-${g.id}`} plain label={`${g.name} · ${g.price}c`}
+                onPress={() => change($, (h, t) => giveGift(h, g.id, t))} />
+            ))}
+          </Box>
+          <Text italic color={tone.log}>{home.log}</Text>
+        </Box>
+      )
+    }
 
     if (view === 'home') {
       const tier = tierOf(home)
@@ -250,6 +290,7 @@ export const register: Register = (on, options) => {
         {tabs}
         {header}
         {scene}
+        <Text italic color={tone.title}>{cat.name}: "{dialogue(cat, now, hourOf(now))}"</Text>
         {home.cats.length > 1 && (
           <Box>
             {home.cats.map(c => (

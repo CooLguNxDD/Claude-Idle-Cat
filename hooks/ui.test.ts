@@ -23,6 +23,10 @@ test('the pane draws the scene and its buttons work on each surface', async ($, 
     expect(await ui.find({ type: 'Text', text: /Skill points: 0/ })).toBeDefined()
     await ui.press({ key: 'skill-claws' })
     expect(await ui.find({ type: 'Text', text: /no skill points/ })).toBeDefined()
+    await ui.press({ key: 'tab-friends' })
+    expect(await ui.find({ type: 'Text', text: /Give Mochi a gift/ })).toBeDefined()
+    await ui.press({ key: 'gift-ribbon' })
+    expect(await ui.find({ type: 'Text', text: /ribbon|already got a gift/ })).toBeDefined()
     await ui.press({ key: 'tab-home' })
     // The loan taken on the first surface carries over to the next.
     if (surface === 'terminal') {

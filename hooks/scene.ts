@@ -109,7 +109,7 @@ export const frameCells = ({ home, now, tick, hour, flavor: f, cols }: SceneInpu
   const mood = moodOf(cat)
   const stage = stageOf(cat.level)
   const bob = mood === 'sleeping' ? 1 : tick % 16 < 8 ? 0 : 1
-  const jump = fresh('yarn', 1.2) || fresh('levelup', 1.5) || fresh('adopt', 1.5) || fresh('evolve', 1.5)
+  const jump = fresh('yarn', 1.2) || fresh('levelup', 1.5) || fresh('adopt', 1.5) || fresh('evolve', 1.5) || fresh('welcome', 2)
     ? -Math.round(3 * Math.sin((age / 1.2) * Math.PI)) : 0
   const ox = 8
   const oy = 8 + bob + Math.min(0, jump)
@@ -142,7 +142,7 @@ export const frameCells = ({ home, now, tick, hour, flavor: f, cols }: SceneInpu
     text(ox + 13 + (step >> 3), headRow - 1 - (step >> 3), step < 8 ? 'z' : 'Z', f.lavender)
   }
   if (cat.genes.isShiny && tick % 24 < 6) text(ox + (tick % 3) * 5, headRow + 1 + (tick % 2), '*', f.mauve)
-  if (fresh('hearts', 2)) {
+  if (fresh('hearts', 2) || fresh('gift', 2.5)) {
     ;[0, 4, 8].forEach((dx, i) => text(ox + 2 + dx, headRow - 1 - (Math.floor(age * 2 + i * 0.5) % 4), '♥', f.red))
   }
   if (fresh('coins', 2.5)) {
@@ -152,6 +152,7 @@ export const frameCells = ({ home, now, tick, hour, flavor: f, cols }: SceneInpu
   if (fresh('yarn', 2)) text(2 + (Math.floor(age * 12) % 22), 10, '@', f.maroon)
   if (fresh('shop', 2)) text(10, 1, 'NEW ITEM!', rainbow(tick))
   if (fresh('adopt', 3)) [...'WELCOME!'].forEach((ch, i) => text(11 + i, 1, ch, rainbow(tick + i)))
+  if (fresh('welcome', 4)) [...'WELCOME BACK!'].forEach((ch, i) => text(10 + i, 1, ch, rainbow(tick + i)))
   if (fresh('evolve', 3)) [...'EVOLVED!'].forEach((ch, i) => text(12 + i, 1, ch, rainbow(tick + i)))
   if (fresh('levelup', 3)) [...'LEVEL UP!'].forEach((ch, i) => text(12 + i, 1, ch, rainbow(tick + i)))
 
