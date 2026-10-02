@@ -11,6 +11,12 @@
       "description": "auto follows Claude Code's theme; daycycle is Latte by day, Frappé at dusk, Mocha at night",
       "default": "auto",
       "options": ["auto", "daycycle", "latte", "frappe", "macchiato", "mocha"]
+    },
+    "sound": {
+      "type": "boolean",
+      "title": "Sound effects",
+      "description": "Chiptune clips on level-up, evolution, adoption and achievements",
+      "default": true
     }
   }
 }

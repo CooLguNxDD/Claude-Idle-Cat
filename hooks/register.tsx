@@ -17,6 +17,8 @@ import type { Coat } from '../types'
 import { LOAN_SHARE, SHOP_CLOSE, SHOP_OPEN, TIERS, baitOf, dailyStock, furniture, isShopOpen, maxCats, payLoan, place,
   takeLoan, tierOf } from './home'
 import { ROWS, frameCells, sceneCols } from './scene'
+import { CLIP_FOR, clipAsset, powershellArgv } from './sfx'
+import type { Clip } from './sfx'
 import { BRANCHES, FORM_LEVEL, SKILLS, branchPoints, canLearn, formOf, freePoints, rankOf, respecPrice } from './skills'
 import type { Branch } from './skills'
 import { resolveFlavor, uiTokens } from './theme'
@@ -44,6 +46,16 @@ let cols = 34
 let frame = 0
 // Claude Code's own theme row, read for the `auto` flavor.
 let claudeTheme = 'dark'
+let isSoundOn = true
+
+// Plays a clip: $.audio.play where the host has a player, PowerShell on Windows.
+const playClip = async ($: EngineInterface, clip: Clip) => {
+  if ((await $.env.get('OS')) === 'Windows_NT') {
+    await $.process.run(powershellArgv($.plugin.root, clip), { timeoutMs: 5000 })
+    return
+  }
+  await $.audio.play({ asset: clipAsset(clip) })
+}
 
 // Applies a change to the household, then saves it so it survives restarts.
 const change = async ($: EngineInterface, fn: (home: Home, now: number) => Home) => {
@@ -55,6 +67,8 @@ const change = async ($: EngineInterface, fn: (home: Home, now: number) => Home)
     return (home = settle(fn(before, now), now))
   })
   latest = home
+  const clip = home.effect && home.effect !== before.effect ? CLIP_FOR[home.effect.kind] : undefined
+  if (clip && isSoundOn) void playClip($, clip).catch(() => undefined)
   for (const a of ACHIEVEMENTS) if (!(a.id in before.achievements) && a.id in home.achievements) $.ui.toast(`🏆 ${a.name}: ${a.text} (+${a.miles} miles)`)
   for (const t of tasksFor(now)) {
     if (!before.miles.done.includes(t.id) && home.miles.done.includes(t.id) && home.miles.day === before.miles.day) {
@@ -82,6 +96,7 @@ const readTheme = async ($: EngineInterface) => {
 }
 
 export const register: Register = (on, options) => {
+  isSoundOn = options.sound !== false
   const flavorAt = (now: number) => resolveFlavor(String(options.flavor ?? 'auto'), claudeTheme, hourOf(now))
 
   on('session.start', async ($, e, next) => {
