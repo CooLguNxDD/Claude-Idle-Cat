@@ -30,6 +30,7 @@ export type Visitor = { id: string; name: string; genes: Genes; arrivedAt: numbe
 export type Slot = 'bowl' | 'bed' | 'toy' | 'rug' | 'plant' | 'hanging'
 
 export type View = 'cat' | 'skills' | 'home' | 'friends' | 'book' | 'miles' | 'arcade' | 'weather'
+export type Route = { view: View; history: View[] }
 
 export type WeatherCondition = 'clear' | 'partly-cloudy' | 'cloudy' | 'fog' | 'drizzle' | 'rain' | 'snow' | 'storm'
 export type WeatherLocation = { label: string; latitude: number; longitude: number; source: 'city' | 'coordinates' | 'device' }
@@ -94,6 +95,6 @@ export type Home = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'afk-cat': { home: Home | null; view: View; isCatListOpen: boolean }
+    'afk-cat': { home: Home | null; route: Route; isCatListOpen: boolean }
   }
 }

@@ -16,19 +16,23 @@ test('the pane draws the scene and its buttons work on each surface', async ($, 
       props: { title: 'AFK Cat', isFocused: true, bodyColumns: 60, placement: 'dock',
         scroll: { offset: 0, bodyRows: 30 }, view: {} },
     })
+    const openTab = async (key: string) => {
+      for (let i = 0; i < 8 && !(await ui.find({ key })); i++) await ui.press({ key: 'tabs-next' })
+      await ui.press({ key })
+    }
     if (surface === 'terminal') expect(await ui.find({ key: 'scene' })).toBeDefined()
     expect(await ui.find({ key: 'adopt' })).toBeDefined()
     await ui.press({ key: 'pet' })
     expect(await ui.find({ type: 'Text', text: /purrs/ })).toBeDefined()
-    await ui.press({ key: 'tab-skills' })
+    await openTab('tab-skills')
     expect(await ui.find({ type: 'Text', text: /Skill points: 0/ })).toBeDefined()
     await ui.press({ key: 'skill-claws' })
     expect(await ui.find({ type: 'Text', text: /no skill points/ })).toBeDefined()
-    await ui.press({ key: 'tab-friends' })
+    await openTab('tab-friends')
     expect(await ui.find({ type: 'Text', text: /Give Mochi a gift/ })).toBeDefined()
     await ui.press({ key: 'gift-ribbon' })
     expect(await ui.find({ type: 'Text', text: /ribbon|already got a gift/ })).toBeDefined()
-    await ui.press({ key: 'tab-home' })
+    await openTab('tab-home')
     // The loan taken on the first surface carries over to the next.
     if (surface === 'terminal') {
       expect(await ui.find({ type: 'Text', text: /Cottage/ })).toBeDefined()
@@ -37,13 +41,13 @@ test('the pane draws the scene and its buttons work on each surface', async ($, 
     expect(await ui.find({ type: 'Text', text: /House ·/ })).toBeDefined()
     expect(await ui.find({ key: 'pay' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /Catnip market/ })).toBeDefined()
-    await ui.press({ key: 'tab-book' })
+    await openTab('tab-book')
     expect(await ui.find({ type: 'Text', text: /Museum ·/ })).toBeDefined()
-    await ui.press({ key: 'tab-miles' })
+    await openTab('tab-miles')
     expect(await ui.find({ type: 'Text', text: /Paw Miles/ })).toBeDefined()
     await ui.press({ key: 'miles-charm' })
     expect(await ui.find({ type: 'Text', text: /miles\./ })).toBeDefined()
-    await ui.press({ key: 'tab-cat' })
+    await openTab('tab-cat')
     await ui.press({ key: 'cat-list' })
     expect(await ui.find({ key: 'cat-c1' })).toBeDefined()
     await ui.press({ key: 'cat-c1' })

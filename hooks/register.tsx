@@ -27,6 +27,8 @@ import { BRANCHES, FORM_LEVEL, SKILLS, branchPoints, canLearn, formOf, freePoint
 import type { Branch } from './skills'
 import { FLAVORS, resolveFlavor, uiTokens } from './theme'
 import type { Flavor } from './theme'
+import { visibleTabs } from './ui/tabs'
+import { goBack, initialRoute, navigate } from './ui/router'
 import { parseCurrent } from './weather/conditions'
 import { coordinates, forecastUrl, geocodingUrl, locationKey, locationUrl, parseLocations } from './weather/location'
 import { acceptWeather, emptyWeather, liveWeather, refreshDue, setLocation, weatherSummary } from './weather/state'
@@ -38,18 +40,8 @@ const SERVER_START_MS = 10_000
 const TICK_MS = 10_000
 const FRAME_MS = 125
 const homeRef = { plugin: 'afk-cat', key: 'home' } as const
-const viewRef = { plugin: 'afk-cat', key: 'view' } as const
+const routeRef = { plugin: 'afk-cat', key: 'route' } as const
 const catListRef = { plugin: 'afk-cat', key: 'isCatListOpen' } as const
-const TABS: { view: View; label: string; hotkey: string }[] = [
-  { view: 'cat', label: 'Cat', hotkey: 'c' },
-  { view: 'skills', label: 'Skills', hotkey: 's' },
-  { view: 'home', label: 'Home', hotkey: 'h' },
-  { view: 'friends', label: 'Friends', hotkey: 'r' },
-  { view: 'book', label: 'Book', hotkey: 'b' },
-  { view: 'miles', label: 'Miles', hotkey: 'm' },
-  { view: 'arcade', label: 'Arcade', hotkey: 'g' },
-  { view: 'weather', label: 'Weather', hotkey: 't' },
-]
 const COATS: Coat[] = ['ginger', 'tabby', 'grey', 'black', 'white', 'cream', 'calico', 'tuxedo', 'siamese']
 const FORMS = ['ninja', 'royal', 'cloud', 'chonk']
 
@@ -205,6 +197,9 @@ const ACTIONS: { action: Action; label: string; hotkey: string }[] = [
 
 const hourOf = (now: number) => new Date(now).getHours()
 
+const routeTo = ($: EngineInterface, target: View | number) =>
+  update($, routeRef, route => navigate(route ?? initialRoute(), target))
+
 const weatherJson = async ($: EngineInterface, url: string): Promise<unknown> => {
   const response = await Promise.race([
     $.http.fetch(url),
@@ -327,7 +322,7 @@ const HELP = [
   '/cat export [file] — save a backup (default: ~/.claude-kitten/backups/)',
   '/cat import <file> — load a backup (your current save is backed up first)',
   '/cat weather <city> — real weather; system for device location, off to clear, refresh to update',
-  'In the pane: c s h r b m g t tabs · f e n feed/pet/nap · p arcade in the browser · w cat list · a adopt',
+  'In the pane: ‹ › tabs · q back · c s h r b m g t visible tab shortcuts · f e n feed/pet/nap · p arcade · w cat list · a adopt',
 ].join('\n')
 
 const userHome = async ($: EngineInterface) => (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
@@ -421,7 +416,7 @@ export const register: Register = (on, options) => {
     }
     if (sub === 'export' || sub === 'import') return backupCommand($, sub, arg)
     if (sub === 'weather') {
-      await update($, viewRef, (): View => 'weather')
+      await routeTo($, 'weather')
       const result = await weatherCommand($, arg)
       await $.ui.open({ id: PANE, title: 'AFK Cat' })
       return result
@@ -477,19 +472,23 @@ export const register: Register = (on, options) => {
           cells={frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols })} />
       : <Box flexDirection="column">{catArt(mood, home.frame, formOf(cat)).map(line => <Text>{line}</Text>)}</Box>
 
-    const view = (await read($, viewRef)) ?? 'cat'
+    const view = ((await read($, routeRef)) ?? initialRoute()).view
     const isCatListOpen = (await read($, catListRef)) ?? false
     const tabs = (
-      <Box flexDirection="column">
-        {[TABS.slice(0, 4), TABS.slice(4)].map((row, i) => <Box key={`tabs-${i}`}>{row.map(t => (
-          <Button key={`tab-${t.view}`} hotkey={t.hotkey} label={t.view === view ? `▸${t.label}` : t.label}
-            variant={t.view === view ? 'primary' : undefined} onPress={() => update($, viewRef, () => t.view)} />
-        ))}</Box>)}
+      <Box key="tabs" flexDirection="row" flexWrap="nowrap" gap={1}>
+        <Button key="tabs-back" plain hotkey="q" label="↶"
+          onPress={() => update($, routeRef, route => goBack(route ?? initialRoute()))} />
+        <Button key="tabs-prev" plain label="‹" onPress={() => routeTo($, -1)} />
+        {visibleTabs(view, e.props.bodyColumns).map(t => (
+          <Button key={`tab-${t.view}`} plain hotkey={t.hotkey} label={t.view === view ? `▸${t.label}` : t.label}
+            variant={t.view === view ? 'primary' : undefined} onPress={() => routeTo($, t.view)} />
+        ))}
+        <Button key="tabs-next" plain label="›" onPress={() => routeTo($, 1)} />
       </Box>
     )
 
     const weatherRow = <Button key="weather-status" plain label={weatherSummary(home.weather, now)}
-      onPress={() => update($, viewRef, (): View => 'weather')} />
+      onPress={() => routeTo($, 'weather')} />
 
     if (view === 'weather') {
       const reading = liveWeather(home.weather, now)
@@ -822,7 +821,7 @@ export const register: Register = (on, options) => {
             <Button key={a.action} label={a.label} hotkey={a.hotkey}
               onPress={async () => {
                 if (a.action !== 'play') return change($, (h, t) => act(h, a.action, t))
-                await update($, viewRef, (): View => 'arcade')
+                await routeTo($, 'arcade')
                 await openArcade($)
               }} />
           ))}
