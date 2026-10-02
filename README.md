@@ -21,7 +21,8 @@ Then type `/cat` to open the pane.
 | `/cat switch [name]` | bring another cat front and centre; no name cycles to the next (or pick it from the cat list, `w` in the pane) |
 | `/cat reset` | start over with a new household |
 | `f` `e` `n` | Feed (5c) · Pet · Nap/Wake |
-| `p` | Play: opens the Arcade |
+| `p` | Play: opens the Arcade in your browser |
+| `o` | (Arcade tab) open or reopen the browser arcade |
 | `a` | adopt from the shelter |
 | `w` | open/close the cat list |
 | `c` `s` `h` `r` `b` `m` `g` | switch tabs: Cat · Skills · Home · Friends · Book · Miles · Arcade |
@@ -56,7 +57,10 @@ How the game works:
   - 19 achievements, three of them from the arcade.
   - A Miles shop with exclusive furniture and a shiny charm.
 - **Arcade tab** (`g`, or Play `p`):
-  - Mini-games that run in the pane at about 30 fps, starring the active cat in its own coat. Click the game to give it the keys; `q` quits a round.
+  - The games run in your browser. `p` (or a game in the Arcade tab) starts a small local server and opens a tab at `http://localhost:<port>`. The pane keeps the game list, the round in progress and the results.
+  - The games are drawn with WebGL: crisp pixel art scaled to fit, with a glow on bright pixels. `C` turns on a CRT look (curved screen, scanlines) and `G` toggles the glow. Without WebGL the page falls back to a plain canvas.
+  - The active cat stars in its own coat. Esc quits a round. The simulation runs at a fixed 60 Hz.
+  - Needs Node.js on your PATH. The server listens on 127.0.0.1 only, needs a per-session token, and shuts down two minutes after Claude Code goes away.
   - **Rooftop Dash**: jump flowerpots (space/↑), duck pigeons (↓) and grab fish treats while the rooftops speed up.
   - **Fish Catch**: slide the bowl (←/→ or mouse) under falling fish. Boots cost points; three cucumbers end the round.
   - **Laser Chase**: click the darting red dot (or aim with the arrows and press space) to pounce. Catches in a row multiply.
@@ -116,7 +120,10 @@ hooks/calendar.ts            seasons, festivals, birthdays, catnip market
 hooks/time.ts                local-midnight day numbers
 hooks/sfx.ts                 which moments make a sound, clip paths, Windows playback argv
 hooks/arcade/engine.ts       pixel framebuffer, half-block runs, particles, shake, easing
-hooks/arcade/client.tsx      surface module: runs a game at ~30 fps, posts the score back
+hooks/arcade/bridge.ts       what the mod and the browser exchange: snapshots, server lines, token, URL
+server/arcade.mjs            local web server: serves the arcade, relays starts/results as stdout lines
+server/public/               the arcade page and its built bundle (arcade.js)
+web/*.ts                     browser runtime: game loop, input, WebGL renderer (build: node tools/build-web.mjs)
 hooks/arcade/games/*.ts      the six mini-games (pure: init, step, draw, score)
 hooks/arcade/rewards.ts      energy cost, medals, daily paid plays, featured game, score checks
 assets/sfx/*.wav             the clips

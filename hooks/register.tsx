@@ -2,8 +2,9 @@ import { read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Home, View } from '../types'
+import { arcadeUrl, browserArgv, newToken, parseLine, snapshotOf, splitLines } from './arcade/bridge'
 import { GAMES, gameOf } from './arcade/games'
-import { ENERGY_COST, PAID_PLAYS, featured, finishGame, modsFor, parseMessage, playsLeft, quitGame, startGame } from './arcade/rewards'
+import { ENERGY_COST, PAID_PLAYS, featured, finishGame, playsLeft, quitGame, startGame } from './arcade/rewards'
 import { catArt } from './art'
 import { buyCatnip, marketNow, seasonOf, sellCatnip, weekOf } from './calendar'
 import { ACHIEVEMENTS, MILES_SHOP, buyWithMiles, settle, tasksFor, track } from './collection'
@@ -23,12 +24,13 @@ import { CLIP_FOR, clipAsset, powershellArgv } from './sfx'
 import type { Clip } from './sfx'
 import { BRANCHES, FORM_LEVEL, SKILLS, branchPoints, canLearn, formOf, freePoints, rankOf, respecPrice } from './skills'
 import type { Branch } from './skills'
-import { resolveFlavor, uiTokens } from './theme'
+import { FLAVORS, resolveFlavor, uiTokens } from './theme'
+import type { Flavor } from './theme'
 
 const PANE = 'afk-cat'
 const SCENE = 'scene'
-const ARCADE = 'arcade'
-const GAME_ROWS = 16
+const SERVER = 'server/arcade.mjs'
+const SERVER_START_MS = 10_000
 const TICK_MS = 10_000
 const FRAME_MS = 125
 const homeRef = { plugin: 'afk-cat', key: 'home' } as const
@@ -53,6 +55,9 @@ let frame = 0
 // Claude Code's own theme row, read for the `auto` flavor.
 let claudeTheme = 'dark'
 let isSoundOn = true
+let flavorNow: (now: number) => Flavor = () => FLAVORS.mocha
+// The browser arcade's server: started on first use, killed with the module; the token guards it.
+const arcade = { port: 0, token: newToken(Math.random), starting: null as Promise<number> | null, pushed: '', isOpened: false }
 
 // Plays a clip: $.audio.play where the host has a player, PowerShell on Windows.
 const playClip = async ($: EngineInterface, clip: Clip) => {
@@ -84,7 +89,90 @@ const change = async ($: EngineInterface, fn: (home: Home, now: number) => Home)
   await $.store.set('home', home)
   const cat = activeCat(home)
   $.ui.status(`🐱 ${cat.name} Lv${cat.level} ${moodOf(cat)} · ${Math.floor(home.coins)}c`)
+  void pushArcade($, home, now)
   return home
+}
+
+// Sends the browser what changed: the menu and the round in progress.
+const pushArcade = async ($: EngineInterface, home: Home, now: number) => {
+  if (!arcade.port) return
+  const body = JSON.stringify(snapshotOf(home, now, flavorNow(now).name))
+  if (body === arcade.pushed) return
+  arcade.pushed = body
+  await $.http.fetch(`http://127.0.0.1:${arcade.port}/api/state`, {
+    method: 'POST', headers: { 'content-type': 'application/json', 'x-arcade-token': arcade.token }, body,
+  }).catch(() => undefined)
+}
+
+// What the browser asked for, relayed by the server; every round is checked against the one the mod started.
+const onArcadeLine = async ($: EngineInterface, line: string) => {
+  const msg = parseLine(line)
+  if (!msg || msg.kind === 'ready') return
+  if (msg.kind === 'start') {
+    await change($, (h, t) => startGame(h, msg.game, t))
+    return
+  }
+  let wasOpen = false
+  const home = await change($, (h, t) => {
+    wasOpen = h.arcade.open?.game === msg.game
+    return msg.kind === 'quit' ? quitGame(h) : finishGame(h, msg.game, msg.score, msg.ms, t)
+  })
+  if (wasOpen && msg.kind === 'result') $.ui.toast(`🎮 ${home.log}`)
+}
+
+// Starts the server once and resolves its port; 0 when it could not start.
+const ensureArcade = ($: EngineInterface): Promise<number> => {
+  if (arcade.port) return Promise.resolve(arcade.port)
+  if (arcade.starting) return arcade.starting
+  const starting = new Promise<number>(resolve => {
+    void (async () => {
+      let rest = ''
+      try {
+        const root = $.plugin.root.replace(/[\\/]+$/, '')
+        const child = $.process.spawn({ argv: ['node', `${root}/${SERVER}`], env: { ARCADE_TOKEN: arcade.token } })
+        for await (const { stream, text } of child) {
+          if (stream !== 'stdout') continue
+          const split = splitLines(rest, text)
+          rest = split.rest
+          for (const line of split.lines) {
+            const msg = parseLine(line)
+            if (msg?.kind === 'ready') {
+              arcade.port = msg.port
+              resolve(msg.port)
+            } else await onArcadeLine($, line)
+          }
+        }
+      } catch {
+        // Node is missing or the server crashed; the pane says so.
+      }
+      arcade.port = 0
+      arcade.starting = null
+      arcade.pushed = ''
+      resolve(0)
+    })()
+    void $.clock.sleep(SERVER_START_MS).then(() => resolve(arcade.port), () => resolve(0))
+  })
+  arcade.starting = starting
+  return starting
+}
+
+// Opens the arcade in the default browser, once a session unless asked again.
+const openArcade = async ($: EngineInterface, isForced = false) => {
+  const port = await ensureArcade($)
+  if (!port) return false
+  if (latest) {
+    arcade.pushed = ''
+    await pushArcade($, latest, await $.clock.now())
+  }
+  if (arcade.isOpened && !isForced) return true
+  const isWindows = (await $.env.get('OS')) === 'Windows_NT'
+  for (const argv of browserArgv(isWindows, arcadeUrl(port, arcade.token))) {
+    const ran = await $.process.run(argv, { timeoutMs: 5000 }).catch(() => null)
+    if (ran && ran.exitCode === 0) break
+  }
+  arcade.isOpened = true
+  $.ui.invalidate('ui.render')
+  return true
 }
 
 const ACTIONS: { action: Action; label: string; hotkey: string }[] = [
@@ -103,7 +191,7 @@ const HELP = [
   '/cat switch [name] — change the active cat (no name: the next one)',
   '/cat rename <name> — rename the active cat',
   '/cat reset — start over (wipes everything)',
-  'In the pane: c s h r b m g tabs · f e n feed/pet/nap · p arcade (mini-games) · w cat list · a adopt',
+  'In the pane: c s h r b m g tabs · f e n feed/pet/nap · p arcade in the browser · w cat list · a adopt',
 ].join('\n')
 
 const readTheme = async ($: EngineInterface) => {
@@ -114,6 +202,7 @@ const readTheme = async ($: EngineInterface) => {
 export const register: Register = (on, options) => {
   isSoundOn = options.sound !== false
   const flavorAt = (now: number) => resolveFlavor(String(options.flavor ?? 'auto'), claudeTheme, hourOf(now))
+  flavorNow = flavorAt
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -132,6 +221,12 @@ export const register: Register = (on, options) => {
     if (home.effect?.kind === 'welcome') $.ui.toast(home.log)
     if (bonus > 0) $.ui.toast(`Day ${home.streak} streak bonus: +${bonus}c`)
     $.clock.every(TICK_MS, () => void readTheme($).then(() => change($, (h, t) => tick(h, t))))
+    // Keeps the arcade server alive; it shuts itself down two minutes after the pings stop.
+    $.clock.every(30_000, () => {
+      if (!arcade.port) return
+      void $.http.fetch(`http://127.0.0.1:${arcade.port}/api/ping`, { method: 'POST', headers: { 'x-arcade-token': arcade.token } })
+        .catch(() => undefined)
+    })
     $.clock.every(FRAME_MS, async () => {
       if (!latest) return
       frame += 1
@@ -179,20 +274,6 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
-  // A finished or abandoned round, posted by the arcade's surface module.
-  on('ui.message', async ($, e, next) => {
-    if (e.element !== ARCADE) return next(e)
-    const msg = parseMessage(e.data)
-    if (!msg) return {}
-    let wasOpen = false
-    const home = await change($, (h, t) => {
-      wasOpen = h.arcade.open?.game === msg.game
-      return msg.kind === 'quit' ? quitGame(h) : finishGame(h, msg.game, msg.score, msg.ms, t)
-    })
-    if (wasOpen && msg.kind === 'result') $.ui.toast(`🎮 ${home.log}`)
-    return {}
-  })
-
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const ui = $.ui.resolve(e)
     const { Box, Text, Button } = ui
@@ -236,32 +317,36 @@ export const register: Register = (on, options) => {
 
     if (view === 'arcade') {
       const open = home.arcade.open
-      if (open && 'Client' in ui) {
-        return (
-          <Box flexDirection="column">
-            {tabs}
-            <ui.Client key={ARCADE} module="./arcade/client.tsx" props={{
-              game: open.game, seed: open.at % 2_147_483_647, mods: modsFor(cat), flavor: flavor.name,
-              genes: cat.genes, best: home.arcade.best[open.game] ?? 0, cols, rows: GAME_ROWS,
-            }} />
-            <Button key="arcade-quit" plain label="Quit the round" onPress={() => change($, h => quitGame(h))} />
-          </Box>
-        )
-      }
       const star = featured(now)
+      const url = arcade.port ? arcadeUrl(arcade.port, arcade.token) : ''
+      const play = (id: (typeof GAMES)[number]['id']) => async () => {
+        await change($, (h, t) => startGame(h, id, t))
+        await openArcade($)
+      }
       return (
         <Box flexDirection="column">
           {tabs}
           <Text bold color={tone.title}>Arcade · {cat.name} plays · {Math.round(cat.energy)} energy</Text>
           <Text color={tone.muted}>
-            Each round costs {ENERGY_COST} energy. Medals pay coins and xp {PAID_PLAYS}× per game a day; joy every time.
+            Games run in your browser (WebGL). Each round costs {ENERGY_COST} energy; medals pay coins and xp {PAID_PLAYS}× per game a day.
           </Text>
-          {!('Client' in ui) && <Text color={tone.warn}>The arcade needs the terminal or the desktop app.</Text>}
+          <Button key="arcade-open" hotkey="o" plain
+            label={arcade.port ? '▸ Show the arcade in the browser again (o)' : '▸ Open the arcade in your browser (o)'}
+            onPress={async () => {
+              if (!(await openArcade($, true))) await change($, h => ({ ...h, log: 'The arcade needs Node.js on your PATH.' }))
+            }} />
+          {url ? <Text color={tone.muted}>{'   '}<ui.Link href={url}>{`localhost:${arcade.port}`}</ui.Link> · stays up while Claude Code runs</Text> : null}
+          {open && (
+            <Box flexDirection="column">
+              <Text color={tone.ok}>▶ {cat.name} is playing {gameOf(open.game)?.name} in the browser.</Text>
+              <Button key="arcade-quit" plain label="   Quit the round" onPress={() => change($, h => quitGame(h))} />
+            </Box>
+          )}
           {GAMES.map(g => (
             <Box flexDirection="column">
               <Button key={`game-${g.id}`} plain
                 label={`${g.id === star ? '★' : '▸'} ${g.name} · best ${home.arcade.best[g.id] ?? 0} · ${playsLeft(home, g.id, now)}/${PAID_PLAYS} paid left${g.id === star ? ' · 2× today' : ''}`}
-                onPress={() => change($, (h, t) => startGame(h, g.id, t))} />
+                onPress={play(g.id)} />
               <Text color={tone.muted}>{'   '}{g.blurb} ({g.controls}) · medals {g.medals.join('/')}</Text>
             </Box>
           ))}
@@ -517,7 +602,11 @@ export const register: Register = (on, options) => {
         <Box>
           {ACTIONS.map(a => (
             <Button key={a.action} label={a.label} hotkey={a.hotkey}
-              onPress={() => (a.action === 'play' ? update($, viewRef, (): View => 'arcade') : change($, (h, t) => act(h, a.action, t)))} />
+              onPress={async () => {
+                if (a.action !== 'play') return change($, (h, t) => act(h, a.action, t))
+                await update($, viewRef, (): View => 'arcade')
+                await openArcade($)
+              }} />
           ))}
         </Box>
         <Button key="adopt" hotkey="a" plain
