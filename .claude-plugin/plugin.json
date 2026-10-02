@@ -12,6 +12,13 @@
       "default": "auto",
       "options": ["auto", "daycycle", "latte", "frappe", "macchiato", "mocha"]
     },
+    "skin": {
+      "type": "string",
+      "title": "Cat interface",
+      "description": "full redraws the spinner, turn line, prompt hint, tool rows and a walking-cat band; light only the spinner, turn line and hint; off leaves Claude Code alone",
+      "default": "full",
+      "options": ["full", "light", "off"]
+    },
     "sound": {
       "type": "boolean",
       "title": "Sound effects",

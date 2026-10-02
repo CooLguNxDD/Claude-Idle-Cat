@@ -97,6 +97,18 @@ Colors come from [Catppuccin](https://catppuccin.com/). Pick a flavor in `/confi
 | `daycycle` | Latte by day, Frappé at dusk, Mocha at night, by your clock |
 | `latte` · `frappe` · `macchiato` · `mocha` | always that flavor |
 
+## Cat interface
+
+Claude Code's own screen gets a cat skin. Pick a level in `/config` → **Cat interface**:
+
+| Value | What changes |
+| --- | --- |
+| `full` (default) | everything below |
+| `light` | the spinner word ("Purring…", "Pouncing…"), the turn line ("Napped for 3s") and a hint tail (`🐱 Mochi · happy · 120c`) |
+| `off` | Claude Code looks as it always does |
+
+`full` also adds a `=^.^=` that pads across a band above the prompt while Claude works, a paw on each tool row (🐟 Read/Grep, 🧶 Edit/Write, 🐭 Bash, 🐾 other) and a reworded ctrl+b pill. The band gives way to surveys, and your own key binding stays.
+
 ## Sound
 
 Short chiptune clips play on level-up, evolution, adoption, achievements, birthdays, gifts and critter finds. Turn them off in `/config` → **Sound effects**.
@@ -125,6 +137,7 @@ hooks/critters.ts            seasonal critters, finding, museum donations, selli
 hooks/collection.ts          cat book, Paw Miles tasks, achievements, miles shop
 hooks/calendar.ts            seasons, festivals, birthdays, catnip market
 hooks/time.ts                local-midnight day numbers
+hooks/skin.ts                cat skin: spinner words, hint tail, walking band, tool paws
 hooks/sfx.ts                 which moments make a sound, clip paths, Windows playback argv
 hooks/arcade/engine.ts       pixel framebuffer, half-block runs, particles, shake, easing
 hooks/arcade/bridge.ts       what the mod and the browser exchange: snapshots, server lines, token, URL

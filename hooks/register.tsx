@@ -25,8 +25,10 @@ import { CLIP_FOR, clipAsset, powershellArgv } from './sfx'
 import type { Clip } from './sfx'
 import { BRANCHES, FORM_LEVEL, SKILLS, branchPoints, canLearn, formOf, freePoints, rankOf, respecPrice } from './skills'
 import type { Branch } from './skills'
+import { catHint, doneWord, hintTail, pawPrefix, skinLevel, spinnerWord, walkFrame } from './skin'
 import { FLAVORS, resolveFlavor, uiTokens } from './theme'
 import type { Flavor } from './theme'
+import type { SkinLevel } from './skin'
 
 const PANE = 'afk-cat'
 const SCENE = 'scene'
@@ -56,6 +58,9 @@ let frame = 0
 // Claude Code's own theme row, read for the `auto` flavor.
 let claudeTheme = 'dark'
 let isSoundOn = true
+let skin: SkinLevel = 'full'
+// True while the walking band is on screen; the frame loop repaints it only then.
+let isBandShown = false
 let flavorNow: (now: number) => Flavor = () => FLAVORS.mocha
 // The browser arcade's server: started on first use, killed with the module; the token guards it.
 const arcade = { port: 0, token: newToken(Math.random), starting: null as Promise<number> | null, pushed: '', isOpened: false }
@@ -246,6 +251,7 @@ const readTheme = async ($: EngineInterface) => {
 
 export const register: Register = (on, options) => {
   isSoundOn = options.sound !== false
+  skin = skinLevel(options.skin)
   const flavorAt = (now: number) => resolveFlavor(String(options.flavor ?? 'auto'), claudeTheme, hourOf(now))
   flavorNow = flavorAt
 
@@ -271,6 +277,9 @@ export const register: Register = (on, options) => {
       if (!arcade.port) return
       void $.http.fetch(`http://127.0.0.1:${arcade.port}/api/ping`, { method: 'POST', headers: { 'x-arcade-token': arcade.token } })
         .catch(() => undefined)
+    })
+    $.clock.every(500, () => {
+      if (isBandShown) $.ui.invalidate('ui.render')
     })
     $.clock.every(FRAME_MS, async () => {
       if (!latest) return
@@ -305,6 +314,13 @@ export const register: Register = (on, options) => {
   on('config.set', { key: 'theme' }, async ($, e, next) => {
     const set = await next(e)
     await readTheme($)
+    $.ui.invalidate('ui.render')
+    return set
+  })
+
+  on('config.set', { key: 'skin' }, async ($, e, next) => {
+    const set = await next(e)
+    skin = skinLevel(e.value)
     $.ui.invalidate('ui.render')
     return set
   })
@@ -662,5 +678,48 @@ export const register: Register = (on, options) => {
           onPress={() => change($, (h, t) => adopt(h, t))} />
       </Box>
     )
+  })
+
+  // Cat skin: redraws Claude Code's own spinner, turn line, hint, band and tool rows.
+  on('ui.render', { component: 'Spinner' }, async ($, e, next) => {
+    if (skin === 'off') return next(e)
+    return next({ ...e, props: { ...e.props, word: spinnerWord(e.props.mode, e.props.word) } })
+  })
+
+  on('ui.render', { component: 'TurnDuration' }, async ($, e, next) => {
+    if (skin === 'off') return next(e)
+    return next({ ...e, props: { ...e.props, word: doneWord(e.props.word) } })
+  })
+
+  on('ui.render', { component: 'PromptHint' }, async ($, e, next) => {
+    if (skin === 'off' || e.props.isDraft) return next(e)
+    const tail = [e.props.tail, hintTail(await read($, homeRef))].filter(Boolean).join(' ')
+    return next({ ...e, props: { ...e.props, tail } })
+  })
+
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    isBandShown = false
+    if (skin !== 'full' || e.props.hasSurvey || !e.props.isWorking) return next(e)
+    isBandShown = true
+    const { Text } = $.ui.resolve(e)
+    const flavor = flavorAt(await $.clock.now())
+    return <Text color={uiTokens(flavor).accent}>{walkFrame(frame, e.props.bodyColumns)}</Text>
+  })
+
+  on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
+    if (skin !== 'full') return next(e)
+    const { Box, Text } = $.ui.resolve(e)
+    const tone = uiTokens(flavorAt(await $.clock.now()))
+    return (
+      <Box>
+        <Text color={tone.accent}>{pawPrefix(e.props.tool)} </Text>
+        {await next(e)}
+      </Box>
+    )
+  })
+
+  on('ui.render', { component: 'ToolProgress' }, async ($, e, next) => {
+    if (skin !== 'full' || e.props.kind !== 'background_hint') return next(e)
+    return next({ ...e, props: { ...e.props, hint: catHint(e.props.hint) } })
   })
 }

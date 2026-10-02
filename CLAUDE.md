@@ -30,6 +30,10 @@ On this machine `~/.claude/settings.json` sets `env.CLAUDE_CODE_PLUGIN_DIRS` to 
     - The mod pushes state to `POST /api/state`.
     - The server listens on 127.0.0.1 only. It checks the token and the Host header and caps request bodies. Keep all of that when adding routes.
 
+## Cat skin (`hooks/skin.ts`)
+
+The `ui.render` hooks on Claude Code's own components pass with `next(e)` when `skin` is `off`. The `ToolUse` hook wraps `await next(e)` and never rebuilds the row.
+
 ## Rules for the save (`Home` in `types/index.d.ts`)
 
 - The household is one JSON value under `$.store` key `home`, capped at 4 MiB. It's written through `change()` in `register.tsx`, which:
