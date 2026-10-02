@@ -4,16 +4,22 @@ export const MAX_COLS = 56
 export const HEIGHT = ROWS * 2
 export const FLOOR_Y = 21
 const UPPER_HALF = 0x2580
+// Image pixels per scene pixel: a cell becomes 4x8, room for a 3x5 glyph and its shadow.
+export const IMAGE_SCALE = 4
 
 export const sceneCols = (bodyColumns: number | undefined) =>
   Math.max(MIN_COLS, Math.min(MAX_COLS, (bodyColumns ?? MIN_COLS) - 2))
 
+import { glyphPixels } from './font'
+
 type Overlay = { ch: string; fg: number }
+export type RgbaImage = { rgba: string; width: number; height: number }
 export type SceneCanvas = {
   w: number
   put: (x: number, y: number, c: number) => void
   text: (col: number, row: number, value: string, fg: number) => void
   pack: () => string
+  image: (shadow: number) => RgbaImage
 }
 
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -50,6 +56,28 @@ export const canvas = (w: number): SceneCanvas => {
         cells[i + 2] = o ? top : low
       }
       return toBase64(new Uint8Array(cells.buffer))
+    },
+    image: shadow => {
+      const s = IMAGE_SCALE
+      const width = w * s
+      const out = new Uint8Array(width * HEIGHT * s * 4)
+      const dot = (x: number, y: number, c: number) => {
+        const i = (y * width + x) * 4
+        out[i] = (c >> 16) & 255
+        out[i + 1] = (c >> 8) & 255
+        out[i + 2] = c & 255
+        out[i + 3] = 255
+      }
+      for (let y = 0; y < HEIGHT * s; y++) for (let x = 0; x < width; x++) dot(x, y, px[Math.floor(y / s) * w + Math.floor(x / s)] ?? 0)
+      // Text overlays draw as pixel glyphs centred in their cell, over the scene rather than replacing it.
+      over.forEach(({ ch, fg }, at) => {
+        const x0 = (at % w) * s + ((s - 3) >> 1)
+        const y0 = Math.floor(at / w) * 2 * s + ((2 * s - 5) >> 1)
+        const lit = glyphPixels(ch)
+        lit.forEach(([x, y]) => dot(x0 + x + 1, y0 + y + 1, shadow))
+        lit.forEach(([x, y]) => dot(x0 + x, y0 + y, fg))
+      })
+      return { rgba: toBase64(out), width, height: HEIGHT * s }
     },
   }
 }

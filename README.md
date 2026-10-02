@@ -171,6 +171,16 @@ Claude Code's own screen gets a cat skin. Pick a level in `/config` → **Cat in
 - **Running cat**: a pixel-art cat in the active cat's coat gallops along a band above the prompt while Claude works, kicking up dust, and wraps when it catches the fish. It sprints for a couple of seconds on every tool call. The band needs 5 free rows and a terminal at least 30 columns wide; otherwise a small `=^.^=` walks along one row. The band gives way to surveys.
 - A paw on each tool row (🐟 Read/Grep, 🧶 Edit/Write, 🐭 Bash, 🐾 other) and a reworded ctrl+b pill; your own key binding stays.
 
+## 🖼️ Pane canvas
+
+In kitty and Ghostty the pane's scene draws as a real pixel picture at 4× the half-block detail, with banners in a tiny pixel font. Other terminals keep the half-block scene. Pick a mode in `/config` → **Pane canvas**:
+
+| Value | What it does |
+| --- | --- |
+| `auto` (default) | a picture where the terminal can show one, half-block cells elsewhere |
+| `image` | always a picture |
+| `text` | always half-block cells |
+
 ## 🔊 Sound
 
 Short chiptune clips play on level-up, evolution, adoption, achievements, birthdays, gifts and critter finds. Turn them off in `/config` → **Sound effects**.
@@ -212,6 +222,7 @@ hooks/genes.ts               coats, eyes, personalities, shiny odds, coat painti
 hooks/genes/paint.ts         themed coat colors and deterministic markings
 hooks/adoption/             rarity/coat registry and shelter receipts
 hooks/scene/shelter.ts       parcel opening and adoption reveal scene
+hooks/scene/font.ts          3x5 pixel font for text drawn on the picture canvas
 hooks/mods.ts                trait × skill multipliers the rules read
 hooks/skills.ts              skill tree, points, evolution forms
 hooks/home.ts                furniture catalog, daily shop, house tiers, Tom Mew loan

@@ -1,0 +1,19 @@
+// A 3x5 pixel font for the image canvas: each glyph is five rows of three bits, top row first.
+const GLYPHS: Record<string, number[]> = {
+  A: [2, 5, 7, 5, 5], B: [6, 5, 6, 5, 6], C: [3, 4, 4, 4, 3], D: [6, 5, 5, 5, 6], E: [7, 4, 6, 4, 7],
+  F: [7, 4, 6, 4, 4], G: [3, 4, 5, 5, 3], H: [5, 5, 7, 5, 5], I: [7, 2, 2, 2, 7], J: [1, 1, 1, 5, 2],
+  K: [5, 5, 6, 5, 5], L: [4, 4, 4, 4, 7], M: [5, 7, 7, 5, 5], N: [6, 5, 5, 5, 5], O: [2, 5, 5, 5, 2],
+  P: [6, 5, 6, 4, 4], Q: [2, 5, 5, 6, 3], R: [6, 5, 6, 5, 5], S: [3, 4, 2, 1, 6], T: [7, 2, 2, 2, 2],
+  U: [5, 5, 5, 5, 7], V: [5, 5, 5, 5, 2], W: [5, 5, 7, 7, 5], X: [5, 5, 2, 5, 5], Y: [5, 5, 2, 2, 2],
+  Z: [7, 1, 2, 4, 7], z: [0, 7, 1, 2, 7], '!': [2, 2, 2, 0, 2], '?': [6, 1, 2, 0, 2], '*': [0, 5, 2, 5, 0],
+  '+': [0, 2, 7, 2, 0], '@': [2, 5, 7, 4, 3], '>': [4, 2, 1, 2, 4], '<': [1, 2, 4, 2, 1],
+  '♥': [0, 5, 7, 7, 2], '★': [2, 2, 7, 2, 5],
+}
+const UNKNOWN = [7, 5, 5, 5, 7]
+
+/** The glyph's lit pixels as [x, y] pairs inside its 3x5 box; a space has none. */
+export const glyphPixels = (ch: string): [number, number][] => {
+  if (ch === ' ') return []
+  const rows = GLYPHS[ch] ?? GLYPHS[ch.toUpperCase()] ?? UNKNOWN
+  return rows.flatMap((bits, y) => [0, 1, 2].filter(x => (bits >> (2 - x)) & 1).map(x => [x, y] as [number, number]))
+}
