@@ -29,6 +29,7 @@ const TICK_MS = 10_000
 const FRAME_MS = 125
 const homeRef = { plugin: 'afk-cat', key: 'home' } as const
 const viewRef = { plugin: 'afk-cat', key: 'view' } as const
+const catListRef = { plugin: 'afk-cat', key: 'isCatListOpen' } as const
 const TABS: { view: View; label: string; hotkey: string }[] = [
   { view: 'cat', label: 'Cat', hotkey: 'c' },
   { view: 'skills', label: 'Skills', hotkey: 's' },
@@ -97,7 +98,7 @@ const HELP = [
   '/cat switch [name] — change the active cat (no name: the next one)',
   '/cat rename <name> — rename the active cat',
   '/cat reset — start over (wipes everything)',
-  'In the pane: c s h r b m tabs · f p e n feed/play/pet/nap · w next cat · a adopt',
+  'In the pane: c s h r b m tabs · f p e n feed/play/pet/nap · w cat list · a adopt',
 ].join('\n')
 
 const readTheme = async ($: EngineInterface) => {
@@ -195,6 +196,7 @@ export const register: Register = (on, options) => {
       : <Box flexDirection="column">{catArt(mood, home.frame, formOf(cat)).map(line => <Text>{line}</Text>)}</Box>
 
     const view = (await read($, viewRef)) ?? 'cat'
+    const isCatListOpen = (await read($, catListRef)) ?? false
     const tabs = (
       <Box>
         {TABS.map(t => (
@@ -430,15 +432,20 @@ export const register: Register = (on, options) => {
         {header}
         {scene}
         <Text italic color={tone.title}>{cat.name}: "{dialogue(cat, now, hourOf(now))}"</Text>
-        <Box>
-          <Text color={tone.muted}>Cats {home.cats.length}/{maxCats(home)}: </Text>
-          {home.cats.map(c => (
-            <Button key={`cat-${c.id}`} plain label={c.id === cat.id ? `▸${c.name}` : c.name}
-              onPress={() => change($, h => switchTo(h, c.id))} />
-          ))}
-          <Button key="next-cat" hotkey="w" plain label="Next cat (w)"
-            onPress={() => change($, h => nextCat(h))} />
-        </Box>
+        <Button key="cat-list" hotkey="w" plain
+          label={`${isCatListOpen ? '▾' : '▸'} Cats ${home.cats.length}/${maxCats(home)} · ${cat.name} (w)`}
+          onPress={() => update($, catListRef, open => !open)} />
+        {isCatListOpen && home.cats.map(c => (
+          <Button key={`cat-${c.id}`} plain
+            label={`   ${c.id === cat.id ? '●' : '○'} ${c.name} · Lv${c.level} ${stageName(c)} · ${moodOf(c)}`}
+            onPress={async () => {
+              await change($, h => switchTo(h, c.id))
+              await update($, catListRef, () => false)
+            }} />
+        ))}
+        {isCatListOpen && home.cats.length < maxCats(home) && (
+          <Text color={tone.muted}>{'   '}+ room for {maxCats(home) - home.cats.length} more · adopt (a)</Text>
+        )}
         {stat('Hunger', cat.hunger)}
         {stat('Joy', cat.joy)}
         {stat('Energy', cat.energy)}

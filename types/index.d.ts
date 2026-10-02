@@ -67,6 +67,6 @@ export type Home = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'afk-cat': { home: Home | null; view: View }
+    'afk-cat': { home: Home | null; view: View; isCatListOpen: boolean }
   }
 }
