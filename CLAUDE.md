@@ -1,4 +1,4 @@
-# claude-kitten
+# Claude Idle Cat (`claude-kitten`)
 
 `afk-cat`: an AFK virtual-pet cat game that runs as a Claude Code mod, a plugin of function hooks. `README.md` covers gameplay and the file layout. This file covers what you need to know before changing code.
 

@@ -1,12 +1,12 @@
-# claude-kitten
+# Claude Idle Cat
 
-An AFK virtual-pet cat that lives inside Claude Code as a mod (a plugin of function hooks).
+`afk-cat`: An AFK virtual-pet cat that lives inside Claude Code as a mod (a plugin of function hooks).
 It's a Tamagotchi with an idle-game loop: look after the cat, earn coins, buy upgrades and come back for streak bonuses.
 
 ## Play
 
 ```bash
-claude --plugin-dir C:\works\MyOSS\claude-kitten
+claude --plugin-dir ./claude-kitten
 ```
 
 Then type `/cat` to open the pane.
