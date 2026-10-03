@@ -22,6 +22,8 @@ Or inside a session: `/plugin marketplace add CooLguNxDD/Claude-Idle-Cat`, then 
 
 Update with `/plugin marketplace update claude-idle-cat`, or turn on auto-update for the marketplace under **Marketplaces** in `/plugin`.
 
+Each `afk-cat--v<version>` tag publishes a GitHub release: the plugin zip, a checksum, and a snapshot of that commit (version, inventory, install commands, and the changes since the previous tag). To pin one release: `claude plugin marketplace add CooLguNxDD/Claude-Idle-Cat#afk-cat--v<version>`.
+
 > A mod is code that runs with your permissions, so install it only if you trust it. To see which hooks and calls it makes before installing, clone the repo and run `claude plugin validate ./claude-kitten`.
 
 ## 🎮 Play
@@ -297,6 +299,7 @@ tools/build-art.mjs          regenerates 24 deterministic 320×180 PNG backgroun
 tools/build-content.mjs      regenerates hooks/content/index.ts; --check fails when it is stale
 tools/preview.mjs            renders a breed sheet, a move strip, a world panorama or a named cat's portrait to a PNG for a look before committing
 tools/build-themes.mjs       writes themes/*.json (Claude Code custom themes) from hooks/theme.ts
+tools/release-snapshot.mjs   writes the tag's plugin zip, checksum, release-snapshot.json and release notes
 themes/*.json                the four Catppuccin Claude Code themes (generated, committed)
 hooks/rng.ts                 seeded random numbers (repeatable tests)
 hooks/theme.ts               Catppuccin palettes and flavor resolution
@@ -313,6 +316,7 @@ claude plugin validate .
 claude plugin test .
 node --test server/arcade.test.mjs
 node tools/build-content.mjs --check
+node --test tools/release-snapshot.test.mjs
 node tools/build-art.mjs
 node tools/build-web.mjs
 ```
@@ -329,6 +333,10 @@ New content is a data file, and four project skills in `.claude/skills/` write o
 | `world-gen` | a themed yard with layers and landmarks | `hooks/content/worlds/<id>.ts` |
 
 To type-check, load the plugin once with `--plugin-dir`. That writes `.claude-plugin/types/` (git-ignored). Then run `npx -p typescript@5 tsc -p .`.
+
+### Cut a release
+
+Set the same `version` in `.claude-plugin/plugin.json` and on the `afk-cat` entry in `.claude-plugin/marketplace.json`. Commit that bump from a clean tree, then run `claude plugin tag --push`. That pushes `afk-cat--v<version>`. GitHub Actions publishes the release. `node tools/release-snapshot.mjs --preview` writes `dist/` first if you want to read the notes before tagging.
 
 The mod API is early access and can change between Claude Code releases. This version was built against 2.1.287.
 
