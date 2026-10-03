@@ -21,8 +21,9 @@ import { COATS, COAT_REGISTRY, RARITIES, rarityBadge, rarityOf } from './adoptio
 import { revealedCat } from './adoption/state'
 import { LOAN_SHARE, SHOP_CLOSE, SHOP_OPEN, TIERS, baitOf, dailyStock, furniture, isShopOpen, maxCats, payLoan, place,
   takeLoan, tierOf } from './home'
-import { ROWS, frameCells, sceneCols } from './scene'
-import { shelterCells } from './scene/shelter'
+import { PICTURE_SCALE, ROWS, frameCells, frameImage, sceneCols } from './scene'
+import type { RgbaImage } from './scene'
+import { shelterCells, shelterImage } from './scene/shelter'
 import { CLIP_FOR, clipAsset, powershellArgv } from './sfx'
 import type { Clip } from './sfx'
 import { BRANCHES, FORM_LEVEL, SKILLS, branchPoints, canLearn, formOf, freePoints, rankOf, respecPrice } from './skills'
@@ -45,6 +46,7 @@ const SERVER = 'server/arcade.mjs'
 const SERVER_START_MS = 10_000
 const TICK_MS = 10_000
 const FRAME_MS = 125
+const STALL_MS = 2000
 const homeRef = { plugin: 'afk-cat', key: 'home' } as const
 const routeRef = { plugin: 'afk-cat', key: 'route' } as const
 const catListRef = { plugin: 'afk-cat', key: 'isCatListOpen' } as const
@@ -54,10 +56,16 @@ const FORMS = ['ninja', 'royal', 'cloud', 'chonk']
 let latest: Home | null = null
 let cols = 34
 let frame = 0
+// What the frame loop paints: the pane's view, element and last frame, whether it is mounted, and an in-flight guard.
+const paint = { view: 'cat' as View, kind: 'raster' as SceneKind, last: '', isMounted: false, isBusy: false, busyAt: 0 }
+// Set once an Image scene draws its text alt: this terminal shows no pictures, so the pane keeps to the Raster.
+let isImageBlocked = false
 // Claude Code's own theme row, read for the `auto` flavor.
 let claudeTheme = 'dark'
 let isSoundOn = true
 let skin: SkinLevel = 'full'
+// How the pane's scene draws: auto tries a picture and falls back to half-block cells.
+let canvasMode: 'auto' | 'image' | 'text' = 'auto'
 // The running-cat band above the prompt: its render instance, width and how it is drawn; the frame loop repaints it.
 let band = { id: '', cols: 0, mode: 'off' as 'off' | 'raster' | 'text' }
 let runX = 0
@@ -207,6 +215,14 @@ const ACTIONS: { action: Action; label: string; hotkey: string }[] = [
 ]
 
 const hourOf = (now: number) => new Date(now).getHours()
+
+type SceneKind = 'raster' | 'image'
+const sceneCellsOf = (home: Home, view: View, now: number, flavor: Flavor) => view === 'adopt'
+  ? shelterCells(home, now, frame, flavor, cols) : frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols })
+const sceneImageOf = (home: Home, view: View, now: number, flavor: Flavor): RgbaImage => view === 'adopt'
+  ? shelterImage(home, now, frame, flavor, cols, PICTURE_SCALE) : frameImage({ home, now, tick: frame, hour: hourOf(now), flavor, cols })
+// A denied Image blit that names its alt means the terminal draws no pictures here.
+const isAltDeny = (deny: string) => /\balt\b|placeholder/i.test(deny)
 
 const routeTo = ($: EngineInterface, target: View | number) =>
   update($, routeRef, route => navigate(route ?? initialRoute(), target))
@@ -397,6 +413,7 @@ const readTheme = async ($: EngineInterface) => {
 export const register: Register = (on, options) => {
   isSoundOn = options.sound !== false
   skin = skinLevel(options.skin)
+  canvasMode = options.canvas === 'image' || options.canvas === 'text' ? options.canvas : 'auto'
   const flavorAt = (now: number) => resolveFlavor(String(options.flavor ?? 'auto'), claudeTheme, hourOf(now))
   flavorNow = flavorAt
 
@@ -430,17 +447,41 @@ export const register: Register = (on, options) => {
     })
     $.clock.every(FRAME_MS, async () => {
       if (!latest) return
-      frame += 1
       const now = await $.clock.now()
-      const view = ((await read($, routeRef)) ?? initialRoute()).view
-      const cells = view === 'adopt' ? shelterCells(latest, now, frame, flavorAt(now), cols)
-        : frameCells({ home: latest, now, tick: frame, hour: hourOf(now), flavor: flavorAt(now), cols })
-      await $.ui.blit({ requestId: PANE, key: SCENE, cells })
-      if (band.mode !== 'raster') return
-      const isSprint = frame < sprintUntil
-      runX = nextX(runX, band.cols, isSprint)
-      const run = { cat: activeCat(latest), flavor: flavorAt(now), tick: frame, x: runX, cols: band.cols, isSprint }
-      await $.ui.blit({ requestId: band.id, key: RUNNER, cells: runFrame(run) })
+      // A frame still waiting on its blit holds the next one back, but never past STALL_MS.
+      if (paint.isBusy && now - paint.busyAt < STALL_MS) return
+      paint.isBusy = true
+      paint.busyAt = now
+      try {
+        frame += 1
+        const flavor = flavorAt(now)
+        // Skips the scene while the pane is closed and when a frame would repaint the same cells.
+        if (paint.isMounted && paint.kind === 'raster') {
+          const cells = sceneCellsOf(latest, paint.view, now, flavor)
+          if (cells !== paint.last) {
+            paint.last = cells
+            if ((await $.ui.blit({ requestId: PANE, key: SCENE, cells })).deny) paint.isMounted = false
+          }
+        } else if (paint.isMounted) {
+          const source = sceneImageOf(latest, paint.view, now, flavor)
+          if (source.rgba !== paint.last) {
+            paint.last = source.rgba
+            const { deny } = await $.ui.blit({ requestId: PANE, key: SCENE, source })
+            if (deny) paint.isMounted = false
+            if (deny && canvasMode === 'auto' && isAltDeny(deny)) {
+              isImageBlocked = true
+              $.ui.invalidate('ui.render')
+            }
+          }
+        }
+        if (band.mode !== 'raster') return
+        const isSprint = frame < sprintUntil
+        runX = nextX(runX, band.cols, isSprint)
+        const run = { cat: activeCat(latest), flavor, tick: frame, x: runX, cols: band.cols, isSprint }
+        if ((await $.ui.blit({ requestId: band.id, key: RUNNER, cells: runFrame(run) })).deny) band.mode = 'off'
+      } finally {
+        paint.isBusy = false
+      }
     })
     return next(e)
   })
@@ -494,6 +535,14 @@ export const register: Register = (on, options) => {
     return set
   })
 
+  on('config.set', { key: 'canvas' }, async ($, e, next) => {
+    const set = await next(e)
+    canvasMode = e.value === 'image' || e.value === 'text' ? e.value : 'auto'
+    isImageBlocked = false
+    $.ui.invalidate('ui.render')
+    return set
+  })
+
   on('tool.call', async ($, e, next) => {
     sprintUntil = frame + 16
     const ran = await next(e)
@@ -524,10 +573,19 @@ export const register: Register = (on, options) => {
     )
     const view = ((await read($, routeRef)) ?? initialRoute()).view
     const reveal = revealedCat(home)
-    const scene = 'Raster' in ui
-      ? <ui.Raster key={SCENE} columns={cols} rows={ROWS}
-          cells={view === 'adopt' ? shelterCells(home, now, frame, flavor, cols)
-            : frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols })} />
+    const isImage = 'Image' in ui && 'Raster' in ui && canvasMode !== 'text' && (canvasMode === 'image' || !isImageBlocked)
+    const sceneImage = isImage ? sceneImageOf(home, view, now, flavor) : null
+    const sceneCells = !isImage && 'Raster' in ui ? sceneCellsOf(home, view, now, flavor) : ''
+    paint.view = view
+    paint.kind = isImage ? 'image' : 'raster'
+    paint.last = sceneImage?.rgba ?? sceneCells
+    paint.isMounted = paint.last !== ''
+    // What the picture shows, for screen readers and terminals that draw the alt instead.
+    const sceneAlt = view !== 'adopt' ? `${cat.name} (${mood}) in the yard`
+      : reveal ? `${reveal.name} at the adoption shelter` : 'A mystery parcel at the adoption shelter'
+    const scene = sceneImage && 'Image' in ui
+      ? <ui.Image key={SCENE} columns={cols} rows={ROWS} source={sceneImage} alt={sceneAlt} />
+      : 'Raster' in ui ? <ui.Raster key={SCENE} columns={cols} rows={ROWS} cells={sceneCells} />
       : view === 'adopt' && !reveal ? <Text color={tone.accent}>{'   /─────\\\n   │  ?  │\n   └─────┘'}</Text>
         : <Box flexDirection="column">{catArt(mood, home.frame, formOf(cat)).map(line => <Text>{line}</Text>)}</Box>
 

@@ -7,9 +7,10 @@ import { coatPixel } from '../genes'
 import { inkOf, mix } from '../theme'
 import type { Flavor } from '../theme'
 import { canvas, HEIGHT } from './canvas'
+import type { RgbaImage, SceneCanvas } from './canvas'
 
-export const shelterCells = (home: Home, now: number, tick: number, f: Flavor, cols: number): string => {
-  const c = canvas(cols)
+const drawShelter = (home: Home, now: number, tick: number, f: Flavor, cols: number, scale = 1): SceneCanvas => {
+  const c = canvas(cols, scale)
   const cat = revealedCat(home)
   const age = home.shelter.last ? Math.max(0, (now - home.shelter.last.at) / 1000) : Infinity
   const accent = cat ? f[RARITIES[rarityOf(cat.genes)].color] : f.mauve
@@ -41,5 +42,10 @@ export const shelterCells = (home: Home, now: number, tick: number, f: Flavor, c
     }))
     c.text(cx - 1, 2, '?', accent)
   }
-  return c.pack()
+  return c
 }
+
+export const shelterCells = (home: Home, now: number, tick: number, f: Flavor, cols: number): string =>
+  drawShelter(home, now, tick, f, cols).pack()
+export const shelterImage = (home: Home, now: number, tick: number, f: Flavor, cols: number, scale: number): RgbaImage =>
+  drawShelter(home, now, tick, f, cols, scale).image(inkOf(f))

@@ -3,9 +3,12 @@ import type { YardState } from './yard'
 import { FLOOR_Y } from './canvas'
 import type { SceneCanvas } from './canvas'
 import type { WeatherReading } from '../../types'
+import { fineSeason } from './fine/season'
+import { pen } from './fine/draw'
 
 export const drawSeason = (c: SceneCanvas, yard: YardState, tick: number, f: Flavor, weather: WeatherReading | null = null) => {
   if (weather && !['clear', 'partly-cloudy', 'cloudy'].includes(weather.condition)) return
+  if (c.isFine) return fineSeason(pen(c), yard, tick, f, weather !== null)
   for (let i = 0; i < 9; i++) {
     const x = (i * 7 + (tick >> 2) * (yard.season === 'autumn' ? 1 : 0) + (tick >> 3)) % c.w
     const y = (i * 5 + (tick >> 1)) % (FLOOR_Y + 1)

@@ -25,6 +25,13 @@
       "title": "Sound effects",
       "description": "Chiptune clips on level-up, evolution, adoption and achievements",
       "default": true
+    },
+    "canvas": {
+      "type": "string",
+      "title": "Pane canvas",
+      "description": "auto draws the scene as a 4x pixel picture where the terminal shows images (kitty, Ghostty) and as half-block cells elsewhere; image or text forces one",
+      "default": "auto",
+      "options": ["auto", "image", "text"]
     }
   }
 }

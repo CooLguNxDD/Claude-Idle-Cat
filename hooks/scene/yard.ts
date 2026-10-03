@@ -6,6 +6,8 @@ import type { SceneCanvas } from './canvas'
 import type { WeatherReading } from '../../types'
 import { skyColors } from './weather/sky'
 import { drawWeatherLayer } from './weather'
+import { fineYardGround, fineYardSky } from './fine/yard'
+import { pen } from './fine/draw'
 
 export type YardState = { season: ReturnType<typeof seasonOf>; festival: ReturnType<typeof festivalOf>; isNight: boolean }
 const STARS: [number, number][] = [[2, 1], [7, 4], [12, 2], [19, 1], [24, 5], [4, 7], [16, 6], [38, 2], [45, 5], [51, 1]]
@@ -16,9 +18,20 @@ export const drawYard = (c: SceneCanvas, now: number, hour: number, tick: number
   const isDusk = !isNight && part === 'dusk'
   const [top, low] = weather ? skyColors(weather, f) : isNight ? [f.crust, f.surface0] : isDusk ? [f.mauve, f.peach]
     : [f.sapphire, mix(f.sky, f.isLight ? f.base : f.text, 0.45)]
+  const isVisible = !weather || weather.condition === 'clear' || weather.condition === 'partly-cloudy'
+  const month = new Date(now).getMonth() + 1
+  const season = seasonOf(month)
+  const festival = festivalOf(month)
+  if (c.isFine) {
+    const fine = { top, low, isNight, isDusk, isSunVisible: isVisible, hasClouds: !weather && isVisible && !isNight,
+      isWinter: (season === 'winter' && !weather) || weather?.condition === 'snow', hasLights: festival === 'lights' }
+    fineYardSky(pen(c), fine, tick, f)
+    if (weather) drawWeatherLayer({ c, weather, tick, f }, 'sky')
+    fineYardGround(pen(c), fine, tick, f)
+    return { season, festival, isNight }
+  }
   for (let y = 0; y < HEIGHT; y++) for (let x = 0; x < c.w; x++) c.put(x, y, mix(top, low, y / 20))
   const sx = c.w - 5
-  const isVisible = !weather || weather.condition === 'clear' || weather.condition === 'partly-cloudy'
   if (isNight && isVisible) {
     STARS.forEach(([x, y], i) => x < c.w - 6 && c.put(x, y, (tick + i * 3) % 12 < 2 ? f.overlay0 : f.text))
     for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1], [2, 1], [1, 2]] as const)
@@ -39,9 +52,6 @@ export const drawYard = (c: SceneCanvas, now: number, hour: number, tick: number
   }
   for (let y = FLOOR_Y; y < HEIGHT; y++) for (let x = 0; x < c.w; x++)
     c.put(x, y, (x + y * 3) % 7 === 0 ? mix(f.peach, f.crust, 0.6) : mix(f.peach, f.crust, 0.4))
-  const month = new Date(now).getMonth() + 1
-  const season = seasonOf(month)
-  const festival = festivalOf(month)
   if (season === 'winter' && !weather) for (let x = 0; x < c.w; x++) {
     c.put(x, FLOOR_Y, f.isLight ? f.base : f.text)
     c.put(x, 14, f.isLight ? f.base : f.text)
