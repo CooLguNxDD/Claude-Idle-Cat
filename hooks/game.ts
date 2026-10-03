@@ -280,7 +280,7 @@ export const adopt = (home: Home, now: number, rng: Rng = Math.random, name?: st
   if (home.coins < price) return { ...home, log: `Adoption costs ${price}c.` }
   const taken = new Set(home.cats.map(c => c.name))
   const free = NAMES.filter(n => !taken.has(n))
-  const genes = { ...rollGenes(rng), ...(home.shinyCharm ? { isShiny: true } : {}) }
+  const genes = { ...rollGenes(rng, now), ...(home.shinyCharm ? { isShiny: true } : {}) }
   const cat = newCat(`c${home.nextId}`, name?.slice(0, 20) || pick(rng, free.length ? free : NAMES), genes, now)
   return { ...home, coins: home.coins - price, cats: [...home.cats, cat], activeId: cat.id, nextId: home.nextId + 1,
     shinyCharm: false, shelter: { pulls: home.shelter.pulls + 1, last: { catId: cat.id, at: now, cost: price } },

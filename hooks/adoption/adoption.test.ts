@@ -10,16 +10,18 @@ import { seeded } from '../rng'
 import { FLAVORS } from '../theme'
 import { COATS, MARKINGS, RARITIES, SILHOUETTES, rarityOf, rollCoat } from './registry'
 
+const NOW = new Date(2026, 9, 15, 12).getTime()
+
 test('rarity boundaries, seeded odds and independent shiny rolls match the published pool', async () => {
   const rolls = [0, 0.60, 0.85, 0.95, 0.99]
   const tiers = Object.keys(RARITIES)
-  rolls.forEach((roll, i) => expect(rarityOf({ coat: rollCoat(() => roll) })).toBe(tiers[i]))
+  rolls.forEach((roll, i) => expect(rarityOf({ coat: rollCoat(() => roll, NOW) })).toBe(tiers[i]))
   const counts: Record<string, number> = {}
   const rng = seeded(371)
   let shinies = 0
   const n = 50_000
   for (let i = 0; i < n; i++) {
-    const g = rollGenes(rng)
+    const g = rollGenes(rng, NOW)
     const rarity = rarityOf(g)
     counts[rarity] = (counts[rarity] ?? 0) + 1
     if (g.isShiny) shinies++

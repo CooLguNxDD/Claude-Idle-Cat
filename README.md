@@ -77,7 +77,7 @@ Short version: stats drop, coins pile up, cats judge you silently.
 
 - Stats drop and coins build up in real time, at half the household's full rate while idle. Time while you're away counts too, up to 8 hours.
 - Being away never hurts: stats stop at 25, so cats get grumpy but never sad. They'll forgive you. Eventually.
-- Every cat has genes: one of 19 coats (each one a breed file in `hooks/content/breeds/`), five possible markings, three silhouettes (classic, fluffy, folded ears), eye color, a personality that changes the rules, and a 1-in-64 chance of being shiny ✨. Existing cats retain their original appearance.
+- Every cat has genes: one of 28 coats (each one a breed file in `hooks/content/breeds/`), five possible markings, three silhouettes (classic, fluffy, folded ears), eye color, a personality that changes the rules, and a 1-in-64 chance of being shiny ✨. Existing cats retain their original appearance.
 - The household starts in a Cottage with room for 2 cats. Every cat earns coins. Yes, even the lazy one.
 
 ### 📦 Adopt tab (top-bar arrows, or `/cat shelter`)
@@ -85,8 +85,9 @@ Short version: stats drop, coins pile up, cats judge you silently.
 *Somewhere out there is a cat in a box. Maybe it's your next one.*
 
 - Roll & adopt opens a pixel parcel and reveals one cat, its rarity and genes. The fee stays at 100c per cat already in your household. It is charged only on success; full houses and insufficient coins consume no roll or shiny charm.
-- Rarity odds: **Common 60%**, **Uncommon 25%**, **Rare 10%**, **Epic 4%**, **Legendary 1%**. Coats within a tier have equal odds; the full pool is visible in the tab. Rarity describes appearance and does not change stats or income.
+- Rarity odds: **Common 60%**, **Uncommon 25%**, **Rare 10%**, **Epic 4%**, **Legendary 1%**. Available coats within a tier have equal odds; today's pool is visible in the tab. Rarity describes appearance and does not change stats or income.
 - New coats include russian blue, chocolate, cinnamon, silver, smoke, tortoiseshell, ragdoll, bengal, lynx and the starry Nebula 🌌. Markings and silhouettes roll independently. Duplicate coats are possible, and every successful pull adds a cat; cats are never replaced.
+- The expanded pack adds Calico Void, legendary Golden Glitch, Snowshoe, Tiger Tabby, Starpoint, Blue Cream, Copper Bengal and Moon Smoke year-round. The epic Ghost coat joins shelter pulls and stray visits throughout October, by your local clock. Ghost cats you adopt or import stay permanently; October visitors can finish their stay and move in after the month ends.
 - Shiny is a separate 1/64 roll in every rarity tier. The Paw Miles shiny charm guarantees the next successful shelter adoption is shiny.
 - The tab keeps your latest arrival card with Meet and Pull again buttons, shelter-pull count, house expansion link and free adoption of yard visitors. `q` returns to the tab you came from.
 
@@ -97,8 +98,9 @@ Short version: stats drop, coins pile up, cats judge you silently.
 - Nyan's shop is open 08:00–22:00 by your clock, with 4 new items every day.
 - Furniture goes in yard spots (bowl, bed, toy, rug, plant, something hanging) and changes the rules: an auto-feeder, sleep regen, coin boosts, slower joy decay, more AFK events, bigger gifts.
 - The yard is wider than the pane and grows with the house: 80 columns for the Cottage, 160 for the House, 240 for the Manor and every bigger house. The view follows the cat; a strip along the top shows where you are. The House unlocks a cat tower and a tunnel, the Manor a big pipe to lounge on, and the cat visits all of them by itself.
+- Six worlds are available for free through `/cat world <id>`: `backyard`, `rooftops`, `snowy-cabin`, `neon-alley`, `space-station` and `beach-pier`. The four new worlds theme the sky, backdrops, floor, fence and landmarks while keeping your furniture and the same movement geometry. Live weather and seasonal effects work everywhere, even aboard the station; pumpkins and Christmas lights still appear.
 - Tom Mew builds a bigger house (House, Manor, Villa, Mansion, Castle, Palace, and on forever) on an interest-free loan. Every house holds one more cat. The first loan is 400c and each one after doubles (800c, 1.6kc, …). A quarter of income pays it back, and there's no deadline. Best landlord in town.
-- Now and then a named cat drops by instead of a plain stray, like Captain Whiskers, a retired ship's cat with opinions about tuna. Named cats can be adopted too.
+- Six named cats can drop by instead of plain strays: Captain Whiskers visits every world; wizard Merlin Meow visits the backyard and snowy cabin; pirate rival Admiral Claw visits rooftops and the beach pier; astronaut Nova visits the station; courier Pixel visits the neon alley; and gentle ghost Boo visits every world in October. Each eligible character gets a 5% roll in registry order, so later characters have slightly lower overall chances. All can be adopted for free.
 - Stray cats visit the yard, drawn by your decor (each item attracts certain personalities). They sit on the fence for a few hours, leave a gift, and you can adopt them for free. Remember, you were one once.
 
 ### 🎁 Claude helps, and other ways to get paid
@@ -126,7 +128,7 @@ Short version: stats drop, coins pile up, cats judge you silently.
 ### 🏅 Miles tab (`m`)
 
 - Five Paw Miles tasks a day, such as "pet 3 times" or "Claude runs 10 tools".
-- 20 achievements, three of them from the arcade, plus a Full palette reward for seeing every coat.
+- 20 achievements, three of them from the arcade, plus a Full palette reward for seeing all 27 year-round coats. Ghost is still recorded in the book, with its October availability, but is optional for Full palette. Previously earned awards stay earned.
 - A Miles shop with exclusive furniture and a shiny charm.
 
 ### 🕹️ Arcade tab (`g`, or Play `p`)
@@ -255,6 +257,8 @@ hooks/content/breeds/*.ts    one file per coat: label, rarity, theme shades and 
 hooks/content/moves/*.ts     one file per move preset: pose, cycle, speed, lift, duration and when it is picked
 hooks/content/cats/*.ts      one file per named cat: fixed genes, bio, catchphrase and how often it visits
 hooks/content/worlds/*.ts    one file per world: width per tier, far layers, furniture slots, landmarks, fence perches
+hooks/content/availability.ts pure local-calendar eligibility for coats and named visitors
+hooks/scene/styles.ts        world-specific sky, floor, rail and landmark palette art at every scale
 hooks/world.ts + camera.ts   pure world lookup, landmark unlocks and the follow/pan camera
 hooks/scene/layers.ts        parallax hills, trees and rooftops; scene/landmarks.ts draws the tower, tunnel and pipe
 hooks/motion.ts              pure move planner: picks the next move and steps the cat's position each frame

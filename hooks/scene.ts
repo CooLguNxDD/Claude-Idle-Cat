@@ -36,8 +36,8 @@ export const drawScene = ({ home, now, tick, hour, flavor, cols, scale, motion, 
   const weather = liveWeather(home.weather, now)
   const localHour = weather ? new Date(now + weather.utcOffset * 1000).getUTCHours() : hour
   const state = drawYard(c, now, localHour, tick, flavor, weather, yard,
-    isNight => drawLayers(c, world, wide, cam, isNight, flavor))
-  drawLandmarks(yard, landmarksOf(world, home.tier), flavor, tick)
+    isNight => drawLayers(c, world, wide, cam, isNight, flavor), world.scene)
+  drawLandmarks(yard, landmarksOf(world, home.tier), flavor, tick, world.scene)
   if (weather) drawWeatherLayer({ c: yard, weather, tick, f: flavor }, 'ground')
   drawDecor(yard, home, now, tick, flavor, state)
   const cat = drawCats(yard, home, now, tick, flavor, motion)

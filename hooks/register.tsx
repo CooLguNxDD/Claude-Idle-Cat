@@ -17,7 +17,7 @@ import { CATCHPHRASE_LEVEL, DAILY_CAP, GIFTS, LEVELS, NICKNAME_LEVEL, PHOTO_LEVE
   levelName, toNextLevel } from './friends'
 import type { Action } from './game'
 import { PERSONALITY_INFO, describeGenes } from './genes'
-import { COATS, RARITIES, breedOf, rarityBadge, rarityOf } from './adoption/registry'
+import { COATS, RARITIES, availableBreeds, breedOf, rarityBadge, rarityOf } from './adoption/registry'
 import { revealedCat } from './adoption/state'
 import { LOAN_SHARE, SHOP_CLOSE, SHOP_OPEN, baitOf, dailyStock, fmtCoins, furniture, isShopOpen, maxCats, payLoan, place,
   takeLoan, tierAt, tierOf } from './home'
@@ -734,8 +734,9 @@ export const register: Register = (on, options) => {
         {home.shinyCharm && <Text color={tone.accent}>Shiny charm ready · your next shelter cat will sparkle.</Text>}
         <Text bold color={tone.title}>Rarity odds</Text>
         {Object.entries(RARITIES).map(([key, r]) => <Text key={`odds-${key}`} color={css(flavor[r.color])}>
-          {r.label} {r.odds}% · {COATS.map(breedOf).filter(b => b.rarity === key).map(b => b.label).join(', ')}
+          {r.label} {r.odds}% · {availableBreeds(now).filter(b => b.rarity === key).map(b => b.label).join(', ')}
         </Text>)}
+        <Text color={tone.muted}>Ghost: available in October. Cats you adopt stay year-round.</Text>
         <Text color={tone.muted}>Coats within each tier have equal odds. Markings and silhouettes vary independently. Shiny: 1/64, in any tier.</Text>
         <Text color={tone.muted}>Rarity is cosmetic. Personality keeps its usual bonuses.</Text>
         {home.visitors.length > 0 && <Text bold color={tone.title}>Yard visitors · free adoption</Text>}
@@ -854,7 +855,7 @@ export const register: Register = (on, options) => {
             </Box>
           ))}
           <Text bold color={tone.accent}>Cat book</Text>
-          <Text>Coats {home.book.coats.length}/{COATS.length}: {COATS.map(c => (home.book.coats.includes(c) ? c : '???')).join(' · ')}</Text>
+          <Text>Coats {home.book.coats.length}/{COATS.length}: {COATS.map(c => `${home.book.coats.includes(c) ? c : '???'}${breedOf(c).available ? ' (October)' : ''}`).join(' · ')}</Text>
           <Text>Forms {home.book.forms.length}/4: {FORMS.map(f => (home.book.forms.includes(f) ? f : '???')).join(' · ')}</Text>
           <Text>Shinies: {home.book.shinies.join(', ') || 'none yet'} · strays met: {home.book.visitors.length}</Text>
           <Text>Photos: {home.book.photos.map(n => `📷 ${n}`).join('  ') || 'none yet (reach Best friend)'}</Text>

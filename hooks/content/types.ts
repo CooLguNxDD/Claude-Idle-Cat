@@ -25,7 +25,14 @@ export type Breed = {
   dark: Shade
   belly: Shade
   pattern: Pattern
+  available?: Availability
 }
+
+export type Availability = { months: readonly number[] }
+
+export const availabilityProblems = (a: Availability | undefined, at: string): string[] =>
+  !a || (a.months.length > 0 && a.months.every(m => Number.isInteger(m) && m >= 1 && m <= 12))
+    ? [] : [`${at}: months must be a nonempty list of integers from 1 to 12`]
 
 export const defineBreed = (breed: Breed): Breed => breed
 
@@ -49,6 +56,7 @@ const shadeProblem = (s: Shade, at: string): string[] => {
 
 /** Every problem with a breed spec; empty means the registry can use it. */
 export const breedProblems = (b: Breed): string[] => [
+  ...availabilityProblems(b.available, `${b.id}.available`),
   ...(/^[a-z][a-z0-9-]*$/.test(b.id) ? [] : [`id ${b.id} must be lowercase kebab-case`]),
   ...(b.label.trim() ? [] : [`${b.id}: label is empty`]),
   ...(RARITY_IDS.includes(b.rarity) ? [] : [`${b.id}: unknown rarity ${b.rarity}`]),
@@ -99,8 +107,10 @@ export const moveProblems = (m: Move, all: readonly Move[]): string[] => [
 ]
 
 /** Far scenery drawn behind the fence; parallax 0 stays put, 1 moves with the yard. */
-export type LayerKind = 'hills' | 'trees' | 'rooftops'
-export const LAYER_KINDS: readonly LayerKind[] = ['hills', 'trees', 'rooftops']
+export type LayerKind = 'hills' | 'trees' | 'rooftops' | 'cabins' | 'neon-city' | 'station-windows' | 'ocean'
+export const LAYER_KINDS: readonly LayerKind[] = ['hills', 'trees', 'rooftops', 'cabins', 'neon-city', 'station-windows', 'ocean']
+export type SceneStyle = 'snowy-cabin' | 'neon-alley' | 'space-station' | 'beach-pier'
+export const SCENE_STYLES: readonly SceneStyle[] = ['snowy-cabin', 'neon-alley', 'space-station', 'beach-pier']
 /** Things the cat can visit; each kind's size and perch live in `scene/landmarks.ts`. */
 export type LandmarkKind = 'tower' | 'tunnel' | 'pipe'
 export const LANDMARK_KINDS: readonly LandmarkKind[] = ['tower', 'tunnel', 'pipe']
@@ -112,6 +122,7 @@ export const TIER_KEYS = ['cottage', 'house', 'manor'] as const
 export type World = {
   id: string
   label: string
+  scene?: SceneStyle
   /** Yard width in scene columns for each house tier; it only grows. */
   width: Record<(typeof TIER_KEYS)[number], number>
   layers: readonly { kind: LayerKind; parallax: number; tint: Shade }[]
@@ -131,6 +142,7 @@ const SLOTS: readonly Slot[] = ['bowl', 'bed', 'toy', 'rug', 'plant', 'hanging']
 export const worldProblems = (w: World): string[] => {
   const widths = TIER_KEYS.map(k => w.width[k])
   const out: string[] = []
+  if (w.scene && !SCENE_STYLES.includes(w.scene)) out.push(`${w.id}: unknown scene style ${w.scene}`)
   if (!/^[a-z][a-z0-9-]*$/.test(w.id)) out.push(`id ${w.id} must be lowercase kebab-case`)
   if (widths.some(n => !Number.isInteger(n) || n < 56 || n > 320)) out.push(`${w.id}: widths are whole columns from 56 to 320`)
   if (widths.some((n, i) => i > 0 && n < widths[i - 1]!)) out.push(`${w.id}: widths must not shrink with the tier`)
@@ -162,13 +174,14 @@ export type NamedCat = {
   bio: string
   catchphrase: string
   /** Chance (0 to 1) that a stray arriving in one of `worlds` (all worlds when missing) is this cat. */
-  appears: { odds: number; worlds?: readonly string[] }
+  appears: { odds: number; worlds?: readonly string[]; available?: Availability }
 }
 
 export const defineCat = (cat: NamedCat): NamedCat => cat
 
 /** Every problem with a named cat against the registries; empty means it can visit. */
 export const catProblems = (c: NamedCat, coats: readonly string[], worlds: readonly string[], all: readonly NamedCat[]): string[] => [
+  ...availabilityProblems(c.appears.available, `${c.id}.appears.available`),
   ...(/^[a-z][a-z0-9-]*$/.test(c.id) ? [] : [`id ${c.id} must be lowercase kebab-case`]),
   ...(c.name.trim() && c.name.length <= 20 ? [] : [`${c.id}: name must be 1 to 20 characters`]),
   ...(all.filter(o => o.name === c.name).length > 1 ? [`${c.id}: another named cat is called ${c.name}`] : []),
