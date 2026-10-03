@@ -5,6 +5,7 @@ import { isContentAvailable } from './content/availability'
 import { seeded } from './rng'
 import { localDay } from './time'
 
+// Seeded weighted selection of two eligible quest chains per local day, without repeats.
 export const questsFor = (now: number) => {
   const rng = seeded(localDay(now) * 101 + 17)
   const pool = QUESTS.filter(q => isContentAvailable(q.available, now)), out: typeof pool = []
@@ -15,7 +16,9 @@ export const questsFor = (now: number) => {
   }
   return out
 }
+// Read today's progress or an empty state after local midnight.
 export const questState = (home: Home, now: number) => home.quests.day === localDay(now) ? home.quests : { day: localDay(now), progress: {}, claimed: [] }
+// Advance only each chain's current step from one tracked action or material payload.
 export const advanceQuests = (home: Home, counter: Counter, n: number, now: number, materials: Record<string, number> = {}): Home => {
   const state = questState(home, now), progress = { ...state.progress }
   for (const q of questsFor(now)) {
@@ -27,6 +30,7 @@ export const advanceQuests = (home: Home, counter: Counter, n: number, now: numb
   }
   return { ...home, quests: { ...state, progress } }
 }
+// Pay a completed daily chain once and record its claim for today.
 export const claimQuest = (home: Home, id: string, now: number): Home => {
   const q = questsFor(now).find(q => q.id === id), state = questState(home, now)
   if (!q || state.claimed.includes(id) || (state.progress[id]?.step ?? 0) < q.steps.length) return home

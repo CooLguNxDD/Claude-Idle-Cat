@@ -162,6 +162,7 @@ import materialSnowflake from './materials/snowflake'
 import materialStardust from './materials/stardust'
 import type { Breed, Move, World, NamedCat, Reaction, Interaction, Expedition, Quest, GameEvent, SkillSpec, FurnitureSpec, ShopItem, Material } from './types'
 
+// breeds definitions in pinned order; engines apply runtime eligibility.
 export const BREEDS: readonly Breed[] = [
   breedGinger,
   breedTabby,
@@ -192,6 +193,7 @@ export const BREEDS: readonly Breed[] = [
   breedStarpoint,
   breedTigerTabby,
 ]
+// moves definitions in pinned order; engines apply runtime eligibility.
 export const MOVES: readonly Move[] = [
   moveGroom,
   moveHop,
@@ -216,6 +218,7 @@ export const MOVES: readonly Move[] = [
   moveSneakAttack,
   moveWindowWatch,
 ]
+// worlds definitions in pinned order; engines apply runtime eligibility.
 export const WORLDS: readonly World[] = [
   worldBackyard,
   worldRooftops,
@@ -224,6 +227,7 @@ export const WORLDS: readonly World[] = [
   worldSnowyCabin,
   worldSpaceStation,
 ]
+// cats definitions in pinned order; engines apply runtime eligibility.
 export const NAMED_CATS: readonly NamedCat[] = [
   catCaptainWhiskers,
   catAdmiralClaw,
@@ -232,6 +236,7 @@ export const NAMED_CATS: readonly NamedCat[] = [
   catNova,
   catPixel,
 ]
+// reactions definitions in pinned order; engines apply runtime eligibility.
 export const REACTIONS: readonly Reaction[] = [
   reactionCelebrateTests,
   reactionHissAtError,
@@ -239,6 +244,7 @@ export const REACTIONS: readonly Reaction[] = [
   reactionStretchTurnDone,
   reactionSulkTestFail,
 ]
+// interactions definitions in pinned order; engines apply runtime eligibility.
 export const INTERACTIONS: readonly Interaction[] = [
   interactionChase,
   interactionGroomBuddy,
@@ -246,6 +252,7 @@ export const INTERACTIONS: readonly Interaction[] = [
   interactionNoseBoop,
   interactionPlayFight,
 ]
+// expeditions definitions in pinned order; engines apply runtime eligibility.
 export const EXPEDITIONS: readonly Expedition[] = [
   expeditionDeepWoods,
   expeditionGardenPatrol,
@@ -255,6 +262,7 @@ export const EXPEDITIONS: readonly Expedition[] = [
   expeditionRiverbank,
   expeditionSnowTrail,
 ]
+// quests definitions in pinned order; engines apply runtime eligibility.
 export const QUESTS: readonly Quest[] = [
   questCurioCrafter,
   questDailyCare,
@@ -263,10 +271,12 @@ export const QUESTS: readonly Quest[] = [
   questWinterGiving,
   questWorkBuddy,
 ]
+// events definitions in pinned order; engines apply runtime eligibility.
 export const EVENTS: readonly GameEvent[] = [
   eventGiftExchange,
   eventHarvestWeekend,
 ]
+// skills definitions in pinned order; engines apply runtime eligibility.
 export const SKILL_FILES: readonly SkillSpec[] = [
   skillClaws,
   skillNose,
@@ -290,6 +300,7 @@ export const SKILL_FILES: readonly SkillSpec[] = [
   skillStargazer,
   skillTrailblazer,
 ]
+// furniture definitions in pinned order; engines apply runtime eligibility.
 export const FURNITURE: readonly FurnitureSpec[] = [
   furnitureBowl,
   furnitureFeeder,
@@ -321,6 +332,7 @@ export const FURNITURE: readonly FurnitureSpec[] = [
   furnitureShellFountain,
   furnitureStarlitRug,
 ]
+// shop definitions in pinned order; engines apply runtime eligibility.
 export const SHOP: readonly ShopItem[] = [
   shopGoldbowl,
   shopRainbow,
@@ -340,6 +352,7 @@ export const SHOP: readonly ShopItem[] = [
   shopStarlitRug,
   shopTrailSnacks,
 ]
+// materials definitions in pinned order; engines apply runtime eligibility.
 export const MATERIALS: readonly Material[] = [
   materialFeather,
   materialNeonScrap,

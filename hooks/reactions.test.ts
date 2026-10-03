@@ -5,8 +5,8 @@ import { isTestCommand, signalsOf, turnSignal } from './reactions/signals'
 import { seeded } from './rng'
 
 test('test command recognition covers runners and compound shell commands', () => {
-  for (const command of ['npm test', 'pnpm run test:unit', 'yarn test', 'bun test', 'npx vitest run', 'pytest -q', 'cargo test', 'go test ./...', 'node --test server/arcade.test.mjs', 'claude plugin test .', 'cd project && npm test']) expect(isTestCommand(command)).toBe(true)
-  for (const command of ['git status', 'npm install', 'sleep 30', 'echo "test"', 'echo npm test', 'printf pytest', 'contest file']) expect(isTestCommand(command)).toBe(false)
+  for (const command of ['npm test', 'pnpm run test:unit', 'yarn test', 'bun test', 'npx vitest run', 'pytest -q', 'cargo test', 'go test ./...', 'node --test server/arcade.test.mjs', 'claude plugin test .', 'cd project && npm test', 'python -m pytest -q', 'python3 -m pytest', 'make test', 'deno test', 'dotnet test', 'echo "x; npm test" && pnpm test']) expect(isTestCommand(command)).toBe(true)
+  for (const command of ['git status', 'npm install', 'sleep 30', 'echo "test"', 'echo npm test', 'printf pytest', 'contest file', 'echo "x; npm test"', "printf 'x && pytest'", 'echo "x || dotnet test"']) expect(isTestCommand(command)).toBe(false)
 })
 test('signals preserve test precedence, timing and turn completion reasons', () => {
   expect(signalsOf({ tool: 'Bash', command: 'npm test', isError: true, ms: 10 })).toEqual(['test.fail', 'tool.error'])

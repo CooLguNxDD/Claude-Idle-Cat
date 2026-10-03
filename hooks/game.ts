@@ -1,3 +1,4 @@
+import { normalizeProgression } from './progression-save'
 import { catsAtHome, isAway } from './away'
 import type { Cat, EffectKind, Genes, Home, Slot } from '../types'
 import { RARITIES, rarityOf } from './adoption/registry'
@@ -104,7 +105,7 @@ export const migrate = (saved: unknown, now: number): Home => {
     const home = saved as Home
     // A round left open by a closed session is dropped (its energy stays spent).
     return { ...base, ...home, cats: home.cats.map(normalizeCat), arcade: { ...base.arcade, ...home.arcade, open: null },
-      weather: normalizeWeather(home.weather, now), shelter: normalizeShelter(home.shelter, home.cats) }
+      weather: normalizeWeather(home.weather, now), shelter: normalizeShelter(home.shelter, home.cats), ...normalizeProgression(home, home.cats) }
   }
   if (version === 2) {
     const { upgrades, maxCats: _old, ...v2 } = saved as V2Home & { maxCats?: number }
@@ -125,7 +126,11 @@ export const migrate = (saved: unknown, now: number): Home => {
   }
 }
 
-export const activeCat = (home: Home): Cat => catsAtHome(home).find(c => c.id === home.activeId) ?? catsAtHome(home)[0] ?? (home.cats[0] as Cat)
+// Falls back to the first cat at home; all-away households retain a read-only display cat.
+export const activeCat = (home: Home): Cat => {
+  const here = catsAtHome(home)
+  return here.find(c => c.id === home.activeId) ?? here[0] ?? home.cats[0]!
+}
 const withCat = (home: Home, id: string, fn: (cat: Cat) => Cat): Home =>
   ({ ...home, cats: home.cats.map(c => (c.id === id ? fn(c) : c)) })
 
@@ -191,22 +196,24 @@ export const tick = (home: Home, now: number, rng: Rng = Math.random): Home => t
 export const tickTally = (home: Home, now: number, rng: Rng = Math.random): { home: Home; deducted: number } => {
   const cap = MAX_AFK_MS + Math.max(...home.cats.map(c => modsOf(c).offlineHours)) * 60 * MINUTE
   const min = Math.min(Math.max(0, now - home.lastTick), cap) / MINUTE
-  const income = idleRate(home) * min
+  const here = catsAtHome(home), hereIds = new Set(here.map(c => c.id))
+  const income = here.reduce((sum, cat) => sum + catRate(home, cat), 0) * IDLE_SHARE * min
   let next: Home = repayFromIncome({
     ...home,
-    cats: home.cats.map(cat => isAway(home, cat.id) ? cat : tickCat(home, cat, min)),
+    cats: home.cats.map(cat => hereIds.has(cat.id) ? tickCat(home, cat, min) : cat),
     coins: home.coins + income,
     lastTick: now,
     frame: home.frame + 1,
   }, income)
   let deducted = home.loan - next.loan
   const deco = homeMods(home)
+  const ticked = new Map(next.cats.map(c => [c.id, c]))
   for (const cat of home.cats) {
-    const woke = cat.isAsleep && !next.cats.find(c => c.id === cat.id)?.isAsleep
+    const woke = cat.isAsleep && !ticked.get(cat.id)?.isAsleep
     if (woke) next.log = `${cat.name} wakes up fully rested.`
   }
   if (deco.autoFeed) {
-    for (const cat of catsAtHome(next)) {
+    for (const cat of next.cats.filter(c => hereIds.has(c.id))) {
       if (cat.hunger < 40 && next.coins >= 5) {
         deducted += 5
         next = withCat({ ...next, coins: next.coins - 5, effect: fx('fish', now),
@@ -214,7 +221,6 @@ export const tickTally = (home: Home, now: number, rng: Rng = Math.random): { ho
       }
     }
   }
-  const here = catsAtHome(home)
   const finder = here.length ? pick(rng, here) : null
   const events = finder ? Math.floor(min * EVENTS_PER_MIN * modsOf(finder).eventRate * deco.eventRate + rng()) : 0
   if (events > 0 && finder) {

@@ -1,3 +1,4 @@
+import { EXPEDITIONS } from './content'
 import { expect, test } from 'claude-code/testing'
 
 import type { Home } from '../types'
@@ -92,4 +93,18 @@ test('v3 saves without collection fields still load', async () => {
   expect(loaded.museum).toEqual([])
   expect(loaded.miles.total).toBe(0)
   expect(CRITTERS.length).toBe(16)
+})
+
+test('expedition achievements honor thresholds, seasonal exclusions and single payment', () => {
+  const h = newHome(0), explorer = ACHIEVEMENTS.find(a => a.id === 'explorer')!, cartographer = ACHIEVEMENTS.find(a => a.id === 'cartographer')!, gourd = ACHIEVEMENTS.find(a => a.id === 'gourd-guardian')!
+  const progress = (done: Record<string, number>) => ({ ...h, expeditions: { ...h.expeditions, done } })
+  expect(explorer.test(progress({ 'garden-patrol': 9 }))).toBe(false)
+  expect(explorer.test(progress({ 'garden-patrol': 10 }))).toBe(true)
+  const every = Object.fromEntries(EXPEDITIONS.filter(e => !e.available).map(e => [e.id, 1]))
+  expect(cartographer.test(progress(every))).toBe(true)
+  expect(cartographer.test(progress({ ...every, riverbank: 0 }))).toBe(false)
+  expect(gourd.test(progress({ 'material:pumpkin': 19 }))).toBe(false)
+  const awarded = settle(progress({ ...every, 'garden-patrol': 10, 'material:pumpkin': 20 }), 1)
+  expect(awarded.achievements).toHaveProperty('explorer'); expect(awarded.achievements).toHaveProperty('cartographer'); expect(awarded.achievements).toHaveProperty('gourd-guardian')
+  expect(settle(awarded, 2).miles.total).toBe(awarded.miles.total)
 })

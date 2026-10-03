@@ -22,6 +22,9 @@ test('content builder preserves seeded order, appends new ids and detects stalen
     writeFileSync(join(content, 'index.ts'), "import zebra from './furniture/zebra'\nimport apple from './furniture/apple'\n")
     const run = args => execFileSync(process.execPath, [join(scratch, 'tools', 'build-content.mjs'), ...args], { stdio: 'pipe' })
     run([]); run(['--check'])
+    writeFileSync(join(content, 'breed-registry.ts'), '// stale\n')
+    assert.throws(() => run(['--check']))
+    run([]); run(['--check'])
     writeFileSync(join(content, 'furniture', 'banana.ts'), source('banana'))
     assert.throws(() => run(['--check']))
     run([])
@@ -30,4 +33,12 @@ test('content builder preserves seeded order, appends new ids and detects stalen
     writeFileSync(join(content, 'furniture', 'wrong.ts'), source('other'))
     assert.throws(() => run([]))
   } finally { rmSync(scratch, { recursive: true, force: true }) }
+})
+
+test('the committed arcade bundle stays isolated from progression content', () => {
+  const bundle = readFileSync(join(root, 'server', 'public', 'arcade.js'), 'utf8')
+  for (const id of ['harbor-map', 'pumpkin-patch', 'gift-exchange', 'hiss-at-error', 'Moon hammock'])
+    assert.equal(bundle.includes(id), false, id)
+  assert.ok(Buffer.byteLength(bundle) < 55300, 'arcade exceeds its pre-v2 bundle size; inspect browser dependencies')
+  assert.ok(bundle.includes('Rooftop'), 'expected arcade code is present')
 })

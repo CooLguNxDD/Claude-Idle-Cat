@@ -15,6 +15,7 @@ export type Material = { id: string; name: string; rarity: Rarity; glyph: string
 export type GearMods = { expTime?: number; matRolls?: number; rareOdds?: number; loot?: number }
 export type ShopItem = { id: string; name: string; text: string; shop: 'miles' | 'curio'; cost: Cost
   kind: 'furniture' | 'charm' | 'map' | 'gear' | 'consumable'; grants: string; unlock?: Unlock; mods?: GearMods }
+// Cosmetic tool/turn signals supported by the reaction engine.
 export const SIGNALS = ['tool.error', 'tool.ok', 'tool.long', 'test.pass', 'test.fail', 'turn.done', 'turn.error'] as const
 export type Signal = typeof SIGNALS[number]
 export type Reaction = { id: string; on: Signal; tools?: readonly string[]; move: string; line?: string
@@ -30,6 +31,7 @@ export type Quest = { id: string; label: string; steps: readonly { text: string;
   reward: Cost & { item?: string }; available?: Availability; weight: number }
 export type GameEvent = { id: string; label: string; kind: 'exchange' | 'boost'; available?: Availability
   weekdays?: readonly number[]; materials?: number; bond?: number }
+// Typed constructors only; the *Problems functions validate authoring limits and references.
 export const defineSkill = (s: SkillSpec) => s
 export const defineFurniture = (s: FurnitureSpec) => s
 export const defineShop = (s: ShopItem) => s
@@ -48,11 +50,12 @@ export const costProblems = (c: Cost, materials: readonly Material[] = []): stri
   ...Object.entries({ coins: c.coins, miles: c.miles }).filter(([, n]) => n !== undefined && !whole(n, 0, 1e9)).map(([k]) => `cost.${k}: nonnegative whole amount required`),
   ...Object.entries(c.materials ?? {}).filter(([id, n]) => !whole(n, 1, 1000) || !materials.some(m => m.id === id)).map(([id]) => `cost: invalid material ${id}`),
 ]
-export const unlockProblems = (u: Unlock | undefined, homeIds: { expeditions?: readonly Expedition[]; shop?: readonly ShopItem[]; worlds?: readonly { id: string }[] } = {}): string[] => [
+export const unlockProblems = (u: Unlock | undefined, homeIds: { expeditions?: readonly Expedition[]; shop?: readonly ShopItem[]; worlds?: readonly { id: string }[]; achievements?: readonly { id: string }[] } = {}): string[] => [
   ...(u?.tier !== undefined && !whole(u.tier, 0, 6) ? ['unlock: tier is 0 to 6'] : []),
   ...(u?.level !== undefined && !whole(u.level, 1, 100) ? ['unlock: level is 1 to 100'] : []),
   ...(u?.expedition && !homeIds.expeditions?.some(e => e.id === u.expedition) ? ['unlock: unknown expedition'] : []),
-  ...(u?.item && !homeIds.shop?.some(i => i.id === u.item && i.kind === 'map') ? ['unlock: unknown map'] : []),
+  ...(u?.item && !homeIds.shop?.some(i => i.grants === u.item && i.kind === 'map') ? ['unlock: unknown map'] : []),
+  ...(u?.achievement && !homeIds.achievements?.some(a => a.id === u.achievement) ? ['unlock: unknown achievement'] : []),
   ...(u?.world && !homeIds.worlds?.some(w => w.id === u.world) ? ['unlock: unknown world'] : []),
 ]
 export const skillProblems = (s: SkillSpec, all: readonly SkillSpec[]): string[] => {
@@ -89,6 +92,7 @@ export const expeditionProblems = (s: Expedition, mats: readonly Material[], ite
   ...(s.loot.rare && (!items.some(i => i.id === s.loot.rare!.item) || !range(s.loot.rare.odds, 0, 0.1)) ? ['invalid rare find'] : []),
   ...(!whole(s.xp, 0, 200) || !range(s.bond, 0, 5) ? ['invalid xp or bond'] : []),
   ...Object.values(s.likes ?? {}).filter(n => !range(n, 1, 1.5)).map(() => 'personality bonus is 1 to 1.5')]
+// Counters shared by Paw Miles tasks and daily quest chains.
 export const COUNTERS = ['pet', 'feed', 'play', 'gift', 'buy', 'tools', 'turns', 'donate', 'visitor', 'catch', 'games', 'bond', 'react', 'expedition', 'exchange', 'craft'] as const
 export const questProblems = (s: Quest, mats: readonly Material[], items: readonly { id: string }[] = []): string[] => [...name(s),
   ...availabilityProblems(s.available, s.id), ...costProblems(s.reward, mats),
@@ -101,8 +105,9 @@ export const eventProblems = (s: GameEvent): string[] => [...name(s), ...availab
   ...(s.kind === 'exchange' && !range(s.bond ?? 0, 1, 5) ? ['exchange bond is 1 to 5'] : []),
   ...(s.weekdays?.some(n => !whole(n, 0, 6)) ? ['weekdays are 0 to 6'] : [])]
 export const shopProblems = (s: ShopItem, mats: readonly Material[], furniture: readonly FurnitureSpec[] = []): string[] => [...name(s), ...costProblems(s.cost, mats),
+  ...(s.shop === 'miles' && (!whole(s.cost.miles ?? 0, 1, 1e9) || s.cost.coins !== undefined || s.cost.materials !== undefined) ? ['miles shop requires only a positive miles cost'] : []),
   ...(!['miles', 'curio'].includes(s.shop) || !['furniture', 'charm', 'map', 'gear', 'consumable'].includes(s.kind) ? ['unknown shop or kind'] : []),
   ...(!s.grants.trim() || (s.kind === 'furniture' && !furniture.some(i => i.id === s.grants)) ? ['unknown grant'] : []),
   ...Object.entries(s.mods ?? {}).filter(([k, n]) => !({ expTime: range(n, 0.8, 1), matRolls: whole(n, 0, 1), rareOdds: range(n, 0, 0.1), loot: range(n, 1, 1.5) } as Record<string, boolean>)[k]).map(([k]) => `invalid gear mod ${k}`)]
-export const unlockHint = (u?: Unlock) => u ? [u.tier !== undefined ? `house tier ${u.tier}` : '', u.level ? `level ${u.level}` : '', u.achievement, u.expedition ? `finish ${u.expedition}` : '', u.item ? `own ${u.item}` : '', u.world ? `world ${u.world}` : ''].filter(Boolean).join(' · ') : ''
+export const unlockHint = (u?: Unlock) => u ? [u.tier !== undefined ? `house tier ${u.tier}` : '', u.level ? `level ${u.level}` : '', u.achievement, u.expedition ? `finish ${u.expedition}` : '', u.item ? `own ${u.item}` : '', u.world ? `yard currently in ${u.world}` : ''].filter(Boolean).join(' · ') : ''
 export const isUnlocked = (h: Home, u?: Unlock) => !u || (h.tier >= (u.tier ?? 0) && h.cats.some(c => c.level >= (u.level ?? 1)) && (!u.achievement || u.achievement in h.achievements) && (!u.expedition || (h.expeditions.done[u.expedition] ?? 0) > 0) && (!u.item || h.owned.includes(u.item)) && (!u.world || h.world.id === u.world))

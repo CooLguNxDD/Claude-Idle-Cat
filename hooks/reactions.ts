@@ -5,6 +5,7 @@ import type { Rng } from './rng'
 
 export type ReactionMemory = Record<string, number>
 export type ReactionMode = 'on' | 'quiet' | 'off'
+// Respect signal priority, per-cat cooldowns and seeded odds; stats are untouched.
 export const pickReaction = (cat: Cat, signals: readonly Signal[], tool: string, now: number, memory: ReactionMemory, rng: Rng, mode: ReactionMode = 'on'): Reaction | null => {
   if (mode === 'off') return null
   for (const on of signals) for (const r of REACTIONS) {
@@ -14,4 +15,5 @@ export const pickReaction = (cat: Cat, signals: readonly Signal[], tool: string,
   }
   return null
 }
+// Record the last reaction timestamp for this cat; used only for cooldowns.
 export const rememberReaction = (m: ReactionMemory, catId: string, id: string, now: number): ReactionMemory => ({ ...m, [`${catId}:${id}`]: now })

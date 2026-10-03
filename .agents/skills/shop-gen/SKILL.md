@@ -22,7 +22,7 @@ export default defineShop({
 })
 ```
 
-Choose miles or curio and kind furniture, charm, map, gear or consumable. Costs are nonnegative whole coins/miles and known materials (1–1000). Furniture grants must name an existing furniture id; maps/charms grant their own permanent id. Gear grants its inventory id and has expTime 0.8–1, matRolls 0–1, rareOdds 0–0.1, loot 1–1.5. Use existing unlock fields: tier, level, achievement, expedition, item, world. For charms and consumables use an existing engine behavior; a novel effect needs an engine change.
+Choose miles or curio and kind furniture, charm, map, gear or consumable. Costs are nonnegative whole coins/miles and known materials (1–1000). Furniture grants must name an existing furniture id; maps/charms grant their own permanent id. Gear grants its inventory id and has expTime 0.8–1, matRolls 0–1, rareOdds 0–0.1, loot 1–1.5. Use existing unlock fields: tier, level, achievement, expedition, item, world. Achievement ids must exist. `unlock.item` names a map’s permanent `grants` token, which may differ from its listing id; `unlock.world` requires that world to be the current yard. Miles listings require only a positive miles cost (no coins or materials). For charms and consumables use an existing engine behavior; a novel effect needs an engine change.
 
 ## 3. Register, look and test
 

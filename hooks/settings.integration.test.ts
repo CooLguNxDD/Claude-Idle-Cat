@@ -8,10 +8,10 @@ test('Settings persists every plugin config through the host, mutes sound immedi
   let stored: Home = { ...newHome(now), rev: 100 }
   const rows = [
     { key: 'afk-cat.sound', label: 'Sound effects', kind: 'boolean', value: true },
-    { key: 'afk-cat.flavor', label: 'Catppuccin flavor', kind: 'choice', value: 'auto', options: ['auto', 'latte', 'mocha'] },
-    { key: 'afk-cat.skin', label: 'Cat interface', kind: 'choice', value: 'full', options: ['full', 'light', 'off'] },
-    { key: 'afk-cat.canvas', label: 'Pane canvas', kind: 'choice', value: 'auto', options: ['auto', 'image', 'text'] },
-    { key: 'afk-cat.reactions', label: 'Claude reactions', kind: 'choice', value: 'on', options: ['on', 'quiet', 'off'] },
+    { key: 'afk-cat.flavor', label: 'Catppuccin flavor', kind: 'text', value: 'auto' },
+    { key: 'afk-cat.skin', label: 'Cat interface', kind: 'text', value: 'full' },
+    { key: 'afk-cat.canvas', label: 'Pane canvas', kind: 'text', value: 'auto' },
+    { key: 'afk-cat.reactions', label: 'Claude reactions', kind: 'text', value: 'on' },
   ]
   const writes: string[] = [], sounds: string[] = [], notices: string[] = []
   let deny = false

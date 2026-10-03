@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 import { newHome } from './game'
-import { craft, drinkTea } from './shop'
+import { craft, drinkTea, payCost } from './shop'
 import { canLearn } from './skills'
 import { homeMods } from './home'
 
@@ -28,4 +28,11 @@ test('tier two skills preserve branches and require level 15, 20 or 25', () => {
   expect(canLearn(cat, 'scout').ok).toBe(false); expect(canLearn({ ...cat, level: 15 }, 'scout').ok).toBe(true)
   expect(canLearn({ ...cat, level: 19, skills: { scout: 1 } }, 'trailblazer').ok).toBe(false)
   expect(canLearn({ ...cat, level: 24, skills: { trailblazer: 1 } }, 'legend').ok).toBe(false)
+})
+
+test('direct cost payment never spends missing materials or any other unaffordable currency', () => {
+  const h = { ...newHome(0), materials: { shell: 5 }, miles: { ...newHome(0).miles, total: 10 } }
+  for (const cost of [{ coins: 20 }, { miles: 11 }, { materials: { feather: 1 } }]) expect(payCost(h, cost)).toBe(h)
+  const paid = payCost(h, { coins: 5, miles: 2, materials: { shell: 3 } })
+  expect(paid.coins).toBe(5); expect(paid.miles.total).toBe(8); expect(paid.materials.shell).toBe(2)
 })

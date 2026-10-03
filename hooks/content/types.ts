@@ -119,6 +119,7 @@ export const SCENE_STYLES: readonly SceneStyle[] = ['snowy-cabin', 'neon-alley',
 /** Things the cat can visit; each kind's size and perch live in `scene/landmarks.ts`. */
 export type LandmarkKind = 'tower' | 'tunnel' | 'pipe' | 'window' | 'shelf'
 export const LANDMARK_KINDS: readonly LandmarkKind[] = ['tower', 'tunnel', 'pipe', 'window', 'shelf']
+// Width per landmark kind in design units, used for world boundary and overlap checks.
 export const LANDMARK_WIDTH: Record<LandmarkKind, number> = { tower: 12, tunnel: 22, pipe: 16, window: 14, shelf: 14 }
 /** How far above the floor a cat sits on each landmark, in design units (negative is up); 0 means it runs through. */
 export const LANDMARK_PERCH: Record<LandmarkKind, number> = { tower: -28, tunnel: 0, pipe: -30, window: -16, shelf: -20 }

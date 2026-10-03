@@ -439,3 +439,7 @@ The mod API is early access and can change between Claude Code releases. This ve
 ---
 
 *From a cardboard box to a cat tower. Not bad for a broke stray.* 😸
+
+Expedition world requirements apply to the currently selected yard: switch to Neon Alley to send a Neon Rooftops party. Switching worlds afterward keeps that party and its frozen rewards. Return notifications persist across session reloads; rewards stay available until you claim. A long test command can trigger a nap at 20 seconds and a celebration when its tests pass.
+
+`/cat send garden-patrol "Sir Miso"` and `/cat exchange "Sir Miso" "Captain Bean"` accept quoted names as well as cat ids. Gift exchange reports when the daily bond cap prevents extra bond points.

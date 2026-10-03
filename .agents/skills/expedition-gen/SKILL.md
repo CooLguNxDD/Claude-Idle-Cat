@@ -24,7 +24,7 @@ export default defineExpedition({
 })
 ```
 
-Minutes are 10–720; parties contain 1–3 cats before skills; minLevel is 1–25. Cost: coins 0–10000, energy 0–100 per cat. Loot coins are coin-rate minutes, each at most 240 (4 hours); material rolls 1–8 per cat, material weights 0.1–10. Critter odds 0–1, optionally filtered by `critterKinds` bug/fish/mouse; rare odds at most 0.1, naming a furniture id. XP at most 200; bond at most 5. Personality multipliers 1–1.5. Use existing materials and unlock ids. Wall-clock completion waits for claim. Loot and event boosts freeze at departure.
+Minutes are 10–720; parties contain 1–3 cats before skills; minLevel is 1–25. Cost: coins 0–10000, energy 0–100 per cat. Loot coins are coin-rate minutes, each at most 240 (4 hours); material rolls 1–8 per cat, material weights 0.1–10. Critter odds 0–1, optionally filtered by `critterKinds` bug/fish/mouse; rare odds at most 0.1, naming a furniture id. XP at most 200; bond at most 5. Personality multipliers 1–1.5. Use existing materials and unlock ids. Achievement ids must exist; `unlock.item` names a map’s permanent `grants` token. World gates apply to the currently selected yard and do not cancel parties already sent. Wall-clock completion waits for claim. Loot and event boosts freeze at departure.
 
 ## 3. Register, look and test
 

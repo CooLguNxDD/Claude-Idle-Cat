@@ -18,8 +18,11 @@ export { isAway } from './away'
 export type Loot = { coins: number; materials: Record<string, number>; critters: string[]; item?: string }
 // Loot and bonuses are frozen at departure; claims never reroll or reread balance data.
 export type ExpeditionRun = Home['expeditions']['runs'][number]
+// Base slot plus House, Manor, Castle and permit bonuses, capped at four.
 export const slotsOf = (h: Home): number => Math.min(4, 1 + [1, 2, 5].filter(t => h.tier >= t).length + (h.owned.includes('expedition-permit') ? 1 : 0))
+// Trail party maximum plus the best party skill, capped at four cats.
 export const partyLimit = (h: Home, e: Expedition, ids: readonly string[]) => Math.min(4, e.party[1] + Math.max(0, ...h.cats.filter(c => ids.includes(c.id)).map(c => skillTotals(c).party)))
+// Check trail availability, unlocks, slots, unique eligible cats and departure coins.
 export const canSend = (h: Home, expId: string, catIds: string[], now: number): LearnCheck => {
   const e = EXPEDITIONS.find(e => e.id === expId)
   if (!e) return { ok: false, reason: 'Unknown expedition.' }
@@ -33,6 +36,9 @@ export const canSend = (h: Home, expId: string, catIds: string[], now: number): 
 }
 const rollLoot = (h: Home, e: Expedition, ids: string[], gearIds: string[], now: number, seed: number): Loot => {
   const rng = seeded(seed), cats = h.cats.filter(c => ids.includes(c.id)), gear = SHOP.filter(s => gearIds.includes(s.id))
+  const totals = new Map(cats.map(c => [c.id, skillTotals(c)])), mods = homeMods(h)
+  const extra = gear.reduce((n, g) => n + (g.mods?.matRolls ?? 0), 0)
+  const boost = materialBoost(now)
   const bonus = cats.reduce((n, c) => n + (e.likes?.[c.genes.personality] ?? 1), 0) / cats.length
   const rate = Math.max(1, coinRate(h)), lootMod = gear.reduce((n, g) => n * (g.mods?.loot ?? 1), 1)
   const coins = Math.min(Math.floor(rate * 240), Math.floor((e.loot.coins[0] + rng() * (e.loot.coins[1] - e.loot.coins[0] + 1)) * rate * bonus * lootMod))
@@ -40,22 +46,26 @@ const rollLoot = (h: Home, e: Expedition, ids: string[], gearIds: string[], now:
   const date = new Date(now), pool = availableNow(date.getMonth() + 1, date.getHours()).filter(c => !e.loot.critterKinds || e.loot.critterKinds.includes(c.kind))
   const weights = Object.fromEntries(pool.map(c => [c.id, c.weight]))
   for (const c of cats) {
-    const skills = skillTotals(c), extra = gear.reduce((n, g) => n + (g.mods?.matRolls ?? 0), 0)
+    const skills = totals.get(c.id)!
     const rolls = Math.min(12, e.loot.rolls[0] + Math.floor(rng() * (e.loot.rolls[1] - e.loot.rolls[0] + 1)) + skills.matRolls + extra)
     const materialWeights = { ...e.loot.materials }
     if (materialWeights.stardust) materialWeights.stardust *= 1 + skills.stardust
     for (let n = 0; n < rolls; n++) {
       const id = weighted(rng, materialWeights)
-      const multiplier = Math.min(2, bonus * materialBoost(now) * homeMods(h).matOdds)
+      const multiplier = Math.min(2, bonus * boost * mods.matOdds)
       const qty = Math.floor(multiplier) + (rng() < multiplier % 1 ? 1 : 0)
       materials[id] = (materials[id] ?? 0) + qty
     }
     if (pool.length && rng() < Math.min(1, e.loot.critters * bonus)) critters.push(weighted(rng, weights))
   }
-  const odds = Math.min(0.25, (e.loot.rare?.odds ?? 0) + Math.max(...cats.map(c => skillTotals(c).rareOdds)) + gear.reduce((n, g) => n + (g.mods?.rareOdds ?? 0), 0))
-  const item = e.loot.rare && rng() < odds ? e.loot.rare.item : undefined
+  let item: string | undefined
+  if (e.loot.rare) {
+    const odds = Math.min(0.25, e.loot.rare.odds + Math.max(...[...totals.values()].map(s => s.rareOdds)) + gear.reduce((n, g) => n + (g.mods?.rareOdds ?? 0), 0))
+    if (rng() < odds) item = e.loot.rare.item
+  }
   return { coins, materials, critters, ...(item ? { item } : {}) }
 }
+// Pay coins, energy and consumed gear once; reserve the party with its frozen reward.
 export const send = (h: Home, expId: string, catIds: string[], gearIds: string[], now: number, seed: number): Home => {
   const check = canSend(h, expId, catIds, now)
   if (!check.ok) return { ...h, log: check.reason }
@@ -72,12 +82,16 @@ export const send = (h: Home, expId: string, catIds: string[], gearIds: string[]
     activeId: catIds.includes(h.activeId) ? remaining[0]?.id ?? h.activeId : h.activeId,
     expeditions: { ...h.expeditions, runs: [...h.expeditions.runs, run] }, log: `Party departed for ${e.label}!` }
 }
+// Clone the frozen departure reward; the optional home argument is retained for callers.
 export const lootOf = (run: ExpeditionRun, _home?: Home): Loot => ({ ...run.loot, materials: { ...run.loot.materials }, critters: [...run.loot.critters] })
+// Outstanding parties whose wall-clock endsAt has passed; no rewards are granted.
 export const readyRuns = (h: Home, now: number) => h.expeditions.runs.filter(r => r.endsAt <= now)
+// Mark ready runs in the durable notification inbox; rewards and cats still wait for claim.
 export const finishExpeditions = (h: Home, now: number): Home => {
   const fresh = readyRuns(h, now).filter(r => !h.expeditions.inbox.includes(r.id)).map(r => r.id)
   return fresh.length ? { ...h, expeditions: { ...h.expeditions, inbox: [...h.expeditions.inbox, ...fresh] } } : h
 }
+// Grant frozen rewards once and free the party by removing the completed run.
 export const claim = (h: Home, id: string, now: number): Home => {
   const run = h.expeditions.runs.find(r => r.id === id && r.endsAt <= now)
   if (!run) return h

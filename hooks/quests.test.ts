@@ -1,3 +1,4 @@
+import { addBond } from './pair'
 import { expect, test } from 'claude-code/testing'
 import { newHome } from './game'
 import { track } from './collection'
@@ -53,4 +54,15 @@ test('pumpkin quests count pumpkin quantities from claims rather than expedition
   expect(h.quests.progress['pumpkin-friends']!.count).toBe(6)
   h = track(h, 'expedition', 1, now, { pumpkin: 4 })
   expect(h.quests.progress['pumpkin-friends']!.step).toBe(1)
+})
+
+test('exchange reports the bond cap accurately while retaining its daily gift receipt', () => {
+  const now = new Date(2026, 11, 5, 12).getTime(), h = newHome(now)
+  const family = { ...h, cats: [...h.cats, { ...h.cats[0]!, id: 'c2', name: 'Miso' }] }
+  const capped = addBond(family, 'c1', 'c2', 10, now)
+  const swapped = exchange(capped, 'c1', 'c2', now, seeded(1))
+  expect(swapped.bonds['c1|c2']!.points).toBe(10)
+  expect(swapped.log).toContain('Daily bond cap reached')
+  expect(exchange(swapped, 'c1', 'c2', now, seeded(1)).log).toBe('Already exchanged today.')
+  expect(exchange(family, 'c1', 'c2', new Date(2026, 5, 5).getTime(), seeded(1)).log).toBe('No gift exchange event is active.')
 })

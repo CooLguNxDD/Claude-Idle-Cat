@@ -1,3 +1,4 @@
+import { catRef, wordsOf } from './commands'
 import { catsAtHome, isAway } from './away'
 import { claim, canSend, finishExpeditions, lootOf, readyRuns, resumeExpeditions, send, slotsOf } from './expeditions'
 import { claimQuest, questsFor, questState } from './quests'
@@ -551,12 +552,15 @@ export const register: Register = (on, options) => {
     paidUsd = await sessionUsd($)
     const saved = (await $.store.get('home')) ?? (await $.store.get('cat'))
     let bonus = 0
+    let returns: string[] = []
     const home = await change($, (_, t) => {
       const loaded = resumeExpeditions(migrate(saved, t), t)
       const day = checkIn(tick(loaded, t), t)
       bonus = day.bonus
+      returns = readyRuns(day.home, t).filter(r => !day.home.expeditions.inbox.includes(r.id)).map(r => r.exp)
       return finishExpeditions(saved ? welcomeBack(loaded, day.home, t) : day.home, t)
     })
+    for (const exp of returns) $.ui.toast(`Expedition ready: ${EXPEDITIONS.find(e => e.id === exp)?.label ?? exp}. Claim in Expeditions.`)
     // Time away and the streak bonus are not this chat's earnings.
     earned.prompt = 0
     earned.chat = 0
@@ -587,11 +591,18 @@ export const register: Register = (on, options) => {
       if (!latest) return
       const now = await $.clock.now()
       for (const id of notifiedRuns) if (!latest.expeditions.runs.some(r => r.id === id)) notifiedRuns.delete(id)
-      const fresh = readyRuns(latest, now).filter(r => !notifiedRuns.has(r.id))
+      const fresh = readyRuns(latest, now).filter(r => !latest!.expeditions.inbox.includes(r.id) && !notifiedRuns.has(r.id))
       if (fresh.length) {
-        for (const r of fresh) { notifiedRuns.add(r.id); $.ui.toast(`Expedition ready: ${EXPEDITIONS.find(e => e.id === r.exp)?.label ?? r.exp}. Claim in Expeditions.`) }
-        void queue(() => change($, (h, t) => finishExpeditions(h, t)))
-        $.ui.invalidate('ui.render')
+        for (const r of fresh) notifiedRuns.add(r.id)
+        void queue(async () => {
+          let notices: string[] = []
+          await change($, (h, t) => {
+            notices = readyRuns(h, t).filter(r => !h.expeditions.inbox.includes(r.id)).map(r => r.exp)
+            return finishExpeditions(h, t)
+          })
+          for (const exp of notices) $.ui.toast(`Expedition ready: ${EXPEDITIONS.find(e => e.id === exp)?.label ?? exp}. Claim in Expeditions.`)
+          $.ui.invalidate('ui.render')
+        }).finally(() => { for (const r of fresh) notifiedRuns.delete(r.id) })
       }
       // A frame still waiting on its blit holds the next one back, but never past STALL_MS.
       if (paint.isBusy && now - paint.busyAt < STALL_MS) return
@@ -667,7 +678,7 @@ export const register: Register = (on, options) => {
       partyCursor = (partyCursor + (key === 'left' ? -1 : 1) + here.length) % Math.max(1, here.length)
       partySelection = here[partyCursor] ? [here[partyCursor]!.id] : []
       $.ui.invalidate('ui.render')
-    } else if (key === 'return') {
+    } else if (key === 'return' && here.length) {
       const selected = partySelection.filter(id => here.some(c => c.id === id))
       const ids = selected.length ? selected : here.slice(0, 1).map(c => c.id)
       await departure($, EXPEDITIONS[expeditionChoice % EXPEDITIONS.length]!.id, ids, gearSelection.filter(id => (latest!.gear[id] ?? 0) > 0))
@@ -676,7 +687,7 @@ export const register: Register = (on, options) => {
   })
 
   on('command.run', { command: 'cat' }, async ($, e) => {
-    const [sub = '', ...rest] = e.args.trim().split(/\s+/)
+    const [sub = '', ...rest] = wordsOf(e.args)
     const arg = rest.join(' ')
 
     if (['expedition', 'quests', 'curio', 'settings'].includes(sub)) {
@@ -689,13 +700,13 @@ export const register: Register = (on, options) => {
       const id = rest[0] ?? '', names = rest.slice(1).filter(s => !s.startsWith('+'))
       const gear = rest.slice(1).filter(s => s.startsWith('+')).map(s => s.slice(1))
       await change($, h => h)
-      const ids = names.map(n => latest!.cats.find(c => c.id === n || c.name.toLowerCase() === n.toLowerCase())?.id ?? n)
+      const ids = names.map(n => catRef(latest!, n))
       return { text: (await departure($, id, ids, gear)).log }
     }
     if (sub === 'claim') return { text: (await change($, (h, t) => arg ? claim(h, arg, t) : readyRuns(h, t).reduce((next, r) => claim(next, r.id, t), h))).log }
     if (sub === 'craft') return { text: (await change($, (h, t) => craft(h, arg, t))).log }
     if (sub === 'tea') return { text: (await change($, h => drinkTea(h, arg || activeCat(h).id))).log }
-    if (sub === 'exchange') return { text: (await change($, (h, t) => exchange(h, rest[0] ?? activeCat(h).id, rest[1] ?? '', t, Math.random))).log }
+    if (sub === 'exchange') return { text: (await change($, (h, t) => exchange(h, catRef(h, rest[0] ?? activeCat(h).id), catRef(h, rest[1] ?? ''), t, Math.random))).log }
     if (sub === 'hide' || sub === 'close') {
       await $.ui.close({ id: PANE })
       return { text: 'The cats will keep earning while the pane is closed. /cat brings it back.' }
@@ -742,19 +753,22 @@ export const register: Register = (on, options) => {
   })
   on('tool.call', async ($, e, next) => {
     sprintUntil = frame + 16
-    const start = await $.clock.now()
-    const command = e.tool === 'Bash' ? String((e as { command?: string }).command ?? '') : ''
-    const timer = $.clock.after(20000, () => { void emitReaction($, ['tool.long'], e.tool).catch(() => undefined) })
+    const command = e.tool === 'Bash' && 'command' in e ? String(e.command ?? '') : ''
+    // Cosmetic timers and reactions must never change the real tool's result.
+    let cancel = () => {}
+    try {
+      const timer = $.clock.after(20000, () => { void emitReaction($, ['tool.long'], e.tool).catch(() => undefined) })
+      cancel = () => timer.cancel()
+    } catch {}
     try {
       const ran = await next(e)
       void queue(() => change($, (h, t) => track(reward(h, rollToolPay(h, Math.random) * rampOf(chatMinutes)), 'tools', 1, t)))
-      const now = await $.clock.now()
-      await emitReaction($, signalsOf({ tool: e.tool, command, isError: ran.isError === true || !!ran.deny, ms: now - start }), e.tool)
+      await emitReaction($, signalsOf({ tool: e.tool, command, isError: ran.isError === true || !!ran.deny, ms: 0 }), e.tool).catch(() => undefined)
       return ran
     } catch (error) {
       await emitReaction($, ['tool.error'], e.tool).catch(() => undefined)
       throw error
-    } finally { timer.cancel() }
+    } finally { try { cancel() } catch {} }
   })
 
   on('turn.start', async ($, e, next) => {
@@ -763,7 +777,7 @@ export const register: Register = (on, options) => {
   })
 
   on('turn.complete', async ($, e, next) => {
-    await emitReaction($, [turnSignal(e.reason)])
+    await emitReaction($, [turnSignal(e.reason)]).catch(() => undefined)
     await queue(async () => {
       const usd = await sessionUsd($)
       const spent = usd === undefined || paidUsd === undefined ? 0 : usd - paidUsd
@@ -1040,6 +1054,7 @@ export const register: Register = (on, options) => {
 
 
     if (view === 'expedition') {
+      const catById = new Map(home.cats.map(c => [c.id, c]))
       const here = catsAtHome(home), selection = partySelection.filter(id => here.some(c => c.id === id))
       const ids = selection.length ? selection : here.slice(0, 1).map(c => c.id)
       const selected = EXPEDITIONS[expeditionChoice % EXPEDITIONS.length]!
@@ -1051,12 +1066,12 @@ export const register: Register = (on, options) => {
         {home.expeditions.runs.map(r => {
           const ready = r.endsAt <= now, minutes = Math.max(0, Math.ceil((r.endsAt - now) / 60000))
           return <Box flexDirection="column">
-            <Text>{EXPEDITIONS.find(e => e.id === r.exp)?.label ?? r.exp} · {r.cats.map(id => home.cats.find(c => c.id === id)?.name ?? id).join(', ')} · {bar(100 * Math.min(1, (now - r.startAt) / (r.endsAt - r.startAt)), 10)} · {ready ? 'Ready to claim' : `${minutes}m left`}</Text>
+            <Text>{EXPEDITIONS.find(e => e.id === r.exp)?.label ?? r.exp} · {r.cats.map(id => catById.get(id)?.name ?? id).join(', ')} · {bar(100 * Math.min(1, (now - r.startAt) / (r.endsAt - r.startAt)), 10)} · {ready ? 'Ready to claim' : `${minutes}m left`}</Text>
             {ready && <Button key={`claim-${r.id}`} plain label="Claim rewards" onPress={() => change($, (h, t) => claim(h, r.id, t))} />}
-            {r.cats.some(id => skillTotals(home.cats.find(c => c.id === id)!).oracle > 0) && <Text>Oracle: {lootOf(r).coins}c · {Object.entries(lootOf(r).materials).map(([id, n]) => `${n} ${id}`).join(', ')}</Text>}
+            {r.cats.some(id => { const cat = catById.get(id); return cat && skillTotals(cat).oracle > 0 }) && <Text>Oracle: {lootOf(r).coins}c · {Object.entries(lootOf(r).materials).map(([id, n]) => `${n} ${id}`).join(', ')}</Text>}
           </Box>
         })}
-        {'Client' in ui && <ui.Client key="expedition-keys" module="./ui/expedition-keys.tsx" props={{ names: ids.map(id => home.cats.find(c => c.id === id)?.name ?? id), trail: selected.label }} height={2} />}
+        {'Client' in ui && <ui.Client key="expedition-keys" module="./ui/expedition-keys.tsx" props={{ names: ids.map(id => catById.get(id)?.name ?? id), trail: selected.label }} height={2} />}
         <Text bold>Party · click the keyboard row for ← → and Enter; choose more below</Text>
         <Box><Button key="party-prev" plain label="←" onPress={() => cycleParty(-1)} /><Button key="party-next" plain label="→" onPress={() => cycleParty(1)} /></Box>
         {here.map(c => <Button key={`party-${c.id}`} plain label={`${ids.includes(c.id) ? '✓' : '·'} ${c.name} · L${c.level} · energy ${Math.floor(c.energy)}`} onPress={() => { partySelection = ids.includes(c.id) ? ids.filter(id => id !== c.id) : [...ids, c.id]; $.ui.invalidate('ui.render') }} />)}

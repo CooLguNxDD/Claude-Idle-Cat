@@ -1,3 +1,4 @@
+import { ACHIEVEMENTS } from '../collection'
 import { expect, test } from 'claude-code/testing'
 import { EVENTS, EXPEDITIONS, FURNITURE, INTERACTIONS, MATERIALS, MOVES, QUESTS, REACTIONS, SHOP, SKILL_FILES, WORLDS } from './index'
 import { eventProblems, expeditionProblems, furnitureProblems, interactionProblems, materialProblems, questProblems, reactionProblems, shopProblems, skillProblems, unlockProblems } from './types'
@@ -9,10 +10,10 @@ import { STOCK, TOTALS } from './legacy-fixture'
 test('all content modules validate and every registry has unique ids', () => {
   for (const [registry, problems] of [
     [SKILL_FILES, SKILL_FILES.flatMap(s => skillProblems(s, SKILL_FILES))], [FURNITURE, FURNITURE.flatMap(s => furnitureProblems(s, MATERIALS))],
-    [SHOP, SHOP.flatMap(s => [...shopProblems(s, MATERIALS, FURNITURE), ...unlockProblems(s.unlock, { expeditions: EXPEDITIONS, shop: SHOP, worlds: WORLDS })])],
+    [SHOP, SHOP.flatMap(s => [...shopProblems(s, MATERIALS, FURNITURE), ...unlockProblems(s.unlock, { expeditions: EXPEDITIONS, shop: SHOP, worlds: WORLDS, achievements: ACHIEVEMENTS })])],
     [MATERIALS, MATERIALS.flatMap(materialProblems)], [REACTIONS, REACTIONS.flatMap(s => reactionProblems(s, MOVES))],
     [INTERACTIONS, INTERACTIONS.flatMap(s => interactionProblems(s, MOVES))], [EVENTS, EVENTS.flatMap(eventProblems)],
-    [EXPEDITIONS, EXPEDITIONS.flatMap(s => [...expeditionProblems(s, MATERIALS, [...FURNITURE, ...SHOP]), ...unlockProblems(s.unlock, { expeditions: EXPEDITIONS, shop: SHOP, worlds: WORLDS })])],
+    [EXPEDITIONS, EXPEDITIONS.flatMap(s => [...expeditionProblems(s, MATERIALS, [...FURNITURE, ...SHOP]), ...unlockProblems(s.unlock, { expeditions: EXPEDITIONS, shop: SHOP, worlds: WORLDS, achievements: ACHIEVEMENTS })])],
     [QUESTS, QUESTS.flatMap(s => questProblems(s, MATERIALS, FURNITURE))],
   ] as const) {
     expect(problems).toEqual([])
@@ -38,4 +39,15 @@ test('validators reject excess bonuses, broken references, NaN and out-of-season
   expect(reactionProblems({ ...REACTIONS[0]!, odds: NaN }, MOVES).length).toBeGreaterThan(0)
   expect(interactionProblems({ ...INTERACTIONS[0]!, roles: { lead: 'missing', partner: 'sit' } }, MOVES).length).toBeGreaterThan(0)
   expect(shopProblems({ ...SHOP[0]!, cost: { materials: { unknown: 1 } } }, MATERIALS, FURNITURE).length).toBeGreaterThan(0)
+})
+
+test('unlock references use achievements and map grants; miles listings cannot hide other costs', () => {
+  expect(unlockProblems({ achievement: 'typo' }, { achievements: ACHIEVEMENTS })).toEqual(['unlock: unknown achievement'])
+  expect(unlockProblems({ achievement: ACHIEVEMENTS[0]!.id }, { achievements: ACHIEVEMENTS })).toEqual([])
+  const map = { ...SHOP.find(s => s.kind === 'map')!, id: 'map-listing', grants: 'map-token' }
+  expect(unlockProblems({ item: 'map-token' }, { shop: [map] })).toEqual([])
+  expect(unlockProblems({ item: 'map-listing' }, { shop: [map] })).toEqual(['unlock: unknown map'])
+  const miles = SHOP.find(s => s.shop === 'miles')!
+  for (const cost of [{ coins: 10 }, { miles: 0 }, { miles: 10, materials: { feather: 1 } }, { miles: 10, coins: 1 }])
+    expect(shopProblems({ ...miles, cost }, MATERIALS, FURNITURE).length).toBeGreaterThan(0)
 })

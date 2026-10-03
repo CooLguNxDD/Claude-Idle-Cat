@@ -101,3 +101,12 @@ test('the late-game progression path can obtain every map material before its un
   const moon = { ...h, owned: [...h.owned, 'star-map'] }
   expect(canSend(moon, 'moon-crater', ['c1'], now).ok).toBe(true)
 })
+
+test('empty and missing parties are rejected before costs, gear, time or loot calculations', () => {
+  const h = { ...family(), gear: { 'trail-snacks': 1 } }
+  for (const ids of [[], ['missing']]) {
+    const result = send(h, 'garden-patrol', ids, ['trail-snacks'], now, 3)
+    expect(result.expeditions).toEqual(h.expeditions); expect(result.coins).toBe(h.coins)
+    expect(result.cats).toEqual(h.cats); expect(result.gear).toEqual(h.gear)
+  }
+})

@@ -1,3 +1,5 @@
+import type { Cost } from './content/types'
+import type { ColorName } from './theme'
 import { FURNITURE } from './content'
 import type { Home, Personality, Slot } from '../types'
 import { seeded } from './rng'
@@ -11,8 +13,8 @@ export type Furniture = {
   miles?: number
   // Seasonal items are stocked only in these months.
   minTier?: number
-  cost?: import('./content/types').Cost
-  art?: { rows: readonly string[]; colors: Record<string, import('./theme').ColorName> }
+  cost?: Cost
+  art?: { rows: readonly string[]; colors: Record<string, ColorName> }
   months?: number[]
 }
 
