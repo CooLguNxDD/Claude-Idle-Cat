@@ -23,6 +23,10 @@ import { LOAN_SHARE, SHOP_CLOSE, SHOP_OPEN, TIERS, baitOf, dailyStock, furniture
   takeLoan, tierOf } from './home'
 import { PICTURE_SCALE, ROWS, frameCells, frameImage, sceneCols } from './scene'
 import type { RgbaImage } from './scene'
+import { CLASSIC_X } from './scene/cats'
+import { motionCtxOf, startMotion, stepMotion } from './motion'
+import { seeded } from './rng'
+import type { Rng } from './rng'
 import { shelterCells, shelterImage } from './scene/shelter'
 import { CLIP_FOR, clipAsset, powershellArgv } from './sfx'
 import type { Clip } from './sfx'
@@ -56,6 +60,9 @@ const FORMS = ['ninja', 'royal', 'cloud', 'chonk']
 let latest: Home | null = null
 let cols = 34
 let frame = 0
+// Where the active cat is in the yard and what it is doing; kept in memory, never in the save.
+let motion = startMotion(CLASSIC_X)
+let motionRng: Rng | null = null
 // What the frame loop paints: the pane's view, element and last frame, whether it is mounted, and an in-flight guard.
 const paint = { view: 'cat' as View, kind: 'raster' as SceneKind, last: '', isMounted: false, isBusy: false, busyAt: 0 }
 // Set once an Image scene draws its text alt: this terminal shows no pictures, so the pane keeps to the Raster.
@@ -218,9 +225,10 @@ const hourOf = (now: number) => new Date(now).getHours()
 
 type SceneKind = 'raster' | 'image'
 const sceneCellsOf = (home: Home, view: View, now: number, flavor: Flavor) => view === 'adopt'
-  ? shelterCells(home, now, frame, flavor, cols) : frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols })
+  ? shelterCells(home, now, frame, flavor, cols) : frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion })
 const sceneImageOf = (home: Home, view: View, now: number, flavor: Flavor): RgbaImage => view === 'adopt'
-  ? shelterImage(home, now, frame, flavor, cols, PICTURE_SCALE) : frameImage({ home, now, tick: frame, hour: hourOf(now), flavor, cols })
+  ? shelterImage(home, now, frame, flavor, cols, PICTURE_SCALE)
+  : frameImage({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion })
 // A denied Image blit that names its alt means the terminal draws no pictures here.
 const isAltDeny = (deny: string) => /\balt\b|placeholder/i.test(deny)
 
@@ -455,6 +463,11 @@ export const register: Register = (on, options) => {
       try {
         frame += 1
         const flavor = flavorAt(now)
+        // The active cat roams only while someone can see it.
+        if (paint.isMounted) {
+          motionRng ??= seeded(now)
+          motion = stepMotion(motion, motionCtxOf(latest, cols, hourOf(now)), motionRng)
+        }
         // Skips the scene while the pane is closed and when a frame would repaint the same cells.
         if (paint.isMounted && paint.kind === 'raster') {
           const cells = sceneCellsOf(latest, paint.view, now, flavor)

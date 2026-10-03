@@ -1,5 +1,5 @@
-// Renders a content preview PNG to look at before committing: node tools/preview.mjs breed <id> [--out <dir>]
-// A breed sheet is one row per flavor, with the 4x portrait in every marking and silhouette.
+// Renders a content preview PNG to look at before committing: node tools/preview.mjs <breed|move> <id> [--out <dir>]
+// A breed sheet is one row per flavor in every marking and silhouette; a move strip is one cycle, facing left then right.
 import { execSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -11,8 +11,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const [kind, id] = process.argv.slice(2)
 const outAt = process.argv.indexOf('--out')
 const out = resolve(outAt > 0 ? process.argv[outAt + 1] : join(tmpdir(), 'idle-cat-previews'))
-if (kind !== 'breed' || !id) {
-  console.error('usage: node tools/preview.mjs breed <id> [--out <dir>]')
+if (!['breed', 'move'].includes(kind) || !id) {
+  console.error('usage: node tools/preview.mjs <breed|move> <id> [--out <dir>]')
   process.exit(1)
 }
 
@@ -23,7 +23,21 @@ import { canvas } from './hooks/scene/canvas'
 import { pen } from './hooks/scene/fine/draw'
 import { drawHiCat } from './hooks/scene/hicat'
 import { FLAVORS, FLAVOR_NAMES } from './hooks/theme'
-export const coats = COATS
+import { MOVES } from './hooks/content'
+export const ids = { breed: COATS, move: MOVES.map(m => m.id) }
+// One cycle of a move at 8x on the classic ginger cat in mocha, with its lift, facing left then right.
+export const strip = (id) => {
+  const move = MOVES.find(m => m.id === id)
+  const f = FLAVORS.mocha
+  return [-1, 1].map(facing => Array.from({ length: move.cycle }, (_, at) => {
+    const c = canvas(24, 8)
+    for (let y = 0; y < 24; y++) for (let x = 0; x < 24; x++) c.put(x, y, y >= 21 ? f.surface0 : f.base)
+    drawHiCat(pen(c), 16, 24 + (move.lift?.[at] ?? 0), { genes: { coat: 'ginger', eyes: 'green', personality: 'lazy',
+      isShiny: false }, mood: 'happy', form: null, isAdult: true, isBirthday: false, isBlink: false, tick: at,
+      pose: { kind: move.pose, phase: at / move.cycle, facing } }, f)
+    return c.image(f.base)
+  }))
+}
 export const sheet = (coat) => FLAVOR_NAMES.map(name => MARKINGS.flatMap(marking => SILHOUETTES.map(silhouette => {
   const c = canvas(24, 4)
   const f = FLAVORS[name]
@@ -37,13 +51,13 @@ const dir = mkdtempSync(join(tmpdir(), 'idle-cat-preview-'))
 const bundle = join(dir, 'preview.mjs')
 execSync(`npx -y esbuild@0.25 --bundle --format=esm --platform=node --loader=ts --outfile=${JSON.stringify(bundle)}`,
   { cwd: root, input: entry, stdio: ['pipe', 'ignore', 'pipe'] })
-const { coats, sheet } = await import(pathToFileURL(bundle).href)
-if (!coats.includes(id)) {
-  console.error(`no breed ${id}; known: ${coats.join(', ')}`)
+const { ids, sheet, strip } = await import(pathToFileURL(bundle).href)
+if (!ids[kind].includes(id)) {
+  console.error(`no ${kind} ${id}; known: ${ids[kind].join(', ')}`)
   process.exit(1)
 }
 
-const rows = sheet(id)
+const rows = kind === 'breed' ? sheet(id) : strip(id)
 const tile = rows[0][0]
 const width = tile.width * rows[0].length
 const height = tile.height * rows.length
@@ -81,6 +95,7 @@ for (let y = 0; y < height; y++) rgba.copy(raw, y * (width * 4 + 1) + 1, y * wid
 const png = Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)),
   chunk('IEND', Buffer.alloc(0))])
 mkdirSync(out, { recursive: true })
-const file = join(out, `breed-${id}.png`)
+const file = join(out, `${kind}-${id}.png`)
 writeFileSync(file, png)
-console.log(`wrote ${file} (rows: latte, frappe, macchiato, mocha; columns: markings x silhouettes)`)
+console.log(`wrote ${file} (${kind === 'breed' ? 'rows: latte, frappe, macchiato, mocha; columns: markings x silhouettes'
+  : 'rows: facing left, facing right; columns: cycle frames'})`)

@@ -6,7 +6,10 @@ import { fileURLToPath } from 'node:url'
 
 const content = join(dirname(fileURLToPath(import.meta.url)), '..', 'hooks', 'content')
 const barrel = join(content, 'index.ts')
-const KINDS = [{ dir: 'breeds', list: 'BREEDS', type: 'Breed', prefix: 'breed' }]
+const KINDS = [
+  { dir: 'breeds', list: 'BREEDS', type: 'Breed', prefix: 'breed' },
+  { dir: 'moves', list: 'MOVES', type: 'Move', prefix: 'move' },
+]
 const isCheck = process.argv.includes('--check')
 
 const previous = existsSync(barrel) ? readFileSync(barrel, 'utf8') : ''

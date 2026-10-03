@@ -1,4 +1,5 @@
-import type { Rarity } from '../../types'
+import type { Personality, Rarity } from '../../types'
+import type { Mood } from '../game'
 import { COLOR_TOKENS, inkOf, mix } from '../theme'
 import type { ColorName, Flavor } from '../theme'
 
@@ -55,4 +56,40 @@ export const breedProblems = (b: Breed): string[] => [
   ...(PATTERN_KINDS.includes(b.pattern.kind) ? [] : [`${b.id}: unknown pattern ${b.pattern.kind}`]),
   ...(b.pattern.kind === 'patches' ? b.pattern.colors.flatMap((c, i) => shadeProblem(c, `${b.id}.pattern.colors[${i}]`)) : []),
   ...(b.pattern.kind === 'stars' ? shadeProblem(b.pattern.star, `${b.id}.pattern.star`) : []),
+]
+
+/** Body poses the cat renderers know; a move picks one and adds travel and lift. */
+export type PoseKind = 'sit' | 'walk' | 'run' | 'loaf' | 'sleep' | 'groom' | 'stretch' | 'crouch'
+export const POSE_KINDS: readonly PoseKind[] = ['sit', 'walk', 'run', 'loaf', 'sleep', 'groom', 'stretch', 'crouch']
+
+export type Move = {
+  id: string
+  label: string
+  pose: PoseKind
+  /** Frames in one loop of the pose at the 8 fps frame loop. */
+  cycle: number
+  /** Design units travelled per frame (4 per scene pixel); 0 stays put. */
+  speed: number
+  /** Design-unit y offset per cycle frame; negative is up. */
+  lift?: readonly number[]
+  seconds: readonly [number, number]
+  when: { moods?: readonly Mood[]; personality?: Partial<Record<Personality, number>>; hours?: readonly [number, number]; weight: number }
+  /** Moves that may follow; empty or missing means any. */
+  next?: readonly string[]
+}
+
+export const defineMove = (move: Move): Move => move
+
+/** Every problem with a move spec against the other moves; empty means the planner can use it. */
+export const moveProblems = (m: Move, all: readonly Move[]): string[] => [
+  ...(/^[a-z][a-z0-9-]*$/.test(m.id) ? [] : [`id ${m.id} must be lowercase kebab-case`]),
+  ...(POSE_KINDS.includes(m.pose) ? [] : [`${m.id}: unknown pose ${m.pose}`]),
+  ...(Number.isInteger(m.cycle) && m.cycle >= 1 && m.cycle <= 32 ? [] : [`${m.id}: cycle must be 1 to 32 frames`]),
+  ...(m.speed >= 0 && m.speed <= 8 ? [] : [`${m.id}: speed must be 0 to 8 design units a frame`]),
+  ...(m.lift && m.lift.length !== m.cycle ? [`${m.id}: lift needs one value per cycle frame`] : []),
+  ...(m.lift?.some(y => y < -12 || y > 4) ? [`${m.id}: lift values stay between -12 and 4`] : []),
+  ...(m.seconds[0] > 0 && m.seconds[0] <= m.seconds[1] && m.seconds[1] <= 120 ? [] : [`${m.id}: seconds must be 0 < min <= max <= 120`]),
+  ...(m.when.weight >= 0 ? [] : [`${m.id}: weight must not be negative`]),
+  ...(m.when.hours && !m.when.hours.every(h => Number.isInteger(h) && h >= 0 && h <= 24) ? [`${m.id}: hours are 0 to 24`] : []),
+  ...(m.next ?? []).filter(id => !all.some(o => o.id === id)).map(id => `${m.id}: next names unknown move ${id}`),
 ]

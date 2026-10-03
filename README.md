@@ -84,6 +84,7 @@ Short version: stats drop, coins pile up, cats judge you silently.
 - Each level gives a skill point for the Skills tab (`s`). There are three branches: **Hunter** (coins, AFK finds, gifts), **Cuddler** (joy, xp) and **Dreamer** (sleep, time away). Resetting skills costs coins.
 - Cats grow from kitten to cat (red collar) at level 5. At level 10 they evolve into the form of their strongest branch: **Ninja** 🥷 (headband), **Royal** 👑 (crown and cape) or **Cloud** ☁️ (halo and wings). A cat with no skills becomes a **Chonk**. (No shame. Chonk is a lifestyle.)
 - The terminal shows an animated pixel-art scene with a day, dusk and night sky that follows your clock. Other surfaces show an ASCII cat.
+- The active cat roams the yard on its own: it walks, trots, hops, pounces, grooms, stretches, loafs and gets the zoomies, picking moves by mood, personality and time of day. Hungry cats head for the bowl, tired ones for the bed, and a napping cat pads to its bed first.
 
 ### 💕 Friends tab (`r`)
 
@@ -227,6 +228,8 @@ hooks/genes.ts               coats, eyes, personalities, shiny odds, coat painti
 hooks/genes/paint.ts         themed coat colors and deterministic markings
 hooks/adoption/             rarity/coat registry and shelter receipts
 hooks/content/breeds/*.ts    one file per coat: label, rarity, theme shades and pattern
+hooks/content/moves/*.ts     one file per move preset: pose, cycle, speed, lift, duration and when it is picked
+hooks/motion.ts              pure move planner: picks the next move and steps the cat's position each frame
 hooks/content/index.ts       generated list of every content file (build: node tools/build-content.mjs)
 hooks/scene/shelter.ts       parcel opening and adoption reveal scene
 hooks/scene/font.ts          3x5 pixel font for text drawn on the picture canvas
@@ -260,7 +263,7 @@ assets/sfx/*.wav             the clips
 tools/gen-sfx.mjs            regenerates the clips
 tools/build-art.mjs          regenerates 24 deterministic 320×180 PNG backgrounds
 tools/build-content.mjs      regenerates hooks/content/index.ts; --check fails when it is stale
-tools/preview.mjs            renders a breed's portrait sheet to a PNG for a look before committing
+tools/preview.mjs            renders a breed's portrait sheet or a move's frame strip to a PNG for a look before committing
 tools/build-themes.mjs       writes themes/*.json (Claude Code custom themes) from hooks/theme.ts
 themes/*.json                the four Catppuccin Claude Code themes (generated, committed)
 hooks/rng.ts                 seeded random numbers (repeatable tests)

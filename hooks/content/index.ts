@@ -17,7 +17,17 @@ import breedRagdoll from './breeds/ragdoll'
 import breedBengal from './breeds/bengal'
 import breedLynx from './breeds/lynx'
 import breedNebula from './breeds/nebula'
-import type { Breed } from './types'
+import moveGroom from './moves/groom'
+import moveHop from './moves/hop'
+import moveLoaf from './moves/loaf'
+import moveNapCurl from './moves/nap-curl'
+import movePounce from './moves/pounce'
+import moveSit from './moves/sit'
+import moveStretch from './moves/stretch'
+import moveTrot from './moves/trot'
+import moveWalk from './moves/walk'
+import moveZoomies from './moves/zoomies'
+import type { Breed, Move } from './types'
 
 export const BREEDS: readonly Breed[] = [
   breedGinger,
@@ -38,4 +48,16 @@ export const BREEDS: readonly Breed[] = [
   breedBengal,
   breedLynx,
   breedNebula,
+]
+export const MOVES: readonly Move[] = [
+  moveGroom,
+  moveHop,
+  moveLoaf,
+  moveNapCurl,
+  movePounce,
+  moveSit,
+  moveStretch,
+  moveTrot,
+  moveWalk,
+  moveZoomies,
 ]

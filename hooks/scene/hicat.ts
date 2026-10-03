@@ -6,6 +6,7 @@ import type { Form } from '../skills'
 import { inkOf, mix } from '../theme'
 import type { Flavor } from '../theme'
 import type { Pen } from './fine/draw'
+import type { PoseKind } from '../content/types'
 
 // The active cat at 4x (56 x 52 fine pixels, the same footprint as the 14 x 13 sprite), built from shapes.
 export type HiCat = {
@@ -16,7 +17,11 @@ export type HiCat = {
   isBirthday: boolean
   isBlink: boolean
   tick: number
+  /** What the body is doing; no pose is the classic sitting cat facing the viewer. */
+  pose?: HiPose
 }
+/** A pose at `phase` (0 to 1) through its cycle; facing 1 walks right with the tail trailing left. */
+export type HiPose = { kind: PoseKind; phase: number; facing: 1 | -1 }
 
 // Fur tokens shade and take the coat; a number is a flat colour (forms, collar).
 type Cell = 'f' | 'w' | 'i' | 'E' | 'K' | 'H' | 'n' | 'p' | number
@@ -31,13 +36,18 @@ const grid = (u: number) => {
   const w = Math.round(GW * u)
   const h = Math.round(GH * u)
   const cells: (Cell | undefined)[] = new Array(w * h)
+  // Shapes drawn after `shift` land offset by (sx, sy) design units, for head bobs and poses.
+  let sx = 0
+  let sy = 0
+  const shift = (x: number, y: number) => { sx = x; sy = y }
   const toDesign = (i: number) => (i + 0.5) / u - PAD
   const cell = (dx: number, dy: number) => (dx >= 0 && dx < w && dy >= 0 && dy < h ? cells[dy * w + dx] : undefined)
   const put = (dx: number, dy: number, v: Cell) => { if (dx >= 0 && dx < w && dy >= 0 && dy < h) cells[dy * w + dx] = v }
   // Visits each device cell whose centre lies in the design-unit box.
   const each = (x0: number, y0: number, x1: number, y1: number, fn: (dx: number, dy: number, x: number, y: number) => void) => {
-    for (let dy = Math.floor((y0 + PAD) * u); dy < Math.ceil((y1 + PAD) * u); dy++)
-      for (let dx = Math.floor((x0 + PAD) * u); dx < Math.ceil((x1 + PAD) * u); dx++) fn(dx, dy, toDesign(dx), toDesign(dy))
+    for (let dy = Math.floor((y0 + sy + PAD) * u); dy < Math.ceil((y1 + sy + PAD) * u); dy++)
+      for (let dx = Math.floor((x0 + sx + PAD) * u); dx < Math.ceil((x1 + sx + PAD) * u); dx++)
+        fn(dx, dy, toDesign(dx) - sx, toDesign(dy) - sy)
   }
   const ellipse = (cx: number, cy: number, rx: number, ry: number, v: Cell, isOnlyOn = false) =>
     each(cx - rx, cy - ry, cx + rx, cy + ry, (dx, dy, x, y) => {
@@ -66,7 +76,7 @@ const grid = (u: number) => {
   const box = (x0: number, y0: number, x1: number, y1: number, v: Cell, when?: (cur: Cell | undefined) => boolean) =>
     each(x0, y0, x1 + 1, y1 + 1, (dx, dy) => { if (!when || when(cell(dx, dy))) put(dx, dy, v) })
   const dot = (x: number, y: number, v: Cell) => box(x, y, x, y, v)
-  return { w, h, cell, toDesign, ellipse, tri, stroke, box, dot }
+  return { w, h, cell, toDesign, shift, ellipse, tri, stroke, box, dot }
 }
 const isSet = (cur: Cell | undefined) => cur !== undefined
 
@@ -75,10 +85,19 @@ const TAIL_TIPS = [[55, 28], [57, 31], [56, 34], [53, 30]] as const
 export const drawHiCat = (p: Pen, x0: number, y0: number, cat: HiCat, f: Flavor) => {
   const g = grid(p.u)
   const { mood, form, tick } = cat
-  const isAsleep = mood === 'sleeping'
+  const isAsleep = mood === 'sleeping' || cat.pose?.kind === 'sleep'
   const isChonk = form === 'chonk'
   const isFluffy = cat.genes.silhouette === 'fluffy'
   const breath = isAsleep ? (tick % 24 < 12 ? 0 : 1) : tick % 16 < 8 ? 0 : 1
+  const pose = cat.pose?.kind ?? 'sit'
+  const wave = Math.sin((cat.pose?.phase ?? 0) * Math.PI * 2)
+  const reach = Math.sin((cat.pose?.phase ?? 0) * Math.PI)
+  // The head leans toward the front (grid -x) when running, dips for crouch, loaf and stretch.
+  const headX = pose === 'run' ? -2 : pose === 'walk' ? -1 : 0
+  const headY = pose === 'loaf' ? 3 : pose === 'crouch' ? 3 : pose === 'stretch' ? Math.round(6 * reach) : pose === 'run' ? 1 : 0
+  const bodyY = pose === 'loaf' || pose === 'crouch' ? 2 : 0
+  const bodyW = pose === 'loaf' ? 3 : pose === 'stretch' ? Math.round(4 * reach) : 0
+  const step = pose === 'walk' ? 1.5 : pose === 'run' ? 3 : 0
 
   // Back layer: cape, cloud puffs and the tail.
   if (form === 'royal') g.ellipse(28, 42, 24, 11, f.mauve)
@@ -89,15 +108,14 @@ export const drawHiCat = (p: Pen, x0: number, y0: number, cat: HiCat, f: Flavor)
       g.ellipse(cx + (cx < 28 ? 3 : -3), 42 - lift, 5, 4, f.lavender)
     }
   }
-  const tip = TAIL_TIPS[Math.floor(tick / 4) % TAIL_TIPS.length]!
+  const tip = TAIL_TIPS[Math.floor(tick / (pose === 'crouch' || pose === 'run' ? 1 : 4)) % TAIL_TIPS.length]!
   g.stroke(isAsleep ? [[44, 48], [52, 50], [58, 47]] : [[43, 46], [52, 43], [tip[0] - 1, (43 + tip[1]) / 2], tip], 2.6, 'f')
 
   // Body, head, ears and paws.
-  g.ellipse(28, 41 + (isAsleep ? 1 : 0), (isChonk ? 23 : 19) + breath * 0.5, 11 + breath * 0.3, 'f')
-  if (isFluffy) for (const s of [-1, 1]) {
-    g.tri([28 + s * 18, 34], [28 + s * 23, 40], [28 + s * 18, 46], 'f')
-    g.tri([28 + s * 18, 18], [28 + s * 25, 25], [28 + s * 17, 30], 'f')
-  }
+  g.ellipse(28, 41 + (isAsleep ? 1 : 0) + bodyY, (isChonk ? 23 : 19) + breath * 0.5 + bodyW, 11 + breath * 0.3 - (bodyY ? 1 : 0), 'f')
+  if (isFluffy) for (const s of [-1, 1]) g.tri([28 + s * 18, 34], [28 + s * 23, 40], [28 + s * 18, 46], 'f')
+  g.shift(headX, headY)
+  if (isFluffy) for (const s of [-1, 1]) g.tri([28 + s * 18, 18], [28 + s * 25, 25], [28 + s * 17, 30], 'f')
   g.ellipse(28, 19, isChonk ? 22 : 20, 14, 'f')
   if (cat.genes.silhouette === 'fold') {
     g.ellipse(13, 8, 7, 4, 'f')
@@ -108,13 +126,19 @@ export const drawHiCat = (p: Pen, x0: number, y0: number, cat: HiCat, f: Flavor)
     g.tri([11, 11], [11, 4], [19, 8], 'i')
     g.tri([45, 11], [45, 4], [37, 8], 'i')
   }
-  g.ellipse(19, 49, 5, 3, 'f')
-  g.ellipse(37, 49, 5, 3, 'f')
+  g.shift(0, 0)
+  // Paws step in turn while walking; a loafing cat tucks them away and a stretch reaches them forward.
+  if (pose !== 'loaf') {
+    const spread = pose === 'stretch' ? Math.round(3 * reach) : 0
+    g.ellipse(19 - spread, 49 - Math.max(0, wave) * step, 5, 3, 'f')
+    g.ellipse(37 + spread, 49 - Math.max(0, -wave) * step, 5, 3, 'f')
+  }
 
   // Face and chest.
-  g.ellipse(28, 43, 11, 8, 'w', true)
+  g.ellipse(28, 43 + bodyY, 11, 8 - (bodyY ? 1 : 0), 'w', true)
+  g.shift(headX, headY)
   g.ellipse(28, 26, 7, 4.5, 'w', true)
-  if (isAsleep || cat.isBlink) for (const cx of [19, 37]) {
+  if (isAsleep || cat.isBlink || pose === 'groom') for (const cx of [19, 37]) {
     g.box(cx - 4, 20, cx + 4, 20, inkOf(f))
     g.dot(cx - 4, isAsleep ? 19 : 21, inkOf(f))
     g.dot(cx + 4, isAsleep ? 19 : 21, inkOf(f))
@@ -140,6 +164,9 @@ export const drawHiCat = (p: Pen, x0: number, y0: number, cat: HiCat, f: Flavor)
     g.ellipse(28, 34.5, 2, 2, f.yellow)
   }
 
+  // A grooming cat licks a raised front paw.
+  if (pose === 'groom') g.ellipse(22, 30 - Math.max(0, wave) * 2, 4.5, 3.5, 'f')
+
   // Front layer: headband, crown, halo, party hat.
   if (form === 'ninja') {
     g.box(6, 10, 50, 12, f.red, isSet)
@@ -156,12 +183,16 @@ export const drawHiCat = (p: Pen, x0: number, y0: number, cat: HiCat, f: Flavor)
     for (const y of [-3, 2]) g.box(20, y, 36, y, f.yellow, cur => cur === f.mauve)
     g.ellipse(28, -10, 2, 2, f.yellow)
   }
+  g.shift(0, 0)
 
   // Outline every shape, then shade fur from a top-left light; both widths follow the scale.
   const ink = inkOf(f)
   const t = Math.max(1, Math.round(p.u))
   const isSolid = (dx: number, dy: number) => g.cell(dx, dy) !== undefined
   const ox = Math.round((x0 - PAD) * p.u)
+  // Facing right mirrors the grid so the tail trails behind; columns map back through `col`.
+  const isMirrored = cat.pose?.facing === 1
+  const col = (dx: number) => (isMirrored ? g.w - 1 - dx : dx)
   const oy = Math.round((y0 - PAD) * p.u)
   // Pointed coats darken ears, face, paws and tail as smooth shapes; patched coats follow smooth waves.
   const pattern = breedOf(cat.genes.coat).pattern
@@ -173,7 +204,7 @@ export const drawHiCat = (p: Pen, x0: number, y0: number, cat: HiCat, f: Flavor)
     const v = g.cell(dx, dy)
     if (v === undefined) {
       for (let r = 1; r <= t; r++) if (isSolid(dx - r, dy) || isSolid(dx + r, dy) || isSolid(dx, dy - r) || isSolid(dx, dy + r)) {
-        p.px(ox + dx, oy + dy, ink)
+        p.px(ox + col(dx), oy + dy, ink)
         break
       }
       continue
@@ -193,10 +224,11 @@ export const drawHiCat = (p: Pen, x0: number, y0: number, cat: HiCat, f: Flavor)
       if (!isSolid(dx + t, dy + t) || !isSolid(dx + 2 * t, dy + 2 * t)) color = mix(color, dark, 0.3)
       else if (!isSolid(dx - t, dy - t) || !isSolid(dx - 2 * t, dy - 2 * t)) color = mix(color, light, 0.22)
     }
-    p.px(ox + dx, oy + dy, color)
+    p.px(ox + col(dx), oy + dy, color)
   }
   // Whiskers sit outside the outline, drawn last in a soft line colour.
   const whisker = mix(ink, light, 0.55)
+  const wx = x0 + 28 + (isMirrored ? -headX : headX)
   for (const s of [-1, 1]) for (const [dy, slope] of [[-1, -0.25], [1, 0.15]] as const)
-    p.line(x0 + 28 + s * 8, y0 + 26 + dy, x0 + 28 + s * 22, y0 + 26 + dy + Math.round(14 * slope), whisker)
+    p.line(wx + s * 8, y0 + 26 + headY + dy, wx + s * 22, y0 + 26 + headY + dy + Math.round(14 * slope), whisker)
 }
