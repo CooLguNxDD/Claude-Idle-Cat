@@ -124,6 +124,7 @@ The games:
 
 Rewards and rules:
 - A round costs 10 energy. Bronze, silver and gold medals pay a few minutes of the household's income plus xp, for 3 paid plays per game a day. Every round adds joy and friendship. One featured game a day pays 2×.
+- 🎁 Arcade prizes: every paid round rolls for a bonus. 15% with no medal, 25% bronze, 35% silver, 50% gold. The prize is one of a coin purse, a new trick (xp), a tuna snack (hunger), the zoomies (energy), a victory cuddle (friendship past the daily cap) or a prize capsule with a critter for your pocket. Each personality is twice as likely to win the prize it loves.
 - Skills make games easier rather than paying more. For example, Dreamer points slow Dash's speed-up.
 - Quick play is still there: it tosses the yarn ball for instant joy. 🧶
 
@@ -252,6 +253,7 @@ hooks/arcade/games/*.ts      the six mini-games (pure: init, step, score)
 hooks/arcade/render/*.ts     focused renderers for each game
 hooks/arcade/art/*.ts        editable pixel-grid sprites and animation frames
 hooks/arcade/rewards.ts      energy cost, medals, daily paid plays, featured game, score checks
+hooks/arcade/prizes.ts       random prizes a paid round can win for the cat
 assets/sfx/*.wav             the clips
 tools/gen-sfx.mjs            regenerates the clips
 tools/build-art.mjs          regenerates 24 deterministic 320×180 PNG backgrounds
