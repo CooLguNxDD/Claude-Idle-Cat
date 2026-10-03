@@ -10,6 +10,7 @@ npx -y -p typescript tsc -p .       # the mod (extends .claude-plugin/types/tsco
 npx -y -p typescript tsc -p web     # the browser runtime (DOM lib)
 claude plugin test .                # every hooks/**/*.test.ts
 node --test server/arcade.test.mjs   # local routes and browser-location permission flow
+node tools/build-content.mjs --check # hooks/content/index.ts lists every content file
 ```
 
 `.claude-plugin/types/` is written by the engine when the mod loads and is git-ignored. If it's missing, load the mod once (see below) before running `tsc -p .`.
@@ -33,6 +34,13 @@ On this machine `~/.claude/settings.json` sets `env.CLAUDE_CODE_PLUGIN_DIRS` to 
     - The first stdout line is `{"kind":"ready","port":N}`. After that, browser actions arrive as JSON lines; `parseLine` in `hooks/arcade/bridge.ts` reads them.
     - The mod pushes state to `POST /api/state`.
     - The server listens on 127.0.0.1 only. It checks the token and the Host header and caps request bodies. Keep all of that when adding routes.
+
+## Content registries (`hooks/content/`)
+
+- Each breed is one file in `hooks/content/breeds/<id>.ts` (`defineBreed`: label, rarity, theme shades, pattern). Shades are theme tokens or mixes, so every flavor works.
+- After adding or removing a content file run `node tools/build-content.mjs`; it rewrites `index.ts`, keeps existing entries in place and appends new ones, so seeded rolls stay stable.
+- `node tools/preview.mjs breed <id>` writes a portrait sheet PNG (rows are flavors) to look at before committing.
+- Breeds are drawn in the browser too: rebuild `server/public/arcade.js` after changing one. An unknown coat paints as `FALLBACK_BREED`, so removing a file never breaks a save.
 
 ## Themes
 

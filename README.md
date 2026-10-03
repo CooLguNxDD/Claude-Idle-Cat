@@ -55,7 +55,7 @@ Short version: stats drop, coins pile up, cats judge you silently.
 
 - Stats drop and coins build up in real time. Time while you're away counts too, up to 8 hours.
 - Being away never hurts: stats stop at 25, so cats get grumpy but never sad. They'll forgive you. Eventually.
-- Every cat has genes: one of 18 coats, five possible markings, three silhouettes (classic, fluffy, folded ears), eye color, a personality that changes the rules, and a 1-in-64 chance of being shiny ✨. Existing cats retain their original appearance.
+- Every cat has genes: one of 18 coats (each one a breed file in `hooks/content/breeds/`), five possible markings, three silhouettes (classic, fluffy, folded ears), eye color, a personality that changes the rules, and a 1-in-64 chance of being shiny ✨. Existing cats retain their original appearance.
 - The household starts in a Cottage with room for 2 cats. Every cat earns coins. Yes, even the lazy one.
 
 ### 📦 Adopt tab (top-bar arrows, or `/cat shelter`)
@@ -101,7 +101,7 @@ Short version: stats drop, coins pile up, cats judge you silently.
 ### 🏅 Miles tab (`m`)
 
 - Five Paw Miles tasks a day, such as "pet 3 times" or "Claude runs 10 tools".
-- 20 achievements, three of them from the arcade, plus a Full palette reward for seeing all 18 coats.
+- 20 achievements, three of them from the arcade, plus a Full palette reward for seeing every coat.
 - A Miles shop with exclusive furniture and a shiny charm.
 
 ### 🕹️ Arcade tab (`g`, or Play `p`)
@@ -226,6 +226,8 @@ hooks/scene/season.ts        seasonal particles when live weather permits them
 hooks/genes.ts               coats, eyes, personalities, shiny odds, coat painting
 hooks/genes/paint.ts         themed coat colors and deterministic markings
 hooks/adoption/             rarity/coat registry and shelter receipts
+hooks/content/breeds/*.ts    one file per coat: label, rarity, theme shades and pattern
+hooks/content/index.ts       generated list of every content file (build: node tools/build-content.mjs)
 hooks/scene/shelter.ts       parcel opening and adoption reveal scene
 hooks/scene/font.ts          3x5 pixel font for text drawn on the picture canvas
 hooks/scene/hicat.ts         the active cat's spec for the picture canvas, built from shapes
@@ -257,6 +259,8 @@ hooks/arcade/prizes.ts       random prizes a paid round can win for the cat
 assets/sfx/*.wav             the clips
 tools/gen-sfx.mjs            regenerates the clips
 tools/build-art.mjs          regenerates 24 deterministic 320×180 PNG backgrounds
+tools/build-content.mjs      regenerates hooks/content/index.ts; --check fails when it is stale
+tools/preview.mjs            renders a breed's portrait sheet to a PNG for a look before committing
 tools/build-themes.mjs       writes themes/*.json (Claude Code custom themes) from hooks/theme.ts
 themes/*.json                the four Catppuccin Claude Code themes (generated, committed)
 hooks/rng.ts                 seeded random numbers (repeatable tests)
@@ -273,6 +277,7 @@ Want to build a tunnel of your own? Run these before you commit:
 claude plugin validate .
 claude plugin test .
 node --test server/arcade.test.mjs
+node tools/build-content.mjs --check
 node tools/build-art.mjs
 node tools/build-web.mjs
 ```

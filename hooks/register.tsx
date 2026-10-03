@@ -17,7 +17,7 @@ import { CATCHPHRASE_LEVEL, DAILY_CAP, GIFTS, LEVELS, NICKNAME_LEVEL, PHOTO_LEVE
   levelName, toNextLevel } from './friends'
 import type { Action } from './game'
 import { PERSONALITY_INFO, describeGenes } from './genes'
-import { COATS, COAT_REGISTRY, RARITIES, rarityBadge, rarityOf } from './adoption/registry'
+import { COATS, RARITIES, breedOf, rarityBadge, rarityOf } from './adoption/registry'
 import { revealedCat } from './adoption/state'
 import { LOAN_SHARE, SHOP_CLOSE, SHOP_OPEN, TIERS, baitOf, dailyStock, furniture, isShopOpen, maxCats, payLoan, place,
   takeLoan, tierOf } from './home'
@@ -631,7 +631,7 @@ export const register: Register = (on, options) => {
         {home.shinyCharm && <Text color={tone.accent}>Shiny charm ready · your next shelter cat will sparkle.</Text>}
         <Text bold color={tone.title}>Rarity odds</Text>
         {Object.entries(RARITIES).map(([key, r]) => <Text key={`odds-${key}`} color={css(flavor[r.color])}>
-          {r.label} {r.odds}% · {COATS.filter(coat => COAT_REGISTRY[coat].rarity === key).map(coat => COAT_REGISTRY[coat].label).join(', ')}
+          {r.label} {r.odds}% · {COATS.map(breedOf).filter(b => b.rarity === key).map(b => b.label).join(', ')}
         </Text>)}
         <Text color={tone.muted}>Coats within each tier have equal odds. Markings and silhouettes vary independently. Shiny: 1/64, in any tier.</Text>
         <Text color={tone.muted}>Rarity is cosmetic. Personality keeps its usual bonuses.</Text>
