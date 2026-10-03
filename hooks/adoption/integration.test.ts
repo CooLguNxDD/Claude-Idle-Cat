@@ -45,3 +45,31 @@ test('Adopt is its own tab, charges one successful roll and Back returns to the 
     await ui.unmount()
   }
 })
+
+test('the arrival card offers Pull again while there is room and coins', async ($, on) => {
+  const now = 1_700_000_000_000
+  mock.clock(on, { now })
+  let stored: Home = { ...newHome(now), tier: 2, coins: 1000, rev: 100 }
+  on('store.get', () => ({ value: stored }))
+  on('store.set', ($, e) => { stored = e.value as Home; return { value: undefined } })
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('ui.blit', () => ({ value: {} }))
+  const run = (args: string) => $.command.run({ command: 'cat', args, origin: { kind: 'composer' },
+    presentation: { isFullscreen: true, columns: 160 } })
+  await run('show')
+  const ui = await $.ui.mount({ plugin: 'afk-cat', surface: 'terminal', component: 'Pane', requestId: 'afk-cat',
+    props: { title: 'AFK Cat', isFocused: true, bodyColumns: 36, placement: 'dock',
+      scroll: { offset: 0, bodyRows: 50 }, view: {} } })
+  await run('shelter')
+  expect(await ui.find({ key: 'shelter-again' })).toBeUndefined()
+  await ui.press({ key: 'adopt' })
+  await ui.press({ key: 'shelter-again' })
+  expect(stored.shelter.pulls).toBe(2)
+  expect(stored.cats.length).toBe(3)
+  await ui.press({ key: 'shelter-again' })
+  expect(stored.cats.length).toBe(4)
+  expect(await ui.find({ key: 'shelter-again' })).toBeUndefined()
+  await ui.unmount()
+})

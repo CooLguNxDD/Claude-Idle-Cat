@@ -66,7 +66,7 @@ Short version: stats drop, coins pile up, cats judge you silently.
 - Rarity odds: **Common 60%**, **Uncommon 25%**, **Rare 10%**, **Epic 4%**, **Legendary 1%**. Coats within a tier have equal odds; the full pool is visible in the tab. Rarity describes appearance and does not change stats or income.
 - New coats include chocolate, cinnamon, silver, smoke, tortoiseshell, ragdoll, bengal, lynx and the starry Nebula 🌌. Markings and silhouettes roll independently. Duplicate coats are possible, and every successful pull adds a cat; cats are never replaced.
 - Shiny is a separate 1/64 roll in every rarity tier. The Paw Miles shiny charm guarantees the next successful shelter adoption is shiny.
-- The tab keeps your latest arrival card, a Meet button, shelter-pull count, house expansion link and free adoption of yard visitors. `q` returns to the tab you came from.
+- The tab keeps your latest arrival card with Meet and Pull again buttons, shelter-pull count, house expansion link and free adoption of yard visitors. `q` returns to the tab you came from.
 
 ### 🏠 Home tab (`h`)
 

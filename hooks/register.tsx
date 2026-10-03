@@ -618,13 +618,17 @@ export const register: Register = (on, options) => {
           <Text bold color={css(flavor[RARITIES[rarityOf(reveal.genes)].color])}>{rarityBadge(reveal.genes)} · {reveal.name}</Text>
           <Text color={tone.muted}>{describeGenes(reveal.genes)}</Text>
           <Text color={tone.muted}>Last arrival · {home.shelter.last!.cost === 0 ? 'yard visitor' : `${home.shelter.last!.cost}c`}</Text>
-          <Button key="shelter-meet" plain label={`Meet ${reveal.name}`} onPress={async () => {
-            await change($, h => switchTo(h, reveal.id))
-            await routeTo($, 'cat')
-          }} />
+          <Box>
+            <Button key="shelter-meet" plain label={`Meet ${reveal.name}`} onPress={async () => {
+              await change($, h => switchTo(h, reveal.id))
+              await routeTo($, 'cat')
+            }} />
+            {room > 0 && home.coins >= price && <Button key="shelter-again" plain label={` Pull again · ${fmtCoins(price)}`}
+              onPress={() => change($, (h, t) => adopt(h, t, Math.random))} />}
+          </Box>
         </Box>}
         <Button key="adopt" plain label={room <= 0 ? 'House full · expand in Home'
-          : home.coins < price ? `Need ${price}c to roll & adopt` : `Roll & adopt · ${price}c`}
+          : home.coins < price ? `Need ${fmtCoins(price)} to roll & adopt` : `Roll & adopt · ${fmtCoins(price)}`}
           onPress={() => change($, (h, t) => adopt(h, t, Math.random))} />
         {room <= 0 && <Button key="shelter-expand" plain label="Go to Home" onPress={() => routeTo($, 'home')} />}
         <Text color={tone.muted}>One cat per pull. The fee is charged only when adoption succeeds. No cats are replaced.</Text>
