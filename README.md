@@ -24,7 +24,7 @@ Update with `/plugin marketplace update claude-idle-cat`, or turn on auto-update
 
 Each `afk-cat--v<version>` tag publishes a GitHub release: the plugin zip, a checksum, and a snapshot of that commit (version, inventory, install commands, and the changes since the previous tag). To pin one release: `claude plugin marketplace add CooLguNxDD/Claude-Idle-Cat#afk-cat--v<version>`.
 
-> A mod is code that runs with your permissions, so install it only if you trust it. To see which hooks and calls it makes before installing, clone the repo and run `claude plugin validate ./claude-kitten`.
+> A mod is code that runs with your permissions, so install it only if you trust it. What it runs, what it fetches, and what it does not send is in [What this mod runs and sends](#what-this-mod-runs-and-sends). To see the hooks before installing, clone the repo and run `claude plugin validate ./claude-kitten`.
 
 ## 🎮 Play
 
@@ -236,12 +236,39 @@ The pane shows temperature and wind, and layers clouds, fog, rain, puddles, snow
 
 Locations are rounded to two decimal places, sent to Open-Meteo, and stored with your cats (including exports). **Off** clears the saved location and cached weather. The Weather tab also provides refresh and °C/°F buttons.
 
+## What this mod runs and sends
+
+The mod both fetches from the network (`http.fetch`) and runs programs (`process.run` and `process.spawn`). Those calls do not feed each other. A reply from a server is never turned into a command. Bytes read from disk are never the body of a request.
+
+**Programs.** The whole command cannot be one fixed string, because the plugin path, the clip name, the script path, and the loopback port are known only at runtime. The programs are only these:
+
+- `powershell`, and only when `OS` is `Windows_NT`. The arguments are `-NoProfile`, `-NonInteractive`, `-Command`, and `(New-Object Media.SoundPlayer '<plugin>/assets/sfx/<clip>.wav').PlaySync()`. The clip is one of `levelup`, `evolve`, `adopt`, `award`, `coin` from this plugin's `assets/sfx/`. This plays a sound because Claude Code has no audio player on Windows. macOS plays the same files with `$.audio.play`. Linux stays silent.
+- `node`, to start this plugin's `server/arcade.mjs`. That file is readable JavaScript in the repository. It listens on `127.0.0.1` only. The child is given `ARCADE_TOKEN` so the browser page can talk to that one process. The mod does not set your own environment variables.
+- `rundll32` with `url.dll,FileProtocolHandler` on Windows, or `open` and then `xdg-open` elsewhere. They open only `http://localhost:<port>/` (the arcade) or `http://localhost:<port>/location` (the device-location page) on the port `server/arcade.mjs` just printed.
+
+**Hosts.** `http.fetch` contacts only these hosts:
+
+- `https://geocoding-api.open-meteo.com` — city search. The query is the city name you typed, and a country code when you wrote one (`London, GB`).
+- `https://api.open-meteo.com` — the current forecast. The query is latitude and longitude rounded to two decimal places, plus the fixed forecast fields. No API key.
+- `http://127.0.0.1` — `POST /api/state` and `POST /api/ping` on the arcade port for this session. `/api/state` sends the local arcade snapshot: the active cat's name, energy, the yard log line, the flavor, the game menu, and the open round if one is in progress. `/api/ping` sends no body. Both send the header `x-arcade-token`.
+
+Nothing else is fetched. The pages opened in the browser are `http://localhost` on that same port.
+
+**Files.** `fs.read` and `fs.write` run only when you use `/cat import` or `/cat export`. Export writes a JSON backup of your cats. Import reads the path you give it, writes a safety copy of the current save, then loads the backup into the plugin store (`$.store`). The default directory is `~/.claude-kitten/backups/`, from `USERPROFILE` or `HOME`. The file name includes the date, so the path cannot be one fixed string. These are your save backups. They are not build files, start-up files, settings files, or instruction files. The file bytes are not passed to `http.fetch` and are not sent anywhere.
+
+**Conversation.** The `turn.complete` hook can see the turn, and the mod can also `http.fetch`, but conversation text is not sent. That hook reads `durationMs` and, when Claude Code reports it, the session cost in US dollars. Those numbers pay the cat coins on this machine. It does not read message text. `turn.start` only resets the coin counter for the prompt. Both hooks pass the event on unchanged with `return next(e)`.
+
+**Configuration.** `config.set` runs only from `/cat theme <latte|frappe|macchiato|mocha>`, and only to set the key `theme` to the Catppuccin theme Claude Code already lists. Hooks on `config.set` for `theme`, `skin`, and `canvas` pass the original event on unchanged with `next(e)`, refresh the cat's colors, and return that result. The mod does not change permission mode, does not call `agent.register` or `agent.spawn`, and leaves Remote Control as you set it. The `/cat` command hook handles that command and does not forward it. The `tool.call` hook passes the tool call on with `next(e)`.
+
+**Environment.** The mod reads `OS` to choose Windows sound and the browser opener, and `USERPROFILE` or `HOME` to place backups. It does not read API keys or other secrets from the machine.
+
 ## 🗺️ Layout
 
 Where everything lives in the playground:
 
 ```
 .claude-plugin/plugin.json   manifest (plugin name: afk-cat)
+.claude-plugin/icon.png      square listing icon, drawn from the pane cat
 types/index.d.ts             Home and Cat state contract ($.state)
 hooks/hooks.json             names the hooks module
 hooks/register.tsx           wiring: session.start, /cat, tool.call, turn.complete, Pane render, timers
