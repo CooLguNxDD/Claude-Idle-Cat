@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { Home } from '../types'
-import { activePay, newHome, rampOf, spendPay } from './game'
+import { activePay, coinRate, newHome, rampOf, spendPay } from './game'
 import { fmtCoins } from './home'
 
 const TEN_MIN = 10 * 60_000
@@ -100,4 +100,71 @@ test('a failed or garbled usage read still starts the session and pays active ti
   isBroken = false
   expect(near(await finish(), activePay(stored, TEN_MIN) * rampOf(10))).toBe(true)
   expect(Number.isFinite(stored.coins)).toBe(true)
+})
+
+test('spend from before the first good usage read is never paid', async ($, on) => {
+  const now = 1_700_000_000_000
+  const clock = mock.clock(on, { now })
+  const cats = newHome(now).cats.map(c => ({ ...c, level: 10 }))
+  let stored: Home = { ...newHome(now), cats, coins: 0, rev: 100 }
+  let usd: number | null = null
+  on('store.get', () => ({ value: stored }))
+  on('store.set', ($, e) => { stored = e.value as Home; return { value: undefined } })
+  on('session.usage', () => {
+    if (usd === null) throw new Error('no ledger')
+    return { value: { startedAt: 0, context: { window: 200_000 }, rateLimits: [], cost: { usd } } }
+  })
+  on('command.register', () => ({ value: { command: 'cat' } }))
+  on('config.list', () => ({ value: [] }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('ui.status', () => ({ value: undefined }))
+  on('turn.complete', () => ({ text: '' }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+  const finish = async () => {
+    const before = stored.coins
+    await $.turn.complete({ answer: 'ok', durationMs: TEN_MIN, isAborted: false, turnId: 't', reason: 'answer' })
+    await clock.advance(10)
+    return stored.coins - before
+  }
+  usd = 5
+  expect(near(await finish(), activePay(stored, TEN_MIN))).toBe(true)
+  usd = 5.5
+  expect(near(await finish(), (activePay(stored, TEN_MIN) + spendPay(stored, 0.5)) * rampOf(10))).toBe(true)
+})
+
+test('a reply whose reward never lands is paid by the next reply', async ($, on) => {
+  const now = 1_700_000_000_000
+  const clock = mock.clock(on, { now })
+  const cats = newHome(now).cats.map(c => ({ ...c, level: 10 }))
+  let stored: Home = { ...newHome(now), cats, coins: 0, rev: 100 }
+  let usd = 1
+  let isDown = false
+  on('store.get', () => {
+    if (isDown) throw new Error('disk gone')
+    return { value: stored }
+  })
+  on('store.set', ($, e) => { stored = e.value as Home; return { value: undefined } })
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200_000 }, rateLimits: [], cost: { usd } } }))
+  on('command.register', () => ({ value: { command: 'cat' } }))
+  on('config.list', () => ({ value: [] }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('ui.status', () => ({ value: undefined }))
+  on('turn.complete', () => ({ text: '' }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+  const finish = async () => {
+    const before = stored.coins
+    await $.turn.complete({ answer: 'ok', durationMs: TEN_MIN, isAborted: false, turnId: 't', reason: 'answer' })
+    await clock.advance(10)
+    return stored.coins - before
+  }
+  isDown = true
+  usd = 1.5
+  expect(await finish()).toBe(0)
+  isDown = false
+  usd = 2
+  // Both replies' active time and both halves of spend, still at the first reply's ramp.
+  const owed = activePay(stored, TEN_MIN) + coinRate(stored) * 10 + spendPay(stored, 1)
+  expect(near(await finish(), owed * rampOf(0))).toBe(true)
 })
