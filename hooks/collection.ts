@@ -1,3 +1,5 @@
+import { advanceQuests } from './quests'
+import { SHOP, EXPEDITIONS } from './content'
 import type { Book, Home, Miles } from '../types'
 import { YEAR_ROUND_COATS } from './adoption/registry'
 import { CRITTERS } from './critters'
@@ -29,7 +31,7 @@ export const record = (home: Home): Home => {
   return same ? home : { ...home, book }
 }
 
-export type Counter = 'pet' | 'feed' | 'play' | 'gift' | 'buy' | 'tools' | 'turns' | 'donate' | 'visitor' | 'catch' | 'games'
+export type Counter = 'pet' | 'feed' | 'play' | 'gift' | 'buy' | 'tools' | 'turns' | 'donate' | 'visitor' | 'catch' | 'games' | 'bond' | 'react' | 'expedition' | 'exchange' | 'craft'
 export type Task = { id: string; text: string; counter: Counter; goal: number; miles: number }
 const TASKS: readonly Task[] = [
   { id: 'pet3', text: 'Pet a cat 3 times', counter: 'pet', goal: 3, miles: 50 },
@@ -60,7 +62,8 @@ const today = (miles: Miles, now: number): Miles =>
   miles.day === dayOf(now) ? miles : { ...miles, day: dayOf(now), counts: {}, done: [] }
 
 // Counts an action toward today's tasks and pays out each task once.
-export const track = (home: Home, counter: Counter, n: number, now: number): Home => {
+export const track = (home: Home, counter: Counter, n: number, now: number, materials: Record<string, number> = {}): Home => {
+  if (!Number.isFinite(n) || n <= 0) return home
   const m = today(home.miles, now)
   const counts = { ...m.counts, [counter]: (m.counts[counter] ?? 0) + n }
   let { total } = m
@@ -71,11 +74,14 @@ export const track = (home: Home, counter: Counter, n: number, now: number): Hom
       total += task.miles
     }
   }
-  return { ...home, miles: { ...m, counts, done, total } }
+  return advanceQuests({ ...home, miles: { ...m, counts, done, total } }, counter, n, now, materials)
 }
 
 export type Achievement = { id: string; name: string; text: string; miles: number; test: (h: Home) => boolean }
 export const ACHIEVEMENTS: readonly Achievement[] = [
+  { id: 'explorer', name: 'Explorer', text: 'Finish 10 expeditions', miles: 300, test: h => EXPEDITIONS.reduce((n, e) => n + (h.expeditions.done[e.id] ?? 0), 0) >= 10 },
+  { id: 'cartographer', name: 'Cartographer', text: 'Finish every year-round expedition', miles: 1000, test: h => EXPEDITIONS.length > 0 && EXPEDITIONS.filter(e => !e.available).every(e => (h.expeditions.done[e.id] ?? 0) > 0) },
+  { id: 'gourd-guardian', name: 'Gourd guardian', text: 'Bring home 20 pumpkins', miles: 300, test: h => (h.expeditions.done['material:pumpkin'] ?? 0) >= 20 },
   { id: 'family', name: 'Family', text: 'Have 2 cats', miles: 100, test: h => h.cats.length >= 2 },
   { id: 'fullhouse', name: 'Full house', text: 'Have 4 cats', miles: 400, test: h => h.cats.length >= 4 },
   { id: 'lv5', name: 'Growing up', text: 'Reach level 5', miles: 100, test: h => h.cats.some(c => c.level >= 5) },
@@ -117,12 +123,8 @@ export const checkAchievements = (home: Home, now: number): Home => {
 export const settle = (home: Home, now: number) => checkAchievements(record(home), now)
 
 export type MilesItem = { id: string; name: string; cost: number; text: string }
-export const MILES_SHOP: readonly MilesItem[] = [
-  { id: 'goldbowl', name: 'Golden bowl', cost: 800, text: 'bowl: auto-feeds, +50% gifts, strays love it' },
-  { id: 'rainbow', name: 'Rainbow rug', cost: 1000, text: 'rug: joy fades 40% slower' },
-  { id: 'moonlamp', name: 'Moon lamp', cost: 1200, text: 'hanging: double AFK events' },
-  { id: 'charm', name: 'Shiny charm', cost: 1500, text: 'your next shelter adoption is shiny' },
-]
+export const MILES_SHOP: readonly MilesItem[] = SHOP.filter(i => i.shop === 'miles')
+  .map(i => ({ id: i.id, name: i.name, text: i.text, cost: i.cost.miles ?? 0 }))
 
 export const buyWithMiles = (home: Home, id: string): Home => {
   const item = MILES_SHOP.find(i => i.id === id)

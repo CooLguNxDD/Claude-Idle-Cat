@@ -33,3 +33,13 @@ export const drawEffects = (c: SceneCanvas, home: Home, now: number, tick: numbe
   if (fresh('evolve', 3)) banner('EVOLVED!', 1)
   if (fresh('levelup', 3)) banner('LEVEL UP!', 1)
 }
+
+// A shelf prop falls through its move cycle; it never changes coins or save state.
+export const drawCup = (c: SceneCanvas, motion: import('../motion').Motion | undefined, f: Flavor, cam: number) => {
+  if (!motion || motion.stage !== 'stay' || importMove(motion.move).prop !== 'cup') return
+  const phase = (motion.frame % 16) / 16, x = Math.round(motion.x / 4 - cam + 16)
+  const y = 13 + Math.floor(phase * phase * 8)
+  c.put(x, y, f.blue); c.put(x + 1, y, f.blue); c.put(x, y + 1, f.sky)
+  if (phase > 0.8) c.put(x + 2, 21, f.overlay1)
+}
+import { moveOf as importMove } from '../motion'

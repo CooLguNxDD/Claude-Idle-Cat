@@ -1,8 +1,10 @@
 import { expect, mock, test } from 'claude-code/testing'
+import { TABS } from './ui/tabs'
 
 test('the pane draws the scene and its buttons work on each surface', async ($, on) => {
   mock.clock(on, { now: 1_700_000_000_000 })
   mock.store(on)
+  on('config.list', () => ({ value: [] }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('ui.status', () => ({ value: undefined }))
   on('ui.close', () => ({ value: undefined }))
@@ -17,7 +19,7 @@ test('the pane draws the scene and its buttons work on each surface', async ($, 
         scroll: { offset: 0, bodyRows: 30 }, view: {} },
     })
     const openTab = async (key: string) => {
-      for (let i = 0; i < 9 && !(await ui.find({ key })); i++) await ui.press({ key: 'tabs-next' })
+      for (let i = 0; i < TABS.length && !(await ui.find({ key })); i++) await ui.press({ key: 'tabs-next' })
       await ui.press({ key })
     }
     if (surface === 'terminal') expect(await ui.find({ key: 'scene' })).toBeDefined()

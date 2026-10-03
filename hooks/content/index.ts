@@ -41,6 +41,14 @@ import movePipeLounge from './moves/pipe-lounge'
 import moveTowerPerch from './moves/tower-perch'
 import moveTunnelDash from './moves/tunnel-dash'
 import moveProwl from './moves/prowl'
+import moveCelebrate from './moves/celebrate'
+import moveChaseTail from './moves/chase-tail'
+import moveCupKnock from './moves/cup-knock'
+import moveHiss from './moves/hiss'
+import moveKnead from './moves/knead'
+import moveReactionNap from './moves/reaction-nap'
+import moveSneakAttack from './moves/sneak-attack'
+import moveWindowWatch from './moves/window-watch'
 import worldBackyard from './worlds/backyard'
 import worldRooftops from './worlds/rooftops'
 import worldBeachPier from './worlds/beach-pier'
@@ -53,7 +61,106 @@ import catBoo from './cats/boo'
 import catMerlinMeow from './cats/merlin-meow'
 import catNova from './cats/nova'
 import catPixel from './cats/pixel'
-import type { Breed, Move, World, NamedCat } from './types'
+import reactionCelebrateTests from './reactions/celebrate-tests'
+import reactionHissAtError from './reactions/hiss-at-error'
+import reactionNapLongBash from './reactions/nap-long-bash'
+import reactionStretchTurnDone from './reactions/stretch-turn-done'
+import reactionSulkTestFail from './reactions/sulk-test-fail'
+import interactionChase from './interactions/chase'
+import interactionGroomBuddy from './interactions/groom-buddy'
+import interactionNapPile from './interactions/nap-pile'
+import interactionNoseBoop from './interactions/nose-boop'
+import interactionPlayFight from './interactions/play-fight'
+import expeditionDeepWoods from './expeditions/deep-woods'
+import expeditionGardenPatrol from './expeditions/garden-patrol'
+import expeditionMoonCrater from './expeditions/moon-crater'
+import expeditionNeonRooftops from './expeditions/neon-rooftops'
+import expeditionPumpkinPatch from './expeditions/pumpkin-patch'
+import expeditionRiverbank from './expeditions/riverbank'
+import expeditionSnowTrail from './expeditions/snow-trail'
+import questCurioCrafter from './quests/curio-crafter'
+import questDailyCare from './quests/daily-care'
+import questPumpkinFriends from './quests/pumpkin-friends'
+import questTrailFriends from './quests/trail-friends'
+import questWinterGiving from './quests/winter-giving'
+import questWorkBuddy from './quests/work-buddy'
+import eventGiftExchange from './events/gift-exchange'
+import eventHarvestWeekend from './events/harvest-weekend'
+import skillClaws from './skills/claws'
+import skillNose from './skills/nose'
+import skillProwl from './skills/prowl'
+import skillApex from './skills/apex'
+import skillPaws from './skills/paws'
+import skillPurr from './skills/purr'
+import skillCharm from './skills/charm'
+import skillBeloved from './skills/beloved'
+import skillCatnap from './skills/catnap'
+import skillDeep from './skills/deep'
+import skillWalk from './skills/walk'
+import skillLucid from './skills/lucid'
+import skillAstral from './skills/astral'
+import skillHarmony from './skills/harmony'
+import skillKinship from './skills/kinship'
+import skillLegend from './skills/legend'
+import skillMatriarch from './skills/matriarch'
+import skillOracle from './skills/oracle'
+import skillScout from './skills/scout'
+import skillStargazer from './skills/stargazer'
+import skillTrailblazer from './skills/trailblazer'
+import furnitureBowl from './furniture/bowl'
+import furnitureFeeder from './furniture/feeder'
+import furnitureSushi from './furniture/sushi'
+import furnitureBox from './furniture/box'
+import furnitureCozy from './furniture/cozy'
+import furnitureHeated from './furniture/heated'
+import furnitureYarn from './furniture/yarn'
+import furnitureWand from './furniture/wand'
+import furnitureLaser from './furniture/laser'
+import furnitureTree from './furniture/tree'
+import furnitureRug from './furniture/rug'
+import furnitureQuilt from './furniture/quilt'
+import furnitureCactus from './furniture/cactus'
+import furnitureCatnip from './furniture/catnip'
+import furnitureBirds from './furniture/birds'
+import furnitureLantern from './furniture/lantern'
+import furnitureChime from './furniture/chime'
+import furnitureBeachball from './furniture/beachball'
+import furnitureSakura from './furniture/sakura'
+import furnitureJackolantern from './furniture/jackolantern'
+import furnitureSnowglobe from './furniture/snowglobe'
+import furnitureGoldbowl from './furniture/goldbowl'
+import furnitureRainbow from './furniture/rainbow'
+import furnitureMoonlamp from './furniture/moonlamp'
+import furnitureMapTable from './furniture/map-table'
+import furnitureMoonHammock from './furniture/moon-hammock'
+import furnitureNeonSign from './furniture/neon-sign'
+import furnitureShellFountain from './furniture/shell-fountain'
+import furnitureStarlitRug from './furniture/starlit-rug'
+import shopGoldbowl from './shop/goldbowl'
+import shopRainbow from './shop/rainbow'
+import shopMoonlamp from './shop/moonlamp'
+import shopCharm from './shop/charm'
+import shopBigSatchel from './shop/big-satchel'
+import shopBondBell from './shop/bond-bell'
+import shopCatnipTea from './shop/catnip-tea'
+import shopExpeditionPermit from './shop/expedition-permit'
+import shopHarborMap from './shop/harbor-map'
+import shopLuckyCollar from './shop/lucky-collar'
+import shopMapTable from './shop/map-table'
+import shopMoonHammock from './shop/moon-hammock'
+import shopNeonSign from './shop/neon-sign'
+import shopShellFountain from './shop/shell-fountain'
+import shopStarMap from './shop/star-map'
+import shopStarlitRug from './shop/starlit-rug'
+import shopTrailSnacks from './shop/trail-snacks'
+import materialFeather from './materials/feather'
+import materialNeonScrap from './materials/neon-scrap'
+import materialPineCone from './materials/pine-cone'
+import materialPumpkin from './materials/pumpkin'
+import materialShell from './materials/shell'
+import materialSnowflake from './materials/snowflake'
+import materialStardust from './materials/stardust'
+import type { Breed, Move, World, NamedCat, Reaction, Interaction, Expedition, Quest, GameEvent, SkillSpec, FurnitureSpec, ShopItem, Material } from './types'
 
 export const BREEDS: readonly Breed[] = [
   breedGinger,
@@ -100,6 +207,14 @@ export const MOVES: readonly Move[] = [
   moveTowerPerch,
   moveTunnelDash,
   moveProwl,
+  moveCelebrate,
+  moveChaseTail,
+  moveCupKnock,
+  moveHiss,
+  moveKnead,
+  moveReactionNap,
+  moveSneakAttack,
+  moveWindowWatch,
 ]
 export const WORLDS: readonly World[] = [
   worldBackyard,
@@ -116,4 +231,121 @@ export const NAMED_CATS: readonly NamedCat[] = [
   catMerlinMeow,
   catNova,
   catPixel,
+]
+export const REACTIONS: readonly Reaction[] = [
+  reactionCelebrateTests,
+  reactionHissAtError,
+  reactionNapLongBash,
+  reactionStretchTurnDone,
+  reactionSulkTestFail,
+]
+export const INTERACTIONS: readonly Interaction[] = [
+  interactionChase,
+  interactionGroomBuddy,
+  interactionNapPile,
+  interactionNoseBoop,
+  interactionPlayFight,
+]
+export const EXPEDITIONS: readonly Expedition[] = [
+  expeditionDeepWoods,
+  expeditionGardenPatrol,
+  expeditionMoonCrater,
+  expeditionNeonRooftops,
+  expeditionPumpkinPatch,
+  expeditionRiverbank,
+  expeditionSnowTrail,
+]
+export const QUESTS: readonly Quest[] = [
+  questCurioCrafter,
+  questDailyCare,
+  questPumpkinFriends,
+  questTrailFriends,
+  questWinterGiving,
+  questWorkBuddy,
+]
+export const EVENTS: readonly GameEvent[] = [
+  eventGiftExchange,
+  eventHarvestWeekend,
+]
+export const SKILL_FILES: readonly SkillSpec[] = [
+  skillClaws,
+  skillNose,
+  skillProwl,
+  skillApex,
+  skillPaws,
+  skillPurr,
+  skillCharm,
+  skillBeloved,
+  skillCatnap,
+  skillDeep,
+  skillWalk,
+  skillLucid,
+  skillAstral,
+  skillHarmony,
+  skillKinship,
+  skillLegend,
+  skillMatriarch,
+  skillOracle,
+  skillScout,
+  skillStargazer,
+  skillTrailblazer,
+]
+export const FURNITURE: readonly FurnitureSpec[] = [
+  furnitureBowl,
+  furnitureFeeder,
+  furnitureSushi,
+  furnitureBox,
+  furnitureCozy,
+  furnitureHeated,
+  furnitureYarn,
+  furnitureWand,
+  furnitureLaser,
+  furnitureTree,
+  furnitureRug,
+  furnitureQuilt,
+  furnitureCactus,
+  furnitureCatnip,
+  furnitureBirds,
+  furnitureLantern,
+  furnitureChime,
+  furnitureBeachball,
+  furnitureSakura,
+  furnitureJackolantern,
+  furnitureSnowglobe,
+  furnitureGoldbowl,
+  furnitureRainbow,
+  furnitureMoonlamp,
+  furnitureMapTable,
+  furnitureMoonHammock,
+  furnitureNeonSign,
+  furnitureShellFountain,
+  furnitureStarlitRug,
+]
+export const SHOP: readonly ShopItem[] = [
+  shopGoldbowl,
+  shopRainbow,
+  shopMoonlamp,
+  shopCharm,
+  shopBigSatchel,
+  shopBondBell,
+  shopCatnipTea,
+  shopExpeditionPermit,
+  shopHarborMap,
+  shopLuckyCollar,
+  shopMapTable,
+  shopMoonHammock,
+  shopNeonSign,
+  shopShellFountain,
+  shopStarMap,
+  shopStarlitRug,
+  shopTrailSnacks,
+]
+export const MATERIALS: readonly Material[] = [
+  materialFeather,
+  materialNeonScrap,
+  materialPineCone,
+  materialPumpkin,
+  materialShell,
+  materialSnowflake,
+  materialStardust,
 ]

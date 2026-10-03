@@ -9,6 +9,20 @@ import type { Landmark } from '../world'
 
 // Each landmark is drawn from x (design units) on the floor; perch heights match LANDMARK_PERCH.
 const DRAWERS: Record<LandmarkKind, (p: Pen, x: number, f: Flavor, tick: number) => void> = {
+  window: (p, x, f) => {
+    p.rect(x + 2, FLOOR - 56, 52, 40, f.peach)
+    p.rect(x + 6, FLOOR - 52, 44, 32, f.sky)
+    p.rect(x + 26, FLOOR - 52, 3, 32, f.peach)
+    p.rect(x + 6, FLOOR - 38, 44, 3, f.peach)
+    p.rect(x, FLOOR - 16, 56, 4, f.overlay1)
+  },
+  shelf: (p, x, f) => {
+    p.rect(x, FLOOR - 20, 56, 4, f.peach)
+    p.rect(x + 8, FLOOR - 16, 4, 16, f.overlay1)
+    p.rect(x + 42, FLOOR - 16, 4, 16, f.overlay1)
+    p.rect(x + 40, FLOOR - 32, 8, 12, f.blue)
+    p.disc(x + 49, FLOOR - 27, 3, 4, f.blue)
+  },
   tower: (p, x, f, tick) => {
     const carpet = mix(f.mauve, f.surface2, 0.4)
     const rope = mix(f.yellow, f.peach, 0.5)

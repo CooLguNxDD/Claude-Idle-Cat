@@ -1,6 +1,7 @@
 import type { Home, Slot } from '../../types'
 import { FURNITURE_ART } from '../art/furniture'
-import { tierOf } from '../home'
+import { art } from '../art/types'
+import { furniture, tierOf } from '../home'
 import { worldOf } from '../world'
 import type { Flavor } from '../theme'
 import { FLOOR_Y } from './canvas'
@@ -16,7 +17,9 @@ export const drawDecor = (c: SceneCanvas, home: Home, now: number, tick: number,
   for (const slot of ORDER) {
     if (!slots.includes(slot)) continue
     const id = home.decor[slot] ?? (slot === 'bowl' ? 'bowl' : undefined)
-    const entry = id ? FURNITURE_ART[id] : undefined
+    const data = furniture(id)
+    const entry = id ? FURNITURE_ART[id] ?? (data?.art ? { slot: data.slot, colors: data.art.colors,
+      sprite: art(`furniture.${id}`, [data.art.rows], [0, 0], slot === 'rug' ? 'back' : 'world') } : undefined) : undefined
     if (!entry || entry.slot !== slot) continue
     const asset = entry.sprite
     const x = at[slot]

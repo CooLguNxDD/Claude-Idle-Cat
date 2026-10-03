@@ -46,3 +46,11 @@ export const CAT_ART = {
 
 export const paneArtOf = (genes: Genes) => genes.silhouette === 'fluffy' ? CAT_ART.fluffy
   : genes.silhouette === 'fold' ? CAT_ART.fold : CAT_ART.pane
+
+// Pose offsets preserve semantic fur pixels in the terminal renderer.
+export const posePixel = (x: number, y: number, kind: import('../content/types').PoseKind, phase: number): readonly [number, number] => {
+  if (kind === 'knead' && y >= 10) return [x, y - (x < 7 ? phase < 0.5 ? 1 : 0 : phase >= 0.5 ? 1 : 0)]
+  if (kind === 'spin') return [x + Math.round(Math.sin(phase * Math.PI * 2)), y]
+  if (kind === 'arch' && y >= 7 && y <= 10) return [x, y - 2]
+  return [x, y]
+}

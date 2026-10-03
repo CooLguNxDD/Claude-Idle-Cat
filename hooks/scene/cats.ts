@@ -1,5 +1,6 @@
+import { catsAtHome } from '../away'
 import type { Cat, Home } from '../../types'
-import { CAT_ART, paneArtOf } from '../art/cats'
+import { CAT_ART, paneArtOf, posePixel } from '../art/cats'
 import { isBirthday } from '../calendar'
 import { activeCat, moodOf, stageOf } from '../game'
 import { coatPixel } from '../genes'
@@ -70,15 +71,23 @@ const mini = (cat: Pick<Cat, 'genes'> & { isAsleep?: boolean }, x0: number, y0: 
 }
 
 /** Draws the household; `motion` places and poses the active cat, else it sits at its classic spot. */
-export const drawCats = (c: SceneCanvas, home: Home, now: number, tick: number, f: Flavor, motion?: Motion): CatScene => {
+export const drawCats = (c: SceneCanvas, home: Home, now: number, tick: number, f: Flavor, motion?: Motion, partner?: { id: string; motion: Motion }, isSolo = false): CatScene => {
   const cat = activeCat(home)
-  const others = home.cats.filter(other => other.id !== cat.id)
+  const others = isSolo ? [] : catsAtHome(home).filter(other => other.id !== cat.id && other.id !== partner?.id)
   const world = worldOf(home)
   if (others[0]) mini(others[0], world.slots.bed + 1, FLOOR_Y - 5, tick, f, c)
   const fence = world.perches.filter(x => x + 6 < c.w - 6)
-  ;[...others.slice(1), ...home.visitors].slice(0, fence.length)
+  ;[...others.slice(1), ...(isSolo ? [] : home.visitors)].slice(0, fence.length)
     .forEach((other, i) => mini(other, fence[i] ?? 26, 9, tick + i * 7, f, c))
 
+  if (!isSolo && !catsAtHome(home).length) {
+    c.text(8, 6, 'AWAY ON A TRIP', f.yellow)
+    return { cat, mood: 'ok', ox: 8, oy: 8, headRow: 4, birthday: false }
+  }
+  if (partner && !isSolo) {
+    const buddy = home.cats.find(c => c.id === partner.id)
+    if (buddy) drawCats(c, { ...home, cats: [buddy], visitors: [], activeId: buddy.id }, now, tick, f, partner.motion, undefined, true)
+  }
   const mood = moodOf(cat)
   const stage = stageOf(cat.level)
   const pose = motion ? poseOf(motion) : null
@@ -93,7 +102,10 @@ export const drawCats = (c: SceneCanvas, home: Home, now: number, tick: number, 
   const ox = Math.round(x / DESIGN)
   const oy = 8 + bob + Math.min(0, jump) + Math.round(lift / DESIGN) + (pose?.kind === 'crouch' || pose?.kind === 'loaf' ? 1 : 0)
   const isMirrored = pose?.facing === 1
-  const at: At = (dx, dy, color) => c.put(ox + (isMirrored ? 15 - dx : dx), oy + dy, color)
+  const at: At = (dx, dy, color) => {
+    const [px, py] = posePixel(dx, dy, pose?.kind ?? 'sit', pose?.phase ?? 0)
+    c.put(ox + (isMirrored ? 15 - px : px), oy + py, color)
+  }
   const isBlink = mood === 'sleeping' || pose?.kind === 'sleep' || pose?.kind === 'groom' || tick % 40 < 2
   const form = formOf(cat)
   const birthday = isBirthday(cat, now)

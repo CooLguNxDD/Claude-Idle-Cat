@@ -34,7 +34,7 @@ export type Visitor = { id: string; name: string; genes: Genes; arrivedAt: numbe
 
 export type Slot = 'bowl' | 'bed' | 'toy' | 'rug' | 'plant' | 'hanging'
 
-export type View = 'cat' | 'skills' | 'home' | 'friends' | 'book' | 'miles' | 'arcade' | 'weather' | 'adopt'
+export type View = 'cat' | 'skills' | 'home' | 'friends' | 'book' | 'miles' | 'arcade' | 'weather' | 'adopt' | 'expedition' | 'settings'
 export type Route = { view: View; history: View[] }
 export type Shelter = { pulls: number; last: { catId: string; at: number; cost: number } | null }
 
@@ -64,8 +64,20 @@ export type Book = { coats: Coat[]; forms: string[]; shinies: string[]; visitors
 // Paw Miles: today's task counters, which tasks paid out, and the running total.
 export type Miles = { total: number; day: number; counts: Record<string, number>; done: string[] }
 
+export type ExpeditionRun = {
+  id: string; exp: string; cats: string[]; gear: string[]; startAt: number; endsAt: number; seed: number
+  loot: { coins: number; materials: Record<string, number>; critters: string[]; item?: string }
+  xp: number; bond: number; offlineSpeed?: number; offlineAppliedAt?: number
+}
+
 export type Home = {
   version: 3
+  expeditions: { runs: ExpeditionRun[]; done: Record<string, number>; inbox: string[] }
+  materials: Record<string, number>
+  gear: Record<string, number>
+  bonds: Record<string, { points: number; day: number; today: number }>
+  quests: { day: number; progress: Record<string, { step: number; count: number }>; claimed: string[] }
+  exchanges: { day: number; pairs: string[]; visitors: string[] }
   coins: number
   cats: Cat[]
   activeId: string

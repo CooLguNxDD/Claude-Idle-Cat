@@ -55,7 +55,7 @@ const weightOf = (m: Move, ctx: MotionCtx) => m.when.weight * (m.when.personalit
 
 /** Weighted pick among the moves allowed now, preferring the previous move's `next` list. */
 export const pickMove = (prev: Move | undefined, ctx: MotionCtx, rng: Rng): Move => {
-  const allowed = MOVES.filter(m => isAllowed(m, ctx) && weightOf(m, ctx) > 0)
+  const allowed = MOVES.filter(m => !m.isScripted && isAllowed(m, ctx) && weightOf(m, ctx) > 0)
   const follow = allowed.filter(m => !prev?.next?.length || prev.next.includes(m.id))
   const pool = follow.length ? follow : allowed
   const total = pool.reduce((sum, m) => sum + weightOf(m, ctx), 0)
@@ -115,7 +115,7 @@ const toBed = (cur: Motion, bed: number): Motion => ({ ...cur, y: 0, isHidden: f
 export const stepMotion = (m: Motion, ctx: MotionCtx, rng: Rng): Motion => {
   const cur = { ...m, x: clampX(m.x, ctx), target: clampX(m.target, ctx) }
   const move = moveOf(cur.move)
-  const isAsleep = ctx.mood === 'sleeping'
+  const isAsleep = ctx.mood === 'sleeping' && !move.isScripted
   const bed = clampX(ctx.spots.bed, ctx)
   // A sleepy cat pads to its bed before curling up, and wakes straight into a new move.
   if (isAsleep && move.pose !== 'sleep' && !(move.id === WALK.id && cur.target === bed && cur.stage === 'free')) {
@@ -124,7 +124,7 @@ export const stepMotion = (m: Motion, ctx: MotionCtx, rng: Rng): Motion => {
   const isTravelling = cur.stage === 'go' || cur.stage === 'through' || (cur.stage === 'free' && move.speed > 0)
   const isArrived = isTravelling && Math.abs(cur.target - cur.x) < 0.01
   if (isArrived && cur.stage === 'go') return arrive(cur, move, ctx)
-  if (cur.left <= 0 || isArrived || (!isAsleep && move.pose === 'sleep')) {
+  if (cur.left <= 0 || isArrived || (!isAsleep && move.pose === 'sleep' && !move.isScripted)) {
     if (isAsleep && move.id === WALK.id) return Math.abs(cur.x - bed) <= NEAR ? begin(NAP, cur, ctx, rng) : toBed(cur, bed)
     return begin(pickMove(move, ctx, rng), cur, ctx, rng)
   }
@@ -133,7 +133,7 @@ export const stepMotion = (m: Motion, ctx: MotionCtx, rng: Rng): Motion => {
   const dx = Math.sign(gap) * Math.min(speed, Math.abs(gap))
   // Travel to a landmark does not use up the time spent on it.
   const left = cur.stage === 'go' ? cur.left : cur.left - 1
-  return { ...cur, x: cur.x + dx, facing: dx > 0 ? 1 : dx < 0 ? -1 : cur.facing, frame: cur.frame + 1, left }
+  return { ...cur, x: cur.x + dx, facing: dx > 0 ? 1 : dx < 0 ? -1 : move.turn && (cur.frame + 1) % move.turn === 0 ? (cur.facing === 1 ? -1 : 1) : cur.facing, frame: cur.frame + 1, left }
 }
 
 export const poseOf = (m: Motion): Pose => {
@@ -153,4 +153,12 @@ export const motionCtxOf = (home: Home, paneCols: number, hour: number): MotionC
     maxX: Math.max(0, (cols - 16) * DESIGN),
     spots: { bowl: (world.slots.bowl - 14) * DESIGN, bed: world.slots.bed * DESIGN },
     landmarks: landmarksOf(world, home.tier).map(l => ({ kind: l.kind, x: l.x * DESIGN, w: l.w * DESIGN })) }
+}
+
+/** Start a registered move without changing the save or consuming planner weights. */
+export const forceMove = (m: Motion, id: string, ctx: MotionCtx, rng: Rng, seconds?: number): Motion => {
+  const move = byId.get(id)
+  if (!move || (move.seek && !ctx.landmarks.some(l => l.kind === move.seek))) return m
+  const next = begin(move, { ...m, x: clampX(m.x, ctx) }, ctx, rng)
+  return seconds === undefined ? next : { ...next, left: Math.round(Math.max(0.125, Math.min(120, seconds)) * FPS) }
 }

@@ -11,6 +11,15 @@ const KINDS = [
   { dir: 'moves', list: 'MOVES', type: 'Move', prefix: 'move' },
   { dir: 'worlds', list: 'WORLDS', type: 'World', prefix: 'world' },
   { dir: 'cats', list: 'NAMED_CATS', type: 'NamedCat', prefix: 'cat' },
+  { dir: 'reactions', list: 'REACTIONS', type: 'Reaction', prefix: 'reaction' },
+  { dir: 'interactions', list: 'INTERACTIONS', type: 'Interaction', prefix: 'interaction' },
+  { dir: 'expeditions', list: 'EXPEDITIONS', type: 'Expedition', prefix: 'expedition' },
+  { dir: 'quests', list: 'QUESTS', type: 'Quest', prefix: 'quest' },
+  { dir: 'events', list: 'EVENTS', type: 'GameEvent', prefix: 'event' },
+  { dir: 'skills', list: 'SKILL_FILES', type: 'SkillSpec', prefix: 'skill' },
+  { dir: 'furniture', list: 'FURNITURE', type: 'FurnitureSpec', prefix: 'furniture' },
+  { dir: 'shop', list: 'SHOP', type: 'ShopItem', prefix: 'shop' },
+  { dir: 'materials', list: 'MATERIALS', type: 'Material', prefix: 'material' },
 ]
 const isCheck = process.argv.includes('--check')
 
