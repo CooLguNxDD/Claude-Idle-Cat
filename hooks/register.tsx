@@ -687,9 +687,9 @@ export const register: Register = (on, options) => {
         {home.weather.location && <Text color={tone.muted}>{home.weather.location.label}</Text>}
         {reading && <Text color={tone.muted}>Updated {Math.max(0, Math.floor((now - reading.fetchedAt) / 60_000))} min ago · refreshes every 15 minutes</Text>}
         {home.weather.error && <Text color={tone.warn}>{home.weather.error}{!reading ? ' Using the seasonal yard.' : ''}</Text>}
-        {'Input' in ui ? <ui.Input key="weather-city" label="City" placeholder="London, GB" submitLabel="search"
+        {'Input' in ui ? <ui.Input key="weather-city" label="Search city" placeholder="e.g. Paris, FR" submitLabel="search"
           onSubmit={async value => { await searchWeather($, value) }} />
-          : <Text>Choose a city: /cat weather London, GB</Text>}
+          : <Text>Search a city: /cat weather {'<city>'}, e.g. Paris, FR</Text>}
         {home.weather.notice && <Text color={tone.muted}>{home.weather.notice}</Text>}
         {home.weather.candidates.map((location, i) => <Button key={`weather-city-${i + 1}`} plain
           label={`${i + 1}. ${location.label}`} onPress={async () => { await selectWeather($, location) }} />)}
