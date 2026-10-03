@@ -1,7 +1,7 @@
 # 😺 Claude Idle Cat
 
 > *Once upon a time, a stray cat lived in a cardboard box. Poor. Broke. Zero coins, one very damp box.*
-> *So the cat collect one coin at a time.* 🏗️🐾
+> *So the cats collect one coin at a time.* 🏗️🐾
 
 `afk-cat`: An AFK virtual-pet cat that lives inside Claude Code as a mod (a plugin of function hooks).
 It's a Tamagotchi with an idle-game loop: look after the cat, earn coins, buy upgrades and come back for streak bonuses. Claude does the work, the cat does the napping. Everybody wins.
@@ -9,8 +9,24 @@ It's a Tamagotchi with an idle-game loop: look after the cat, earn coins, buy up
 ![Claude Idle Cat demo](docs/video/claude-idle-cat-x-20s.gif)
 
 *20-second tour. [Watch the full-quality MP4](docs/video/claude-idle-cat-x-20s.mp4).*
+## 📦 Install
+
+Needs Claude Code v2.1.287 or later (mods are on by default). This repo is its own plugin marketplace:
+
+```bash
+claude plugin marketplace add CooLguNxDD/Claude-Idle-Cat
+claude plugin install afk-cat@claude-idle-cat
+```
+
+Or inside a session: `/plugin marketplace add CooLguNxDD/Claude-Idle-Cat`, then `/plugin install afk-cat@claude-idle-cat`. If a session is already open, run `/reload-plugins`; `/plugin` then shows `1 mod active · afk-cat`.
+
+Update with `/plugin marketplace update claude-idle-cat`, or turn on auto-update for the marketplace under **Marketplaces** in `/plugin`.
+
+> A mod is code that runs with your permissions, so install it only if you trust it. To see which hooks and calls it makes before installing, clone the repo and run `claude plugin validate ./claude-kitten`.
 
 ## 🎮 Play
+
+Installed from the marketplace? Skip to `/cat`. To run straight from a clone instead:
 
 ```bash
 claude --plugin-dir ./claude-kitten
