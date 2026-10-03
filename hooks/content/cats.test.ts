@@ -12,7 +12,10 @@ test('every named cat is valid against the coat and world registries', () => {
   for (const cat of NAMED_CATS) expect(catProblems(cat, COATS, WORLDS.map(w => w.id), NAMED_CATS)).toEqual([])
   const bad: NamedCat = { id: 'X', name: '', genes: { coat: 'plaid', eyes: 'green', personality: 'lazy' }, bio: 'b',
     catchphrase: 'c', appears: { odds: 0.9, worlds: ['moon'] } }
-  expect(catProblems(bad, COATS, ['backyard'], [bad]).length).toBe(5)
+  const problems = catProblems(bad, COATS, ['backyard'], [bad])
+  expect(problems).toContain('X: unknown coat plaid')
+  expect(problems).toContain('X: unknown world moon')
+  expect(problems.length).toBe(5)
 })
 
 test('named cats visit as rare strays with their own name, genes and catchphrase', () => {

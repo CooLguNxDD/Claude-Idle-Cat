@@ -17,14 +17,35 @@ const isCheck = process.argv.includes('--check')
 const previous = existsSync(barrel) ? readFileSync(barrel, 'utf8') : ''
 const problems = []
 const camel = id => id.replace(/-([a-z0-9])/g, (_, c) => c.toUpperCase())
+// The id property of the `export default defineX({...})` object, ignoring comments, strings and nested objects.
+const exportedId = source => {
+  const start = source.search(/export default\s+define\w+\(\s*\{/)
+  if (start < 0) return null
+  let depth = 0
+  for (let i = source.indexOf('{', start); i < source.length; i++) {
+    const ch = source[i]
+    if (ch === '/' && source[i + 1] === '/') i = source.indexOf('\n', i) < 0 ? source.length : source.indexOf('\n', i)
+    else if (ch === '/' && source[i + 1] === '*') i = source.indexOf('*/', i + 2) + 1 || source.length
+    else if (ch === "'" || ch === '"' || ch === '`') {
+      for (i++; i < source.length && source[i] !== ch; i++) if (source[i] === '\\') i++
+    } else if (ch === '{' || ch === '[' || ch === '(') depth++
+    else if (ch === '}' || ch === ']' || ch === ')') { if (--depth === 0) return null }
+    else if (depth === 1 && /[\s{,]/.test(source[i - 1])) {
+      const m = /^id\s*:\s*(['"])([^'"]*)\1/.exec(source.slice(i))
+      if (m) return m[2]
+    }
+  }
+  return null
+}
 const sections = KINDS.map(kind => {
   const files = (existsSync(join(content, kind.dir)) ? readdirSync(join(content, kind.dir)) : []).filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts'))
     .map(f => f.slice(0, -3))
   for (const id of files) {
     if (!/^[a-z][a-z0-9-]*$/.test(id)) problems.push(`${kind.dir}/${id}.ts: file names must be lowercase kebab-case`)
     const source = readFileSync(join(content, kind.dir, `${id}.ts`), 'utf8')
-    if (!source.includes(`id: '${id}'`)) problems.push(`${kind.dir}/${id}.ts: its id must match the file name`)
-    if (!source.includes('export default')) problems.push(`${kind.dir}/${id}.ts: needs a default export`)
+    const exported = exportedId(source)
+    if (exported === null) problems.push(`${kind.dir}/${id}.ts: needs \`export default define…({ id: '${id}', … })\``)
+    else if (exported !== id) problems.push(`${kind.dir}/${id}.ts: its id '${exported}' must match the file name`)
   }
   const kept = [...previous.matchAll(new RegExp(`from '\\./${kind.dir}/([a-z0-9-]+)'`, 'g'))].map(m => m[1])
     .filter(id => files.includes(id))
