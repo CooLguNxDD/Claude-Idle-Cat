@@ -49,6 +49,7 @@ const openPane = async ($: Parameters<TestBody>[0], on: Parameters<TestBody>[1],
   on('command.register', () => ({ value: { command: 'cat' } }))
   on('config.list', () => ({ value: [] }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200_000 }, rateLimits: [] } }))
   const blits: Blit[] = []
   on('ui.blit', ($, e) => {
     if (e.key !== 'scene') return { value: {} }

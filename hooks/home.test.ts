@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Home } from '../types'
-import { activeCat, adoptVisitor, coinRate, newHome, tick } from './game'
+import { activeCat, adoptVisitor, coinRate, newHome, tick, tickTally } from './game'
 import { BASE_LOAN, CATALOG, STOCK_SIZE, buyFurniture, dailyStock, fmtCoins, homeMods, loanFor, maxCats, payLoan, place, takeLoan,
   tierAt } from './home'
 import { seeded } from './rng'
@@ -57,6 +57,9 @@ test('Tom Mew expands the house and income pays the loan back to exactly zero', 
   expect(takeLoan(loaned).log).toMatch(/Pay off/)
   const later = tick({ ...loaned, cats: loaned.cats.map(c => ({ ...c, level: 30 })) }, 8 * HOUR, () => 0)
   expect(later.loan).toBeLessThan(loaned.loan)
+  // The repayment comes out of income, so the tick reports it as spent on its own.
+  expect(tickTally({ ...loaned, cats: loaned.cats.map(c => ({ ...c, level: 30 })) }, 8 * HOUR, () => 0).deducted)
+    .toBe(loaned.loan - later.loan)
   let paid = later
   for (let i = 0; i < 50; i++) paid = tick({ ...paid, lastTick: 0 }, 8 * HOUR, () => 0)
   expect(paid.loan).toBe(0)

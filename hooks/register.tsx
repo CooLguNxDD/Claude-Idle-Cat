@@ -10,9 +10,9 @@ import { backupDir, backupName, inDir, parseBackup, pickBase, toBackup } from '.
 import { buyCatnip, marketNow, seasonOf, sellCatnip, weekOf } from './calendar'
 import { ACHIEVEMENTS, MILES_SHOP, buyWithMiles, settle, tasksFor, track } from './collection'
 import { CRITTERS, critter, isAvailable, sell } from './critters'
-import { act, activeCat, adopt, adoptPrice, adoptVisitor, bar, buyItem, checkIn, coinRate, donateCritter, giveGift,
-  learnSkill, migrate, moodOf, newHome, nextCat, rename, respec, reward, stageName, switchTo, tick, welcomeBack,
-  xpToNext } from './game'
+import { act, activeCat, adopt, adoptPrice, adoptVisitor, bar, buyItem, checkIn, coinRate, donateCritter, giveGift, idleRate,
+  learnSkill, migrate, moodOf, newHome, nextCat, rename, respec, reward, rollToolPay, spendPay, stageName, switchTo,
+  tick, tickTally, TOOL_CHANCE, activeMinutes, activePay, rampOf, toolPay, welcomeBack, xpToNext } from './game'
 import { CATCHPHRASE_LEVEL, DAILY_CAP, GIFTS, LEVELS, NICKNAME_LEVEL, PHOTO_LEVEL, dayOf, dialogue, friendLevel,
   levelName, toNextLevel } from './friends'
 import type { Action } from './game'
@@ -85,6 +85,17 @@ let band = { id: '', cols: 0, mode: 'off' as 'off' | 'raster' | 'text' }
 let runX = 0
 // Frame number until which the cat sprints; a tool call starts it.
 let sprintUntil = 0
+// Session spend (US dollars) already paid out; unknown until a usage read works, so earlier spend is never paid.
+let paidUsd: number | undefined
+// Coins gained this prompt and this chat; the prompt resets on turn.start, both on session.start.
+const earned = { prompt: 0, chat: 0 }
+// Active minutes this chat has run; Claude's pay ramps up with it.
+let chatMinutes = 0
+// Active minutes from replies whose reward never landed; the next reply pays them.
+let owedMinutes = 0
+// Claude's rewards run one at a time, in order, so a reply's toast sees every tool tip before it.
+let rewards: Promise<unknown> = Promise.resolve()
+const queue = (job: () => Promise<unknown>) => (rewards = rewards.then(job).catch(() => undefined))
 let flavorNow: (now: number) => Flavor = () => FLAVORS.mocha
 // The browser arcade's server: started on first use, killed with the module; the token guards it.
 const arcade = { port: 0, token: newToken(Math.random), starting: null as Promise<number> | null, pushed: '', isOpened: false }
@@ -101,7 +112,9 @@ const playClip = async ($: EngineInterface, clip: Clip) => {
 }
 
 // Applies a change to the household, then saves it so it survives restarts.
-const change = async ($: EngineInterface, fn: (home: Home, now: number) => Home) => {
+// `deducted` reports coins fn spent on its own, so they still count as earned; `onApplied` runs once the change lands.
+const change = async ($: EngineInterface, fn: (home: Home, now: number) => Home, deducted?: () => number,
+  onApplied?: () => void) => {
   const now = await $.clock.now()
   const stored = await $.store.get('home')
   let home!: Home
@@ -110,7 +123,11 @@ const change = async ($: EngineInterface, fn: (home: Home, now: number) => Home)
     before = pickBase(stored, prev ?? newHome(now), now)
     return (home = { ...settle(fn(before, now), now), rev: before.rev + 1 })
   })
+  onApplied?.()
   latest = home
+  const gain = Math.max(0, home.coins - before.coins + (deducted?.() ?? 0))
+  earned.prompt += gain
+  earned.chat += gain
   const clip = home.effect && home.effect !== before.effect ? CLIP_FOR[home.effect.kind] : undefined
   if (clip && isSoundOn) void playClip($, clip).catch(() => undefined)
   for (const a of ACHIEVEMENTS) if (!(a.id in before.achievements) && a.id in home.achievements) $.ui.toast(`🏆 ${a.name}: ${a.text} (+${a.miles} miles)`)
@@ -386,6 +403,16 @@ const themeCommand = async ($: EngineInterface, arg: string) => {
   return { text: `Theme set to ${option}.` }
 }
 
+// The session's spend in US dollars, or undefined when the host can't say.
+const sessionUsd = async ($: EngineInterface) => {
+  try {
+    const usd = (await $.session.usage()).cost?.usd
+    return typeof usd === 'number' && Number.isFinite(usd) ? usd : undefined
+  } catch {
+    return undefined
+  }
+}
+
 const userHome = async ($: EngineInterface) => (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
 
 // /cat export writes a dated backup; /cat import checks one, backs up the current save, then loads it.
@@ -441,6 +468,7 @@ export const register: Register = (on, options) => {
       description: 'Open your AFK cats (/cat hide, /cat shelter, /cat adopt [name], /cat switch <name>, /cat rename <name>, /cat weather <city>, /cat export, /cat import <file>, /cat help)',
     })
     await readTheme($)
+    paidUsd = await sessionUsd($)
     const saved = (await $.store.get('home')) ?? (await $.store.get('cat'))
     let bonus = 0
     const home = await change($, (_, t) => {
@@ -449,11 +477,23 @@ export const register: Register = (on, options) => {
       bonus = day.bonus
       return saved ? welcomeBack(loaded, day.home, t) : day.home
     })
+    // Time away and the streak bonus are not this chat's earnings.
+    earned.prompt = 0
+    earned.chat = 0
+    chatMinutes = 0
+    owedMinutes = 0
     if (home.effect?.kind === 'welcome') $.ui.toast(home.log)
     if (bonus > 0) $.ui.toast(`Day ${home.streak} streak bonus: +${bonus}c`)
     void refreshWeather($)
     $.clock.every(60_000, () => { void refreshWeather($) })
-    $.clock.every(TICK_MS, () => void readTheme($).then(() => change($, (h, t) => tick(h, t))))
+    $.clock.every(TICK_MS, () => void readTheme($).then(() => {
+      let auto = 0
+      return change($, (h, t) => {
+        const r = tickTally(h, t)
+        auto = r.deducted
+        return r.home
+      }, () => auto)
+    }))
     // Keeps the arcade server alive; it shuts itself down two minutes after the pings stop.
     $.clock.every(30_000, () => {
       if (!arcade.port) return
@@ -574,12 +614,43 @@ export const register: Register = (on, options) => {
   on('tool.call', async ($, e, next) => {
     sprintUntil = frame + 16
     const ran = await next(e)
-    void change($, (h, t) => track(reward(h, 1), 'tools', 1, t))
+    void queue(() => change($, (h, t) => track(reward(h, rollToolPay(h, Math.random) * rampOf(chatMinutes)), 'tools', 1, t)))
     return ran
   })
 
+  on('turn.start', async ($, e, next) => {
+    earned.prompt = 0
+    return next(e)
+  })
+
   on('turn.complete', async ($, e, next) => {
-    void change($, (h, t) => track({ ...reward(h, 3, 2, t), effect: { kind: 'coins', at: t } }, 'turns', 1, t))
+    await queue(async () => {
+      const usd = await sessionUsd($)
+      const spent = usd === undefined || paidUsd === undefined ? 0 : usd - paidUsd
+      const minutes = activeMinutes(e.durationMs)
+      const owed = owedMinutes
+      const ramp = rampOf(chatMinutes)
+      // Payout state advances only once the reward lands; a failed write leaves it for the next reply.
+      let isApplied = false
+      const settled = () => {
+        isApplied = true
+        paidUsd = usd ?? paidUsd
+        chatMinutes += minutes + owed
+        owedMinutes -= owed
+      }
+      try {
+        await change($, (h, t) => {
+          const pay = (activePay(h, e.durationMs) + coinRate(h) * owed + spendPay(h, spent)) * ramp
+          const paid = { ...reward(h, pay, 2, t), effect: { kind: 'coins' as const, at: t } }
+          return track(pay > 0 ? { ...paid, log: `Claude worked ${Math.round(minutes + owed)}m: +${fmtCoins(pay)}` } : paid, 'turns', 1, t)
+        }, undefined, settled)
+      } catch {
+        // A reward that landed is kept by the next save, so only an unapplied one is owed.
+        if (!isApplied) owedMinutes += minutes
+        return
+      }
+      $.ui.toast(`💰 +${fmtCoins(earned.prompt)} this prompt · +${fmtCoins(earned.chat)} this chat · ×${ramp.toFixed(1)} session`)
+    })
     return next(e)
   })
 
@@ -997,7 +1068,7 @@ export const register: Register = (on, options) => {
           XP {bar((cat.xp / xpToNext(cat.level)) * 100, 10)} {cat.xp}/{xpToNext(cat.level)}
         </Text>
         <Text color={tone.coin}>
-          Coins {fmtCoins(home.coins)} (+{coinRate(home).toFixed(1)}/min)
+          Coins {fmtCoins(home.coins)} (+{idleRate(home).toFixed(1)}/min idle · ×{rampOf(chatMinutes).toFixed(1)} session · +{toolPay(home).toFixed(1)}/tool, {TOOL_CHANCE * 100}% of calls)
           {freePoints(cat) > 0 ? ` · ${freePoints(cat)} skill point${freePoints(cat) > 1 ? 's' : ''} to spend (s)` : ''}
         </Text>
         <Text italic color={tone.log}>{home.log}</Text>

@@ -20,6 +20,17 @@ const MINUTE = 60_000
 const DAY = 24 * 60 * MINUTE
 const MAX_AFK_MS = 8 * 60 * MINUTE
 const EVENTS_PER_MIN = 0.02
+// Idle time earns a share of the full rate; Claude's work pays in minutes of it.
+export const IDLE_SHARE = 0.5
+const TOOL_MINUTES = 0.15
+// Only some tool calls pay, so a long run of calls is a few tips, not a steady wage.
+export const TOOL_CHANCE = 0.2
+const MINUTES_PER_USD = 8
+// A reply pays its active time, up to this many minutes: a long sleep or an unanswered prompt can't farm it.
+export const ACTIVE_CAP_MINUTES = 30
+// Claude's pay in a chat grows from 1x to RAMP_MAX over its first RAMP_MINUTES of active time.
+const RAMP_MINUTES = 60
+const RAMP_MAX = 2
 // Time away never pushes a stat below this: cats get grumpy, never sad.
 export const DECAY_FLOOR = 25
 
@@ -124,6 +135,21 @@ export const catRate = (home: Home, cat: Cat) =>
   cat.level * modsOf(cat).coin * homeMods(home).coin * (cat.hunger < 35 ? 0.75 : 1) *
   (cat.isAsleep ? modsOf(cat).sleepCoin : 1)
 export const coinRate = (home: Home) => home.cats.reduce((sum, cat) => sum + catRate(home, cat), 0)
+export const idleRate = (home: Home) => coinRate(home) * IDLE_SHARE
+export const toolPay = (home: Home) => coinRate(home) * TOOL_MINUTES
+// A tool call pays toolPay with probability TOOL_CHANCE, else nothing.
+export const rollToolPay = (home: Home, rng: Rng) => (rng() < TOOL_CHANCE ? toolPay(home) : 0)
+// Active minutes a reply counts for: its wall-clock length, capped.
+export const activeMinutes = (durationMs: number) =>
+  Number.isFinite(durationMs) ? Math.min(Math.max(0, durationMs) / MINUTE, ACTIVE_CAP_MINUTES) : 0
+// What a reply pays for the time it ran: one active minute is one minute of the full rate.
+export const activePay = (home: Home, durationMs: number) => coinRate(home) * activeMinutes(durationMs)
+// Pay multiplier for a chat that has run this many active minutes.
+export const rampOf = (chatMinutes: number) =>
+  1 + (RAMP_MAX - 1) * Math.min(Math.max(0, chatMinutes) / RAMP_MINUTES, 1)
+// What a reply's API spend (US dollars) pays; no cap.
+export const spendPay = (home: Home, usd: number) =>
+  coinRate(home) * Math.max(0, usd) * MINUTES_PER_USD
 
 const gainXp = (home: Home, id: string, xp: number, now: number): Home => {
   let log = home.log
@@ -156,10 +182,13 @@ const tickCat = (home: Home, cat: Cat, min: number): Cat => {
 }
 
 // Advances real time since lastTick for every cat; offline time is capped at 8h.
-export const tick = (home: Home, now: number, rng: Rng = Math.random): Home => {
+export const tick = (home: Home, now: number, rng: Rng = Math.random): Home => tickTally(home, now, rng).home
+
+// tick, plus the coins it spent on its own (loan repayment, auto-feeder), so earnings count gross.
+export const tickTally = (home: Home, now: number, rng: Rng = Math.random): { home: Home; deducted: number } => {
   const cap = MAX_AFK_MS + Math.max(...home.cats.map(c => modsOf(c).offlineHours)) * 60 * MINUTE
   const min = Math.min(Math.max(0, now - home.lastTick), cap) / MINUTE
-  const income = coinRate(home) * min
+  const income = idleRate(home) * min
   let next: Home = repayFromIncome({
     ...home,
     cats: home.cats.map(cat => tickCat(home, cat, min)),
@@ -167,6 +196,7 @@ export const tick = (home: Home, now: number, rng: Rng = Math.random): Home => {
     lastTick: now,
     frame: home.frame + 1,
   }, income)
+  let deducted = home.loan - next.loan
   const deco = homeMods(home)
   for (const cat of home.cats) {
     const woke = cat.isAsleep && !next.cats.find(c => c.id === cat.id)?.isAsleep
@@ -175,6 +205,7 @@ export const tick = (home: Home, now: number, rng: Rng = Math.random): Home => {
   if (deco.autoFeed) {
     for (const cat of next.cats) {
       if (cat.hunger < 40 && next.coins >= 5) {
+        deducted += 5
         next = withCat({ ...next, coins: next.coins - 5, effect: fx('fish', now),
           log: `The auto-feeder served ${cat.name} a fish.` }, cat.id, c => ({ ...c, hunger: clamp(c.hunger + 30) }))
       }
@@ -196,7 +227,7 @@ export const tick = (home: Home, now: number, rng: Rng = Math.random): Home => {
       log: found.length === 1 ? `${who} brought home a ${names[0]}!` : `The cats brought home ${found.length} critters!` },
     'catch', found.length, now)
   }
-  return celebrate(spoil(stepVisitors(next, now, min, rng), now), now)
+  return { home: celebrate(spoil(stepVisitors(next, now, min, rng), now), now), deducted }
 }
 
 // Once per calendar day: a bonus that grows with the streak (capped at 7 days).

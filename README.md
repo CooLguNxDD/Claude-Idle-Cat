@@ -55,7 +55,7 @@ Then type `/cat` to open the pane. Meow.
 
 Short version: stats drop, coins pile up, cats judge you silently.
 
-- Stats drop and coins build up in real time. Time while you're away counts too, up to 8 hours.
+- Stats drop and coins build up in real time, at half the household's full rate while idle. Time while you're away counts too, up to 8 hours.
 - Being away never hurts: stats stop at 25, so cats get grumpy but never sad. They'll forgive you. Eventually.
 - Every cat has genes: one of 19 coats (each one a breed file in `hooks/content/breeds/`), five possible markings, three silhouettes (classic, fluffy, folded ears), eye color, a personality that changes the rules, and a 1-in-64 chance of being shiny ✨. Existing cats retain their original appearance.
 - The household starts in a Cottage with room for 2 cats. Every cat earns coins. Yes, even the lazy one.
@@ -83,7 +83,7 @@ Short version: stats drop, coins pile up, cats judge you silently.
 
 ### 🎁 Claude helps, and other ways to get paid
 
-- Claude helps: +1c for each tool call, and +3c and +2xp each time Claude finishes a reply.
+- Claude's work pays by time and effort, not by prompt count. Each finished reply pays its active time (one minute of work is one minute of the household's full rate, at most 30 per reply) and +2xp, plus a bonus for what the reply cost: $1 of session spend (as `/cost` totals it) is worth 8 minutes, with no cap. So a quick "meow" earns almost nothing, and a long build earns a lot. About 1 tool call in 5 adds a tiny tip. All of it ramps from 1x to 2x over a chat's first hour of active time, so long sessions pay more. Each finished reply toasts the coins you gained during that prompt and during this chat, plus the session multiplier (idle income and gifts included; spending isn't subtracted).
 - A daily check-in bonus grows with your streak (up to 7 days). Random AFK events give extra coins.
 - Each level gives a skill point for the Skills tab (`s`). There are three branches: **Hunter** (coins, AFK finds, gifts), **Cuddler** (joy, xp) and **Dreamer** (sleep, time away). Resetting skills costs coins.
 - Cats grow from kitten to cat (red collar) at level 5. At level 10 they evolve into the form of their strongest branch: **Ninja** 🥷 (headband), **Royal** 👑 (crown and cape) or **Cloud** ☁️ (halo and wings). A cat with no skills becomes a **Chonk**. (No shame. Chonk is a lifestyle.)

@@ -1,8 +1,8 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Home } from '../types'
-import { DECAY_FLOOR, act, activeCat, adopt, checkIn, coinRate, migrate, moodOf, newHome, nextCat, stageOf, switchTo,
-  tick } from './game'
+import { ACTIVE_CAP_MINUTES, DECAY_FLOOR, IDLE_SHARE, TOOL_CHANCE, act, activeCat, activePay, adopt, checkIn, coinRate,
+  migrate, moodOf, newHome, nextCat, idleRate, rampOf, rollToolPay, spendPay, stageOf, switchTo, tick, tickTally, toolPay } from './game'
 import { seeded } from './rng'
 import { ROWS, frameCells } from './scene'
 import { FLAVORS } from './theme'
@@ -50,6 +50,15 @@ test('a placed auto-feeder feeds every hungry cat', async () => {
   expect(tick(hungry, 60_000, noEvents).cats.every(c => c.hunger > 30)).toBe(true)
 })
 
+test('a tick reports what the auto-feeder spent, so earnings count gross income', async () => {
+  const once: Home = { ...rich(newHome(0)), owned: [...newHome(0).owned, 'feeder'], decor: { ...newHome(0).decor, bowl: 'feeder' } }
+  const two = adopt(once, 1, seeded(1))
+  const hungry = { ...two, lastTick: 0, cats: two.cats.map(c => ({ ...c, hunger: 10 })) }
+  const { home, deducted } = tickTally(hungry, 60_000, noEvents)
+  expect(deducted).toBe(10)
+  expect(Math.abs(home.coins + deducted - hungry.coins - idleRate(hungry))).toBeLessThan(1e-9)
+})
+
 test('adoption rolls genes, picks a free name and respects the house size', async () => {
   const two = adopt(rich(newHome(0)), 5, seeded(7))
   expect(two.cats.length).toBe(2)
@@ -62,6 +71,60 @@ test('adoption rolls genes, picks a free name and respects the house size', asyn
   expect(activeCat(nextCat(nextCat(two))).id).toBe('c2')
   expect(nextCat(newHome(0)).log).toMatch(/only cat/)
   expect(coinRate(two)).toBeGreaterThan(coinRate(newHome(0)))
+})
+
+test('idle time pays a share of the full rate; Claude\'s work pays minutes of it', async () => {
+  const home = newHome(0)
+  expect(tick(home, 30 * 60_000, noEvents).coins - home.coins).toBe(coinRate(home) * IDLE_SHARE * 30)
+  const pro = { ...home, cats: home.cats.map(c => ({ ...c, level: 20 })) }
+  expect(toolPay(pro)).toBeGreaterThan(toolPay(home))
+  expect(activePay(pro, 60_000)).toBeGreaterThan(activePay(home, 60_000))
+})
+
+test('a reply pays its active time, so a quick prompt earns almost nothing', async () => {
+  const home = { ...newHome(0), cats: newHome(0).cats.map(c => ({ ...c, level: 10 })) }
+  const rate = coinRate(home)
+  expect(activePay(home, 0)).toBe(0)
+  expect(activePay(home, -5)).toBe(0)
+  expect(activePay(home, Number.NaN)).toBe(0)
+  expect(Math.abs(activePay(home, 10_000) - rate / 6) < 1e-9).toBe(true)
+  expect(Math.abs(activePay(home, 10 * 60_000) - rate * 10) < 1e-9).toBe(true)
+  expect(Math.abs(activePay(home, 3 * 60 * 60_000) - rate * ACTIVE_CAP_MINUTES) < 1e-9).toBe(true)
+  expect(toolPay({ ...newHome(0) })).toBeLessThan(1)
+})
+
+test('the session ramp grows from 1x to 2x over an hour of active time', async () => {
+  expect(rampOf(0)).toBe(1)
+  expect(rampOf(30)).toBe(1.5)
+  expect(rampOf(60)).toBe(2)
+  expect(rampOf(600)).toBe(2)
+  expect(rampOf(-5)).toBe(1)
+})
+
+test('a reply\'s spend pays coins, never below zero and with no cap', async () => {
+  const home = { ...newHome(0), cats: newHome(0).cats.map(c => ({ ...c, level: 10 })) }
+  expect(spendPay(home, 0)).toBe(0)
+  expect(spendPay(home, -1)).toBe(0)
+  expect(spendPay(home, 0.5)).toBeGreaterThan(spendPay(home, 0.1))
+  expect(spendPay(home, 100)).toBeGreaterThan(spendPay(home, 10))
+})
+
+test('work pay keeps its fraction instead of rounding to whole coins', async () => {
+  const home = { ...newHome(0), cats: newHome(0).cats.map(c => ({ ...c, level: 7 })) }
+  expect(Number.isInteger(toolPay(home))).toBe(false)
+  expect(Number.isInteger(activePay(home, 12_345))).toBe(false)
+  expect(Number.isInteger(spendPay(home, 0.013))).toBe(false)
+})
+
+test('only some tool calls pay', async () => {
+  const home = newHome(0)
+  expect(rollToolPay(home, () => 0)).toBe(toolPay(home))
+  expect(rollToolPay(home, () => TOOL_CHANCE - 0.001)).toBe(toolPay(home))
+  expect(rollToolPay(home, () => TOOL_CHANCE)).toBe(0)
+  const rng = seeded(11)
+  const paid = Array.from({ length: 2_000 }, () => rollToolPay(home, rng)).filter(n => n > 0).length
+  expect(paid / 2_000).toBeGreaterThan(TOOL_CHANCE - 0.05)
+  expect(paid / 2_000).toBeLessThan(TOOL_CHANCE + 0.05)
 })
 
 test('daily streak pays once per day and resets after a gap', async () => {
