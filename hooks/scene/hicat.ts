@@ -155,7 +155,7 @@ export const drawHiCat = (p: Pen, x0: number, y0: number, cat: HiCat, f: Flavor)
     g.ellipse(28, -10, 2, 2, f.yellow)
   }
 
-  // Outline every shape, then shade fur from a top-left light; both stay a crisp line at any scale.
+  // Outline every shape, then shade fur from a top-left light; both widths follow the scale.
   const ink = inkOf(f)
   const t = Math.max(1, Math.round(p.u))
   const isSolid = (dx: number, dy: number) => g.cell(dx, dy) !== undefined

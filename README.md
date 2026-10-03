@@ -181,7 +181,7 @@ In kitty and Ghostty the pane's scene draws as a real pixel picture at 4× the h
 | `image` | always a picture |
 | `text` | always half-block cells |
 
-The picture's art is a spec, not a bitmap: shapes are laid out on a design grid of 4 units per scene pixel and rasterized at whatever scale the canvas has, with outlines and dithering kept one crisp pixel. `PICTURE_SCALE` in `hooks/scene.ts` sets the detail (2, 4 or 8 all render from the same spec).
+The picture's art is a spec, not a bitmap: shapes are laid out on a design grid of 4 units per scene pixel and rasterized at whatever scale the canvas has, so edges, outlines and dithering stay pixel-sharp at every size. `PICTURE_SCALE` in `hooks/scene.ts` sets the detail (2, 4 or 8 all render from the same spec).
 
 ## 🔊 Sound
 
