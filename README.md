@@ -6,6 +6,10 @@
 `afk-cat`: An AFK virtual-pet cat that lives inside Claude Code as a mod (a plugin of function hooks).
 It's a Tamagotchi with an idle-game loop: look after the cat, earn coins, buy upgrades and come back for streak bonuses. Claude does the work, the cat does the napping. Everybody wins.
 
+![Claude Idle Cat demo](docs/video/claude-idle-cat-x-20s.gif)
+
+*20-second tour. [Watch the full-quality MP4](docs/video/claude-idle-cat-x-20s.mp4).*
+
 ## 🎮 Play
 
 ```bash
