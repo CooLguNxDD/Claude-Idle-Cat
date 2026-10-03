@@ -13,7 +13,9 @@ Quick essentials (full detail in CLAUDE.md):
   npx -y -p typescript tsc -p web
   claude plugin test .
   node --test server/arcade.test.mjs
+  node --test tools/release-snapshot.test.mjs
   ```
+- A release is the tag `afk-cat--v<version>` from `claude plugin tag --push`. `version` must match in `plugin.json` and the marketplace entry. The tag workflow publishes the zip, snapshot, and contribution notes.
 - Two runtimes:
   - Mod (`hooks/`): sandbox where everything external goes through `$` inside `hooks/register.tsx`. All other modules are pure `(home, now, rng)`.
   - Browser arcade (`web/`, served by `server/arcade.mjs`): after changes to `web/` or shared imports, run `node tools/build-web.mjs` and commit `server/public/arcade.js`.

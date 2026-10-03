@@ -1,0 +1,19 @@
+# Used when GitHub generates release notes from pull requests.
+# The tag workflow writes its own notes from git history; this file groups those pull requests the same way.
+changelog:
+  categories:
+    - title: Features
+      labels:
+        - feat
+        - enhancement
+    - title: Fixes
+      labels:
+        - fix
+        - bug
+    - title: Documentation
+      labels:
+        - docs
+        - documentation
+    - title: Other changes
+      labels:
+        - "*"

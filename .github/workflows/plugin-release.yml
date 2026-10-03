@@ -1,0 +1,63 @@
+# Publishes a Claude plugin release when an afk-cat--vX.Y.Z tag is pushed.
+# The tag name is the one `claude plugin tag` creates: <plugin.json name>--v<version>.
+name: Plugin release
+
+on:
+  push:
+    tags:
+      - "afk-cat--v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check the release snapshot tool
+        run: node --test tools/release-snapshot.test.mjs
+
+      - name: Check content registry and arcade server
+        run: |
+          node tools/build-content.mjs --check
+          node --test server/arcade.test.mjs
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code@2.1.287
+
+      - name: Validate and test the mod
+        run: |
+          claude plugin validate .claude-plugin/plugin.json
+          claude plugin validate .
+          claude plugin test .
+
+      - name: Build the release snapshot
+        run: node tools/release-snapshot.mjs --tag "${GITHUB_REF_NAME}" --out dist
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          TITLE="$(node -p "require('./dist/release-snapshot.json').title")"
+          ZIP="$(node -p "require('./dist/release-snapshot.json').archive.file")"
+          PRE=()
+          if node -e "process.exit(require('./dist/release-snapshot.json').prerelease ? 0 : 1)"; then
+            PRE+=(--prerelease)
+          fi
+          ASSETS=("dist/${ZIP}" "dist/${ZIP}.sha256" dist/release-snapshot.json)
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
+            gh release edit "$TAG" --title "$TITLE" --notes-file dist/RELEASE.md "${PRE[@]}"
+          else
+            gh release create "$TAG" "${ASSETS[@]}" --title "$TITLE" --notes-file dist/RELEASE.md "${PRE[@]}"
+          fi

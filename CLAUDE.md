@@ -11,6 +11,7 @@ npx -y -p typescript tsc -p web     # the browser runtime (DOM lib)
 claude plugin test .                # every hooks/**/*.test.ts
 node --test server/arcade.test.mjs   # local routes and browser-location permission flow
 node tools/build-content.mjs --check # hooks/content/index.ts lists every content file
+node --test tools/release-snapshot.test.mjs # release tag snapshot, notes, and version agreement
 ```
 
 `.claude-plugin/types/` is written by the engine when the mod loads and is git-ignored. If it's missing, load the mod once (see below) before running `tsc -p .`.
@@ -78,6 +79,18 @@ The `ui.render` hooks on Claude Code's own components pass with `next(e)` when `
 - `fs` paths reach hooks as absolute, native paths. Stubs should look files up by name (see `hooks/backup.test.ts`).
 - Stub `process.spawn` with an async generator that returns `{ value: { code, signal } }`. Stub `process.run` results so they include `isStdoutTruncated` and `isStderrTruncated`.
 - Rules tests use `seeded(n)` from `hooks/rng.ts` and a fixed `now`.
+
+## Release
+
+A Claude plugin release is an annotated tag `afk-cat--v<version>`, the name `claude plugin tag` creates. Pushing that tag runs `.github/workflows/plugin-release.yml`. The workflow validates the mod, archives the tagged tree, and opens a GitHub release. The release attaches the plugin zip, its sha256, and `release-snapshot.json` (version, commit, inventory, install URLs, and the commits since the previous tag). The release notes repeat those details in Markdown.
+
+`.claude-plugin/plugin.json` and the `afk-cat` entry in `.claude-plugin/marketplace.json` must use the same `version` string. Bump both, commit, then from a clean checkout:
+
+```bash
+claude plugin tag --push
+```
+
+`node tools/release-snapshot.mjs --preview` writes the same files under `dist/` before the tag exists. `metadata.claudeCode` in `plugin.json` is the Claude Code version named in the release notes.
 
 ## Conventions
 
