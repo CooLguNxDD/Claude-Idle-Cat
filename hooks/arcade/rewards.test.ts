@@ -91,3 +91,16 @@ test('unpaid rounds never roll; a cuddly cat favours cuddles', async () => {
   expect(cuddles).toBeGreaterThan(600 * PRIZE_CHANCE.gold / 6)
   expect(rollPrize(home, cat, null, () => 0.5)).toBeNull()
 })
+
+test('the cat that started the round is paid, even after switching cats', async () => {
+  const t = at(7)
+  const two = { ...newHome(t), cats: [...newHome(t).cats, { ...activeCat(newHome(t)), id: 'c2', name: 'Bean' }] }
+  const started = startGame(two, 'dash', t)
+  const done = finishGame({ ...started, activeId: 'c2' }, 'dash', 900, 60_000, t + 60_000, never)
+  const [mochi, bean] = done.cats
+  expect(done.activeId).toBe('c2')
+  expect(mochi!.xp).toBeGreaterThan(0)
+  expect(mochi!.joy).toBeGreaterThan(activeCat(two).joy)
+  expect(bean!).toEqual(two.cats[1]!)
+  expect(done.log).toMatch(/^Mochi scored/)
+})

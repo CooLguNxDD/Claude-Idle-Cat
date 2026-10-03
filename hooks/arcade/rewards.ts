@@ -33,8 +33,8 @@ const today = (a: Arcade, now: number): Arcade => (a.day === dayOf(now) ? a : { 
 export const playsLeft = (home: Home, id: GameId, now: number) =>
   Math.max(0, PAID_PLAYS - (today(home.arcade, now).plays[id] ?? 0))
 
-const withActive = (home: Home, fn: (cat: Cat) => Cat): Home =>
-  ({ ...home, cats: home.cats.map(c => (c.id === home.activeId ? fn(c) : c)) })
+const withCat = (home: Home, id: string, fn: (cat: Cat) => Cat): Home =>
+  ({ ...home, cats: home.cats.map(c => (c.id === id ? fn(c) : c)) })
 const clamp = (n: number) => Math.max(0, Math.min(100, n))
 
 export const startGame = (home: Home, id: GameId, now: number): Home => {
@@ -43,8 +43,8 @@ export const startGame = (home: Home, id: GameId, now: number): Home => {
   if (!game) return home
   if (cat.isAsleep) return { ...home, log: `${cat.name} is asleep. Wake them first (n).` }
   if (cat.energy < ENERGY_COST) return { ...home, log: `${cat.name} is too tired for ${game.name}. Let them nap.` }
-  return withActive({ ...home, arcade: { ...today(home.arcade, now), open: { game: id, at: now } },
-    log: `${cat.name} gets ready for ${game.name}!` }, c => ({ ...c, energy: clamp(c.energy - ENERGY_COST) }))
+  return withCat({ ...home, arcade: { ...today(home.arcade, now), open: { game: id, at: now, catId: cat.id } },
+    log: `${cat.name} gets ready for ${game.name}!` }, cat.id, c => ({ ...c, energy: clamp(c.energy - ENERGY_COST) }))
 }
 
 export const quitGame = (home: Home): Home =>
@@ -79,7 +79,8 @@ export const finishGame = (home: Home, game: GameId, posted: number, postedMs: n
   const coins = isPaid && medal ? Math.round(Math.max(FLOOR[medal], coinRate(home) * MINUTES[medal]) * (isFeatured ? 2 : 1)) : 0
   const xp = isPaid && medal ? XP[medal] : 0
   const joy = 15 + Math.min(15, Math.floor((score / g.medals[2]) * 15))
-  const cat = activeCat(home)
+  // The cat that started the round is paid, even if another one is active now.
+  const cat = home.cats.find(c => c.id === open.catId) ?? activeCat(home)
   const prize = isPaid ? rollPrize(home, cat, medal, rng) : null
   const parts = [
     `${cat.name} scored ${score} in ${g.name}`,
@@ -90,13 +91,14 @@ export const finishGame = (home: Home, game: GameId, posted: number, postedMs: n
     isBest ? 'new best!' : '',
     prize?.text ?? '',
   ].filter(Boolean)
-  const next: Home = withActive({
+  const next: Home = withCat({
     ...home,
     arcade: { ...arcade, open: null, plays: { ...arcade.plays, [game]: (arcade.plays[game] ?? 0) + 1 },
       best: { ...arcade.best, [game]: Math.max(score, arcade.best[game] ?? 0) }, golds: arcade.golds + (medal === 'gold' ? 1 : 0) },
     effect: { kind: medal === 'gold' ? 'award' : medal ? 'medal' : 'yarn', at: now },
     log: parts.join(' · ').replace(/([^!])$/, '$1.'),
-  }, c => (prize?.cat ?? (x => x))(befriend({ ...c, joy: clamp(c.joy + joy) }, medal ? 3 : 1, now)))
+  }, cat.id, c => (prize?.cat ?? (x => x))(befriend({ ...c, joy: clamp(c.joy + joy) }, medal ? 3 : 1, now)))
   const won = prize?.critter ? addToPocket(next, [prize.critter]) : next
-  return track(reward(won, coins + (prize?.coins ?? 0), xp + (prize?.xp ?? 0), now), 'games', 1, now)
+  const paid = reward({ ...won, activeId: cat.id }, coins + (prize?.coins ?? 0), xp + (prize?.xp ?? 0), now)
+  return track({ ...paid, activeId: home.activeId }, 'games', 1, now)
 }

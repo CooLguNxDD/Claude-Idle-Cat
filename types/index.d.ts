@@ -56,7 +56,7 @@ export type Arcade = {
   plays: Partial<Record<GameId, number>>
   best: Partial<Record<GameId, number>>
   golds: number
-  open: { game: GameId; at: number } | null
+  open: { game: GameId; at: number; catId?: string } | null
 }
 
 // What the household has collected, recorded the first time it is seen.

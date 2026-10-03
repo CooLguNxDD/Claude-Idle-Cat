@@ -20,6 +20,8 @@ export const SNACK = 20
 export const ZOOMIES = 10
 export const CUDDLE = 5
 
+const CRITTER_WEIGHTS = Object.fromEntries(CRITTERS.map(c => [c.id, c.weight])) as Record<string, number>
+
 const clamp = (n: number) => Math.max(0, Math.min(100, n))
 const same = (c: Cat) => c
 
@@ -33,12 +35,12 @@ const prizeOf = (id: PrizeId, home: Home, cat: Cat, rng: Rng): Prize => {
     return { id, coins: 0, xp, cat: same, text: `🎁 learned a new trick (+${xp}xp)` }
   }
   if (id === 'snack') return { id, coins: 0, xp: 0, cat: c => ({ ...c, hunger: clamp(c.hunger + SNACK) }),
-    text: `🎁 won a tuna snack (+${SNACK} hunger)` }
+    text: `🎁 won a tuna snack (+${clamp(cat.hunger + SNACK) - cat.hunger} hunger)` }
   if (id === 'zoomies') return { id, coins: 0, xp: 0, cat: c => ({ ...c, energy: clamp(c.energy + ZOOMIES) }),
     text: `🎁 got the zoomies (+${ZOOMIES} energy)` }
   if (id === 'cuddle') return { id, coins: 0, xp: 0, cat: c => ({ ...c, friendship: c.friendship + CUDDLE }),
     text: `🎁 a victory cuddle (+${CUDDLE} friendship)` }
-  const critter = weighted(rng, Object.fromEntries(CRITTERS.map(c => [c.id, c.weight])) as Record<string, number>)
+  const critter = weighted(rng, CRITTER_WEIGHTS)
   const name = CRITTERS.find(c => c.id === critter)?.name ?? critter
   return { id, coins: 0, xp: 0, cat: same, critter, text: `🎁 a prize capsule held a ${name}!` }
 }
