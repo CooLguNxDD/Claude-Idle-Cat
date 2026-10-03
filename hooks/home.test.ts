@@ -2,7 +2,8 @@ import { expect, test } from 'claude-code/testing'
 
 import type { Home } from '../types'
 import { activeCat, adoptVisitor, coinRate, newHome, tick } from './game'
-import { CATALOG, STOCK_SIZE, TIERS, buyFurniture, dailyStock, homeMods, maxCats, payLoan, place, takeLoan } from './home'
+import { BASE_LOAN, CATALOG, STOCK_SIZE, buyFurniture, dailyStock, fmtCoins, homeMods, loanFor, maxCats, payLoan, place, takeLoan,
+  tierAt } from './home'
 import { seeded } from './rng'
 import { arrivalsPerHour, maxVisitors, stepVisitors } from './visitors'
 
@@ -15,7 +16,7 @@ const rich = (home: Home): Home => ({ ...home, coins: 100_000 })
 test('the catalog is consistent', async () => {
   const ids = new Set(CATALOG.map(f => f.id))
   expect(ids.size).toBe(CATALOG.length)
-  const slots = new Set(TIERS.flatMap(t => t.slots))
+  const slots = new Set(tierAt(99).slots)
   for (const item of CATALOG) expect(slots.has(item.slot)).toBe(true)
 })
 
@@ -36,7 +37,7 @@ test('buying needs an open shop, stock and coins, then places the item', async (
   expect(buyFurniture(rich(newHome(0)), notStocked.id, now, 12).log).toMatch(/stock/)
   const bought = buyFurniture(rich(newHome(0)), item.id, now, 12)
   expect(bought.owned).toContain(item.id)
-  if (TIERS[0]!.slots.includes(item.slot)) expect(bought.decor[item.slot]).toBe(item.id)
+  if (tierAt(0).slots.includes(item.slot)) expect(bought.decor[item.slot]).toBe(item.id)
 })
 
 test('decor changes the rules', async () => {
@@ -52,7 +53,7 @@ test('Tom Mew expands the house and income pays the loan back to exactly zero', 
   const loaned = takeLoan(newHome(0))
   expect(loaned.tier).toBe(1)
   expect(maxCats(loaned)).toBe(3)
-  expect(loaned.loan).toBe(TIERS[1]!.loan)
+  expect(loaned.loan).toBe(tierAt(1).loan)
   expect(takeLoan(loaned).log).toMatch(/Pay off/)
   const later = tick({ ...loaned, cats: loaned.cats.map(c => ({ ...c, level: 30 })) }, 8 * HOUR, () => 0)
   expect(later.loan).toBeLessThan(loaned.loan)
@@ -60,7 +61,32 @@ test('Tom Mew expands the house and income pays the loan back to exactly zero', 
   for (let i = 0; i < 50; i++) paid = tick({ ...paid, lastTick: 0 }, 8 * HOUR, () => 0)
   expect(paid.loan).toBe(0)
   expect(payLoan(paid, 100).log).toMatch(/No loan/)
-  expect(payLoan({ ...rich(loaned) }, 100).loan).toBe(TIERS[1]!.loan - 100)
+  expect(payLoan({ ...rich(loaned) }, 100).loan).toBe(tierAt(1).loan - 100)
+})
+
+test('houses never run out and each loan doubles from the base', async () => {
+  expect([1, 2, 3, 4].map(loanFor)).toEqual([BASE_LOAN, BASE_LOAN * 2, BASE_LOAN * 4, BASE_LOAN * 8])
+  let home: Home = newHome(0)
+  for (let i = 1; i <= 8; i++) {
+    home = { ...takeLoan(home), loan: 0 }
+    expect(home.tier).toBe(i)
+    expect(maxCats(home)).toBe(2 + i)
+  }
+  expect(tierAt(3).name).toBe('Villa')
+  expect(tierAt(8).name).toBe('Palace 3')
+  expect(tierAt(8).slots).toEqual(tierAt(2).slots)
+  expect(maxVisitors(home)).toBe(4)
+  expect(Number.isSafeInteger(loanFor(10_000))).toBe(true)
+  expect(tierAt(-1).loan).toBe(0)
+  expect(tierAt(Number.NaN).name).toBe('Cottage')
+})
+
+test('coin labels stay short at any size', async () => {
+  expect(fmtCoins(1600.7)).toBe('1600c')
+  expect(fmtCoins(12_800)).toBe('12.8kc')
+  expect(fmtCoins(3_000_000)).toBe('3Mc')
+  expect(fmtCoins(Number.MAX_SAFE_INTEGER)).toBe('9Qac')
+  expect(fmtCoins(1e30)).toBe('1.00e+30c')
 })
 
 test('decor pulls more strays, who stay, leave gifts and can be adopted', async () => {

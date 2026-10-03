@@ -10,7 +10,8 @@ const BASE_PER_HOUR = 0.12
 const STRAYS = ['Smokey', 'Patches', 'Whiskers', 'Professor', 'Captain', 'Noodle', 'Pickles', 'Marbles', 'Biscotti',
   'Sir Fluff', 'Clementine', 'Oreo', 'Jellybean', 'Pumpkin', 'Domino', 'Toast', 'Momo', 'Peaches']
 
-export const maxVisitors = (home: Home) => 1 + home.tier
+// The yard fits a few strays, however big the house gets.
+export const maxVisitors = (home: Home) => 1 + Math.min(home.tier, 3)
 export const arrivalsPerHour = (home: Home) => BASE_PER_HOUR * (1 + baitOf(home).total / 8)
 
 const giftFor = (home: Home, personality: Personality, rng: Rng) =>

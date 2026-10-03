@@ -43,13 +43,19 @@ const BY_ID = new Map(CATALOG.map(f => [f.id, f]))
 export const furniture = (id: string | undefined) => (id ? BY_ID.get(id) : undefined)
 export const STARTER = CATALOG.filter(f => f.price === 0 && !f.miles).map(f => f.id)
 
-// House tiers, paid off through Tom Mew's interest-free loan.
-export const TIERS = [
-  { name: 'Cottage', maxCats: 2, slots: ['bowl', 'bed', 'toy'] as Slot[], loan: 0 },
-  { name: 'House', maxCats: 3, slots: ['bowl', 'bed', 'toy', 'rug', 'plant'] as Slot[], loan: 500 },
-  { name: 'Manor', maxCats: 4, slots: ['bowl', 'bed', 'toy', 'rug', 'plant', 'hanging'] as Slot[], loan: 1500 },
-]
-export const tierOf = (home: Home) => TIERS[Math.min(home.tier, TIERS.length - 1)] ?? TIERS[0]!
+// House tiers, paid off through Tom Mew's interest-free loan. There is no top tier.
+export type Tier = { name: string; maxCats: number; slots: Slot[]; loan: number }
+const SLOTS: Slot[] = ['bowl', 'bed', 'toy', 'rug', 'plant', 'hanging']
+const NAMES = ['Cottage', 'House', 'Manor', 'Villa', 'Mansion', 'Castle', 'Palace']
+export const BASE_LOAN = 400
+// Each new house costs twice the last; clamped so huge tiers stay exact integers.
+export const loanFor = (n: number) => (n <= 0 ? 0 : Math.min(BASE_LOAN * 2 ** (n - 1), Number.MAX_SAFE_INTEGER))
+const tierName = (n: number) => NAMES[n] ?? `${NAMES[NAMES.length - 1]} ${n - NAMES.length + 2}`
+export const tierAt = (n: number): Tier => {
+  const i = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
+  return { name: tierName(i), maxCats: 2 + i, slots: SLOTS.slice(0, [3, 5][i] ?? SLOTS.length), loan: loanFor(i) }
+}
+export const tierOf = (home: Home) => tierAt(home.tier)
 export const maxCats = (home: Home) => tierOf(home).maxCats
 export const LOAN_SHARE = 0.25
 
@@ -76,6 +82,17 @@ export const baitOf = (home: Home) => {
     if (item.likes) likes[item.likes] = (likes[item.likes] ?? 0) + item.bait
   }
   return { total, likes }
+}
+
+const SUFFIXES = ['', 'k', 'M', 'B', 'T', 'Qa', 'Qi']
+// Short coin label: 1600c, then 12.8kc, 3.4Mc …; past the suffixes, scientific.
+export const fmtCoins = (n: number) => {
+  if (!Number.isFinite(n)) return '∞c'
+  const v = Math.floor(n)
+  if (Math.abs(v) < 10_000) return `${v}c`
+  const e = Math.min(Math.floor(Math.log10(Math.abs(v)) / 3), SUFFIXES.length)
+  if (e >= SUFFIXES.length) return `${v.toExponential(2)}c`
+  return `${(v / 1000 ** e).toFixed(1).replace(/\.0$/, '')}${SUFFIXES[e]}c`
 }
 
 export const SHOP_OPEN = 8
@@ -121,11 +138,12 @@ export const place = (home: Home, id: string): Home => {
 
 // Tom Mew expands the house right away; income pays the loan back with no interest or deadline.
 export const takeLoan = (home: Home): Home => {
-  const next = TIERS[home.tier + 1]
-  if (!next) return { ...home, log: 'Tom Mew: "This is already the finest manor in town!"' }
-  if (home.loan > 0) return { ...home, log: `Tom Mew: "Pay off the ${Math.ceil(home.loan)}c first, yes yes!"` }
+  if (home.loan > 0) return { ...home, log: `Tom Mew: "Pay off the ${fmtCoins(Math.ceil(home.loan))} first, yes yes!"` }
+  const tier = tierOf(home)
+  const next = tierAt(home.tier + 1)
+  if (next.maxCats <= tier.maxCats) return { ...home, log: 'Tom Mew: "Even I can\'t build bigger than this!"' }
   return { ...home, tier: home.tier + 1, loan: next.loan,
-    log: `Tom Mew built you a ${next.name}! Loan: ${next.loan}c, paid from income.` }
+    log: `Tom Mew built you a ${next.name}! Loan: ${fmtCoins(next.loan)}, paid from income.` }
 }
 
 export const payLoan = (home: Home, amount: number): Home => {
@@ -133,7 +151,7 @@ export const payLoan = (home: Home, amount: number): Home => {
   if (pay <= 0) return { ...home, log: home.loan > 0 ? 'Not enough coins.' : 'No loan to pay.' }
   const loan = home.loan - pay
   return { ...home, coins: home.coins - pay, loan,
-    log: loan === 0 ? 'Loan paid off! Tom Mew has more ideas…' : `Paid ${pay}c. ${Math.ceil(loan)}c left.` }
+    log: loan === 0 ? 'Loan paid off! Tom Mew has more ideas…' : `Paid ${pay}c. ${fmtCoins(Math.ceil(loan))} left.` }
 }
 
 // Takes LOAN_SHARE of fresh income toward the loan; returns the home with both updated.

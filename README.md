@@ -74,7 +74,7 @@ Short version: stats drop, coins pile up, cats judge you silently.
 
 - Nyan's shop is open 08:00–22:00 by your clock, with 4 new items every day.
 - Furniture goes in yard spots (bowl, bed, toy, rug, plant, something hanging) and changes the rules: an auto-feeder, sleep regen, coin boosts, slower joy decay, more AFK events, bigger gifts.
-- Tom Mew builds a bigger house (House, then Manor) on an interest-free loan. A quarter of income pays it back, and there's no deadline. Best landlord in town.
+- Tom Mew builds a bigger house (House, Manor, Villa, Mansion, Castle, Palace, and on forever) on an interest-free loan. Every house holds one more cat. The first loan is 400c and each one after doubles (800c, 1.6kc, …). A quarter of income pays it back, and there's no deadline. Best landlord in town.
 - Stray cats visit the yard, drawn by your decor (each item attracts certain personalities). They sit on the fence for a few hours, leave a gift, and you can adopt them for free. Remember, you were one once.
 
 ### 🎁 Claude helps, and other ways to get paid

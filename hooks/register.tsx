@@ -19,8 +19,8 @@ import type { Action } from './game'
 import { PERSONALITY_INFO, describeGenes } from './genes'
 import { COATS, COAT_REGISTRY, RARITIES, rarityBadge, rarityOf } from './adoption/registry'
 import { revealedCat } from './adoption/state'
-import { LOAN_SHARE, SHOP_CLOSE, SHOP_OPEN, TIERS, baitOf, dailyStock, furniture, isShopOpen, maxCats, payLoan, place,
-  takeLoan, tierOf } from './home'
+import { LOAN_SHARE, SHOP_CLOSE, SHOP_OPEN, baitOf, dailyStock, fmtCoins, furniture, isShopOpen, maxCats, payLoan, place,
+  takeLoan, tierAt, tierOf } from './home'
 import { PICTURE_SCALE, ROWS, frameCells, frameImage, sceneCols } from './scene'
 import type { RgbaImage } from './scene'
 import { shelterCells, shelterImage } from './scene/shelter'
@@ -107,7 +107,7 @@ const change = async ($: EngineInterface, fn: (home: Home, now: number) => Home)
   }
   await $.store.set('home', home)
   const cat = activeCat(home)
-  $.ui.status(`🐱 ${cat.name} Lv${cat.level} ${moodOf(cat)} · ${Math.floor(home.coins)}c`)
+  $.ui.status(`🐱 ${cat.name} Lv${cat.level} ${moodOf(cat)} · ${fmtCoins(home.coins)}`)
   void pushArcade($, home, now)
   return home
 }
@@ -613,7 +613,7 @@ export const register: Register = (on, options) => {
         {tabs}
         {scene}
         <Text bold color={tone.title}>Adoption shelter</Text>
-        <Text color={tone.coin}>{Math.floor(home.coins)}c · {home.cats.length}/{maxCats(home)} cats · {home.shelter.pulls} shelter pulls</Text>
+        <Text color={tone.coin}>{fmtCoins(home.coins)} · {home.cats.length}/{maxCats(home)} cats · {home.shelter.pulls} shelter pulls</Text>
         {reveal && <Box flexDirection="column">
           <Text bold color={css(flavor[RARITIES[rarityOf(reveal.genes)].color])}>{rarityBadge(reveal.genes)} · {reveal.name}</Text>
           <Text color={tone.muted}>{describeGenes(reveal.genes)}</Text>
@@ -832,7 +832,7 @@ export const register: Register = (on, options) => {
 
     if (view === 'home') {
       const tier = tierOf(home)
-      const next = TIERS[home.tier + 1]
+      const next = tierAt(home.tier + 1)
       const hour = hourOf(now)
       const isOpen = isShopOpen(hour)
       const stock = dailyStock(now)
@@ -844,17 +844,15 @@ export const register: Register = (on, options) => {
           {scene}
           {weatherRow}
           <Text bold color={tone.title}>
-            {tier.name} · {home.cats.length}/{tier.maxCats} cats · {tier.slots.length} decor spots · Coins {Math.floor(home.coins)}
+            {tier.name} · {home.cats.length}/{tier.maxCats} cats · {tier.slots.length} decor spots · Coins {fmtCoins(home.coins)}
           </Text>
           {home.loan > 0
             ? <Box>
-                <Text color={tone.warn}>Tom Mew loan: {Math.ceil(home.loan)}c left ({LOAN_SHARE * 100}% of income pays it) </Text>
+                <Text color={tone.warn}>Tom Mew loan: {fmtCoins(Math.ceil(home.loan))} left ({LOAN_SHARE * 100}% of income pays it) </Text>
                 <Button key="pay" plain label="Pay 100c" onPress={() => change($, h => payLoan(h, 100))} />
               </Box>
-            : next
-              ? <Button key="loan" plain label={`Ask Tom Mew to build a ${next.name} · ${next.loan}c loan · ${next.maxCats} cats`}
-                  onPress={() => change($, h => takeLoan(h))} />
-              : <Text color={tone.muted}>The finest manor in town.</Text>}
+            : <Button key="loan" plain label={`Ask Tom Mew to build a ${next.name} · ${fmtCoins(next.loan)} loan · ${next.maxCats} cats`}
+                onPress={() => change($, h => takeLoan(h))} />}
           <Text bold color={tone.accent}>Yard — strays drawn by your decor (pull {baitOf(home).total})</Text>
           {home.visitors.length === 0 && <Text color={tone.muted}>No strays right now. They come and go while you work.</Text>}
           {home.visitors.map(v => (
@@ -967,7 +965,7 @@ export const register: Register = (on, options) => {
           XP {bar((cat.xp / xpToNext(cat.level)) * 100, 10)} {cat.xp}/{xpToNext(cat.level)}
         </Text>
         <Text color={tone.coin}>
-          Coins {Math.floor(home.coins)} (+{coinRate(home).toFixed(1)}/min)
+          Coins {fmtCoins(home.coins)} (+{coinRate(home).toFixed(1)}/min)
           {freePoints(cat) > 0 ? ` · ${freePoints(cat)} skill point${freePoints(cat) > 1 ? 's' : ''} to spend (s)` : ''}
         </Text>
         <Text italic color={tone.log}>{home.log}</Text>
