@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/icon/claude-idle-cat-icon-256.png" alt="Claude Idle Cat icon" width="128" height="128"></p>
+
 # 😺 Claude Idle Cat
 
 > *Once upon a time, a stray cat lived in a cardboard box. Poor. Broke. Zero coins, one very damp box.*
