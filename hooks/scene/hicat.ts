@@ -155,6 +155,8 @@ export const drawHiCat = (c: SceneCanvas, x0: number, y0: number, cat: HiCat, f:
     if (!isSolid(x, y) && (isSolid(x - 1, y) || isSolid(x + 1, y) || isSolid(x, y - 1) || isSolid(x, y + 1))) outline.push([x, y])
   // Pointed coats darken ears, face, paws and tail as smooth shapes rather than the sprite's blocky rows.
   const isPointed = cat.genes.coat === 'siamese' || cat.genes.coat === 'ragdoll'
+  // Calico and tortoiseshell patches follow smooth waves instead of the sprite's diagonal blocks.
+  const isPatchy = cat.genes.coat === 'calico' || cat.genes.coat === 'tortoiseshell'
   const isPoint = (x: number, y: number) => y < 9 || ((x - 28) / 11) ** 2 + ((y - 24) / 8) ** 2 <= 1 || y >= 47 || (x >= 45 && y >= 34)
   const light = f.isLight ? 0xffffff : f.text
   const dark = f.crust
@@ -163,7 +165,10 @@ export const drawHiCat = (c: SceneCanvas, x0: number, y0: number, cat: HiCat, f:
     if (v === undefined) continue
     let color: number
     if (typeof v === 'number') color = v
-    else if (v === 'f' && isPointed) color = (isPoint(x, y) ? coatPixel(cat.genes, f, 'f', 5, 1) : coatPixel(cat.genes, f, 'f', 0, 8)) ?? f.peach
+    else if (v === 'f' && isPatchy) {
+      const n = Math.sin(x * 0.31 + 1.7) + Math.sin(y * 0.27 + x * 0.11) + Math.sin((x - y) * 0.19 + 0.6)
+      color = n > 0.9 ? f.peach : n < -0.8 ? mix(ink, f.surface1, 0.4) : coatPixel(cat.genes, f, 'f', 5, 0) ?? f.peach
+    } else if (v === 'f' && isPointed) color = (isPoint(x, y) ? coatPixel(cat.genes, f, 'f', 5, 1) : coatPixel(cat.genes, f, 'f', 0, 8)) ?? f.peach
     else if (v === 'f' || v === 'w') color = coatPixel(cat.genes, f, v, Math.floor(x / 4), Math.floor(y / 4)) ?? f.peach
     else if (v === 'E') color = coatPixel(cat.genes, f, 'E', x < 28 ? 3 : 10, 5) ?? f.green
     else color = v === 'K' ? ink : v === 'H' ? light : v === 'n' ? mix(f.pink, f.red, 0.35) : f.pink

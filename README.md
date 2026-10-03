@@ -224,6 +224,7 @@ hooks/adoption/             rarity/coat registry and shelter receipts
 hooks/scene/shelter.ts       parcel opening and adoption reveal scene
 hooks/scene/font.ts          3x5 pixel font for text drawn on the picture canvas
 hooks/scene/hicat.ts         the 4x active cat for the picture canvas, built from shapes
+hooks/scene/fine/            4x sky, yard, seasons and weather for the picture canvas
 hooks/mods.ts                trait × skill multipliers the rules read
 hooks/skills.ts              skill tree, points, evolution forms
 hooks/home.ts                furniture catalog, daily shop, house tiers, Tom Mew loan
