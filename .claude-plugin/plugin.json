@@ -1,9 +1,16 @@
 {
   "name": "afk-cat",
-  "version": "0.3.0",
+  "displayName": "Claude Idle Cat",
+  "version": "0.0.1",
   "description": "A Tamagotchi-style AFK cat that lives in a Claude Code pane, earns coins while you idle and while Claude works",
   "author": {
     "name": "Andrew Liang"
+  },
+  "homepage": "https://github.com/CooLguNxDD/Claude-Idle-Cat",
+  "repository": "https://github.com/CooLguNxDD/Claude-Idle-Cat",
+  "license": "MIT",
+  "metadata": {
+    "claudeCode": "2.1.287"
   },
   "types": "./types/index.d.ts",
   "experimental": {
@@ -13,27 +20,14 @@
     "flavor": {
       "type": "string",
       "title": "Catppuccin flavor",
-      "description": "auto follows Claude Code's theme; daycycle is Latte by day, Frapp\u00e9 at dusk, Mocha at night",
-      "default": "auto",
-      "options": [
-        "auto",
-        "daycycle",
-        "latte",
-        "frappe",
-        "macchiato",
-        "mocha"
-      ]
+      "description": "auto follows Claude Code's theme; daycycle is Latte by day, Frappé at dusk, Mocha at night. Also latte, frappe, macchiato, mocha",
+      "default": "auto"
     },
     "skin": {
       "type": "string",
       "title": "Cat interface",
       "description": "full redraws the spinner, turn line, prompt hint, tool rows and a walking-cat band; light only the spinner, turn line and hint; off leaves Claude Code alone",
-      "default": "full",
-      "options": [
-        "full",
-        "light",
-        "off"
-      ]
+      "default": "full"
     },
     "sound": {
       "type": "boolean",
@@ -45,23 +39,13 @@
       "type": "string",
       "title": "Pane canvas",
       "description": "auto draws the scene as a 4x pixel picture where the terminal shows images (kitty, Ghostty) and as half-block cells elsewhere; image or text forces one",
-      "default": "auto",
-      "options": [
-        "auto",
-        "image",
-        "text"
-      ]
+      "default": "auto"
     },
     "reactions": {
       "type": "string",
       "title": "Claude reactions",
       "description": "on animates and shows lines; quiet animates; off disables reactions",
-      "default": "on",
-      "options": [
-        "on",
-        "quiet",
-        "off"
-      ]
+      "default": "on"
     }
   }
 }
