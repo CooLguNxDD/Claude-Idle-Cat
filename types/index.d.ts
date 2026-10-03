@@ -1,8 +1,8 @@
 export type EffectKind = 'hearts' | 'fish' | 'yarn' | 'coins' | 'levelup' | 'evolve' | 'shop' | 'adopt' | 'visitor' | 'welcome' | 'gift' | 'catch' | 'award' | 'birthday' | 'medal'
 export type Effect = { kind: EffectKind; at: number }
 
-export type Coat = 'ginger' | 'tabby' | 'grey' | 'black' | 'white' | 'cream' | 'calico' | 'tuxedo' | 'siamese'
-  | 'chocolate' | 'cinnamon' | 'silver' | 'smoke' | 'tortoiseshell' | 'ragdoll' | 'bengal' | 'lynx' | 'nebula'
+// A breed id from hooks/content/breeds; checked against the registry, not the type system.
+export type Coat = string
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'
 export type Marking = 'classic' | 'socks' | 'blaze' | 'mask' | 'spots'
 export type Silhouette = 'classic' | 'fluffy' | 'fold'
@@ -98,6 +98,8 @@ export type Home = {
   prefs: { glow: boolean; crt: boolean }
   weather: WeatherState
   shelter: Shelter
+  // Which world file the yard is drawn from; an unknown id falls back to the first world.
+  world: { id: string }
 }
 
 declare module 'claude-code' {

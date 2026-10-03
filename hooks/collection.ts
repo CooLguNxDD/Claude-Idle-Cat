@@ -1,4 +1,5 @@
 import type { Book, Home, Miles } from '../types'
+import { COATS } from './adoption/registry'
 import { CRITTERS } from './critters'
 import { dayOf, hasPhoto, friendLevel, PHOTO_LEVEL } from './friends'
 import { furniture, place, tierOf } from './home'
@@ -83,7 +84,8 @@ export const ACHIEVEMENTS: readonly Achievement[] = [
   { id: 'shiny', name: 'Sparkle', text: 'Meet a shiny cat', miles: 500, test: h => h.book.shinies.length > 0 },
   { id: 'coats5', name: 'Coat curious', text: 'See 5 coats', miles: 200, test: h => h.book.coats.length >= 5 },
   { id: 'coats9', name: 'Coat collector', text: 'See 9 coats', miles: 800, test: h => h.book.coats.length >= 9 },
-  { id: 'coats18', name: 'Full palette', text: 'See all 18 coats', miles: 1600, test: h => h.book.coats.length >= 18 },
+  { id: 'coats18', name: 'Full palette', text: 'See every coat', miles: 1600,
+    test: h => COATS.every(coat => h.book.coats.includes(coat)) },
   { id: 'museum5', name: 'Curator', text: 'Donate 5 critters', miles: 200, test: h => h.museum.length >= 5 },
   { id: 'museumall', name: 'Blathers would be proud', text: 'Complete the museum', miles: 2000,
     test: h => h.museum.length >= CRITTERS.length },

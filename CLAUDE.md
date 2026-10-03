@@ -10,6 +10,7 @@ npx -y -p typescript tsc -p .       # the mod (extends .claude-plugin/types/tsco
 npx -y -p typescript tsc -p web     # the browser runtime (DOM lib)
 claude plugin test .                # every hooks/**/*.test.ts
 node --test server/arcade.test.mjs   # local routes and browser-location permission flow
+node tools/build-content.mjs --check # hooks/content/index.ts lists every content file
 ```
 
 `.claude-plugin/types/` is written by the engine when the mod loads and is git-ignored. If it's missing, load the mod once (see below) before running `tsc -p .`.
@@ -34,6 +35,17 @@ On this machine `~/.claude/settings.json` sets `env.CLAUDE_CODE_PLUGIN_DIRS` to 
     - The mod pushes state to `POST /api/state`.
     - The server listens on 127.0.0.1 only. It checks the token and the Host header and caps request bodies. Keep all of that when adding routes.
 
+## Content registries (`hooks/content/`)
+
+- Each breed is one file in `hooks/content/breeds/<id>.ts` (`defineBreed`: label, rarity, theme shades, pattern). Shades are theme tokens or mixes, so every flavor works.
+- Each move preset is one file in `hooks/content/moves/<id>.ts` (`defineMove`: pose, cycle, speed, lift, seconds, `when`). `hooks/motion.ts` picks and steps moves; the motion lives in memory in `register.tsx`, never in the save.
+- Each world is one file in `hooks/content/worlds/<id>.ts` (`defineWorld`: width per tier, layers, slots, landmarks, perches). The scene draws the sky on the pane and the fence, decor, landmarks and cats on a world-wide `view()` scrolled by the camera.
+- Each named cat is one file in `hooks/content/cats/<id>.ts` (`defineCat`); it replaces a stray at `appears.odds`, rolled from its own seed so plain strays draw the same numbers.
+- The `breed-gen`, `cat-gen`, `move-gen` and `world-gen` skills in `.claude/skills/` write these files; keep them in step when a spec changes.
+- After adding or removing a content file run `node tools/build-content.mjs`; it rewrites `index.ts`, keeps existing entries in place and appends new ones, so seeded rolls stay stable.
+- `node tools/preview.mjs breed <id>` writes a portrait sheet PNG (rows are flavors); `move <id>` writes one cycle of frames. Look before committing.
+- Breeds are drawn in the browser too: rebuild `server/public/arcade.js` after changing one. An unknown coat paints as `FALLBACK_BREED`, so removing a file never breaks a save.
+
 ## Themes
 
 `themes/*.json` are generated from `hooks/theme.ts` (`claudeThemeOf`). After any palette or token change run `node tools/build-themes.mjs` and commit them.
@@ -50,6 +62,7 @@ The `ui.render` hooks on Claude Code's own components pass with `next(e)` when `
 
   Never write the store any other way.
 - A new field on `Home` needs a default in `newHome` and must survive `migrate` (`hooks/game.ts`, currently `version: 3`). Old saves don't have it.
+- `Home.world` holds only the world id; an unknown id draws the first world. The camera and the cat's motion live in memory in `register.tsx`.
 - `Home.weather` stores a rounded location, display units and checked current conditions. Weather is off by default; all HTTP wiring stays in `register.tsx`, and stale or unavailable data falls back to the seasonal yard.
 - `Home.shelter` stores successful paid pulls and the latest arrival receipt. Rarity comes from the coat registry. Optional markings/silhouettes default to classic, preserving old cat appearances. Failed adoptions never spend coins, consume RNG, or use a shiny charm.
 - Award arcade rounds only through `finishGame` in `hooks/arcade/rewards.ts`. It pays a round only if the mod started it (`arcade.open`), and it clamps both the time and the score, because browser input can't be trusted.

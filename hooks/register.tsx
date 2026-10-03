@@ -17,12 +17,21 @@ import { CATCHPHRASE_LEVEL, DAILY_CAP, GIFTS, LEVELS, NICKNAME_LEVEL, PHOTO_LEVE
   levelName, toNextLevel } from './friends'
 import type { Action } from './game'
 import { PERSONALITY_INFO, describeGenes } from './genes'
-import { COATS, COAT_REGISTRY, RARITIES, rarityBadge, rarityOf } from './adoption/registry'
+import { COATS, RARITIES, breedOf, rarityBadge, rarityOf } from './adoption/registry'
 import { revealedCat } from './adoption/state'
 import { LOAN_SHARE, SHOP_CLOSE, SHOP_OPEN, baitOf, dailyStock, fmtCoins, furniture, isShopOpen, maxCats, payLoan, place,
   takeLoan, tierAt, tierOf } from './home'
-import { PICTURE_SCALE, ROWS, frameCells, frameImage, sceneCols } from './scene'
+import { PICTURE_SCALE, ROWS, frameCells, frameImage, sceneCols, yardCols } from './scene'
 import type { RgbaImage } from './scene'
+import { CLASSIC_X } from './scene/cats'
+import { motionCtxOf, startMotion, stepMotion } from './motion'
+import { followCam, panCam } from './camera'
+import type { Camera } from './camera'
+import { setWorld } from './world'
+import { WORLDS } from './content'
+import { DESIGN } from './scene/fine/draw'
+import { seeded } from './rng'
+import type { Rng } from './rng'
 import { shelterCells, shelterImage } from './scene/shelter'
 import { CLIP_FOR, clipAsset, powershellArgv } from './sfx'
 import type { Clip } from './sfx'
@@ -56,6 +65,11 @@ const FORMS = ['ninja', 'royal', 'cloud', 'chonk']
 let latest: Home | null = null
 let cols = 34
 let frame = 0
+// Where the active cat is in the yard and what it is doing; kept in memory, never in the save.
+let motion = startMotion(CLASSIC_X)
+let motionRng: Rng | null = null
+// The pane's window onto the yard; it follows the cat until a pan holds it for a while.
+let camera: Camera = { x: 0, manualUntil: 0 }
 // What the frame loop paints: the pane's view, element and last frame, whether it is mounted, and an in-flight guard.
 const paint = { view: 'cat' as View, kind: 'raster' as SceneKind, last: '', isMounted: false, isBusy: false, busyAt: 0 }
 // Set once an Image scene draws its text alt: this terminal shows no pictures, so the pane keeps to the Raster.
@@ -218,9 +232,11 @@ const hourOf = (now: number) => new Date(now).getHours()
 
 type SceneKind = 'raster' | 'image'
 const sceneCellsOf = (home: Home, view: View, now: number, flavor: Flavor) => view === 'adopt'
-  ? shelterCells(home, now, frame, flavor, cols) : frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols })
+  ? shelterCells(home, now, frame, flavor, cols) : frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion,
+    camX: camera.x })
 const sceneImageOf = (home: Home, view: View, now: number, flavor: Flavor): RgbaImage => view === 'adopt'
-  ? shelterImage(home, now, frame, flavor, cols, PICTURE_SCALE) : frameImage({ home, now, tick: frame, hour: hourOf(now), flavor, cols })
+  ? shelterImage(home, now, frame, flavor, cols, PICTURE_SCALE)
+  : frameImage({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion, camX: camera.x })
 // A denied Image blit that names its alt means the terminal draws no pictures here.
 const isAltDeny = (deny: string) => /\balt\b|placeholder/i.test(deny)
 
@@ -351,7 +367,9 @@ const HELP = [
   '/cat import <file> — load a backup (your current save is backed up first)',
   '/cat weather <city> — real weather; system for device location, off to clear, refresh to update',
   '/cat theme <latte|frappe|macchiato|mocha> — switch Claude Code to that Catppuccin theme',
+  '/cat world [id] — list the worlds, or move the yard to another one',
   'In the pane: ‹ › tabs · q back · c a s h r b m g t visible tab shortcuts · f e n feed/pet/nap · p arcade · w cat list',
+  'On the Cat tab: j and l pan the yard · 0 follows the cat again',
 ].join('\n')
 
 // Sets Claude Code's own theme to one of this mod's Catppuccin themes, found in the theme row's options.
@@ -455,6 +473,12 @@ export const register: Register = (on, options) => {
       try {
         frame += 1
         const flavor = flavorAt(now)
+        // The active cat roams only while someone can see it.
+        if (paint.isMounted) {
+          motionRng ??= seeded(now)
+          motion = stepMotion(motion, motionCtxOf(latest, cols, hourOf(now)), motionRng)
+          camera = followCam(camera, Math.round(motion.x / DESIGN), 14, yardCols(latest, cols), cols, frame)
+        }
         // Skips the scene while the pane is closed and when a frame would repaint the same cells.
         if (paint.isMounted && paint.kind === 'raster') {
           const cells = sceneCellsOf(latest, paint.view, now, flavor)
@@ -495,6 +519,10 @@ export const register: Register = (on, options) => {
     }
     if (sub === 'export' || sub === 'import') return backupCommand($, sub, arg)
     if (sub === 'theme') return themeCommand($, arg)
+    if (sub === 'world') {
+      if (!arg) return { text: `Worlds: ${WORLDS.map(w => `${w.id} (${w.label})`).join(', ')}. Use /cat world <id>.` }
+      return { text: (await change($, h => setWorld(h, arg.trim().toLowerCase()))).log }
+    }
     if (sub === 'weather') {
       await routeTo($, 'weather')
       const result = await weatherCommand($, arg)
@@ -635,7 +663,7 @@ export const register: Register = (on, options) => {
         {home.shinyCharm && <Text color={tone.accent}>Shiny charm ready · your next shelter cat will sparkle.</Text>}
         <Text bold color={tone.title}>Rarity odds</Text>
         {Object.entries(RARITIES).map(([key, r]) => <Text key={`odds-${key}`} color={css(flavor[r.color])}>
-          {r.label} {r.odds}% · {COATS.filter(coat => COAT_REGISTRY[coat].rarity === key).map(coat => COAT_REGISTRY[coat].label).join(', ')}
+          {r.label} {r.odds}% · {COATS.map(breedOf).filter(b => b.rarity === key).map(b => b.label).join(', ')}
         </Text>)}
         <Text color={tone.muted}>Coats within each tier have equal odds. Markings and silhouettes vary independently. Shiny: 1/64, in any tier.</Text>
         <Text color={tone.muted}>Rarity is cosmetic. Personality keeps its usual bonuses.</Text>
@@ -659,9 +687,9 @@ export const register: Register = (on, options) => {
         {home.weather.location && <Text color={tone.muted}>{home.weather.location.label}</Text>}
         {reading && <Text color={tone.muted}>Updated {Math.max(0, Math.floor((now - reading.fetchedAt) / 60_000))} min ago · refreshes every 15 minutes</Text>}
         {home.weather.error && <Text color={tone.warn}>{home.weather.error}{!reading ? ' Using the seasonal yard.' : ''}</Text>}
-        {'Input' in ui ? <ui.Input key="weather-city" label="City" placeholder="London, GB" submitLabel="search"
+        {'Input' in ui ? <ui.Input key="weather-city" label="Search city" placeholder="e.g. Paris, FR" submitLabel="search"
           onSubmit={async value => { await searchWeather($, value) }} />
-          : <Text>Choose a city: /cat weather London, GB</Text>}
+          : <Text>Search a city: /cat weather {'<city>'}, e.g. Paris, FR</Text>}
         {home.weather.notice && <Text color={tone.muted}>{home.weather.notice}</Text>}
         {home.weather.candidates.map((location, i) => <Button key={`weather-city-${i + 1}`} plain
           label={`${i + 1}. ${location.label}`} onPress={async () => { await selectWeather($, location) }} />)}
@@ -973,6 +1001,16 @@ export const register: Register = (on, options) => {
           {freePoints(cat) > 0 ? ` · ${freePoints(cat)} skill point${freePoints(cat) > 1 ? 's' : ''} to spend (s)` : ''}
         </Text>
         <Text italic color={tone.log}>{home.log}</Text>
+        {yardCols(home, cols) > cols && (
+          <Box>
+            <Button key="pan-left" plain hotkey="j" label="◂ yard (j)"
+              onPress={() => { camera = panCam(camera, -1, yardCols(home, cols), cols, frame) }} />
+            <Button key="pan-follow" plain hotkey="0" label={`follow ${cat.name} (0)`}
+              onPress={() => { camera = { ...camera, manualUntil: 0 } }} />
+            <Button key="pan-right" plain hotkey="l" label="yard ▸ (l)"
+              onPress={() => { camera = panCam(camera, 1, yardCols(home, cols), cols, frame) }} />
+          </Box>
+        )}
         <Box>
           {ACTIONS.map(a => (
             <Button key={a.action} label={a.label} hotkey={a.hotkey}

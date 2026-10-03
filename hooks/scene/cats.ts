@@ -11,6 +11,12 @@ import { FLOOR_Y } from './canvas'
 import type { SceneCanvas } from './canvas'
 import { drawHiCat } from './hicat'
 import { DESIGN, pen } from './fine/draw'
+import { poseOf } from '../motion'
+import { worldOf } from '../world'
+import type { Motion } from '../motion'
+
+// The active cat's left edge, in design units, when nothing is moving it.
+export const CLASSIC_X = 8 * DESIGN
 
 export type CatScene = { cat: Cat; mood: ReturnType<typeof moodOf>; ox: number; oy: number; headRow: number; birthday: boolean }
 const TAIL: [number, number][][] = [
@@ -18,35 +24,38 @@ const TAIL: [number, number][][] = [
   [[15, 9], [15, 10], [14, 11], [13, 11]],
 ]
 
-const formBack = (form: Form | null, ox: number, oy: number, tick: number, f: Flavor, c: SceneCanvas) => {
-  if (form === 'royal') for (let y = 8; y <= 12; y++) for (const x of [0, 1, 12, 13]) c.put(ox + x, oy + y, f.mauve)
+// Puts one sprite pixel at (x, y) relative to the cat, mirrored when it faces right.
+type At = (x: number, y: number, color: number) => void
+
+const formBack = (form: Form | null, tick: number, f: Flavor, at: At) => {
+  if (form === 'royal') for (let y = 8; y <= 12; y++) for (const x of [0, 1, 12, 13]) at(x, y, f.mauve)
   if (form === 'cloud') {
     const lift = tick % 8 < 4 ? 0 : 1
     for (const [x, y] of [[-2, 7], [-1, 7], [-3, 8], [-2, 8], [-1, 8], [-2, 9]] as const) {
-      c.put(ox + x, oy + y - lift, f.lavender)
-      c.put(ox + 13 - x, oy + y - lift, f.lavender)
+      at(x, y - lift, f.lavender)
+      at(13 - x, y - lift, f.lavender)
     }
   }
-  if (form === 'chonk') for (let y = 8; y <= 11; y++) for (const x of [0, 13]) c.put(ox + x, oy + y, inkOf(f))
+  if (form === 'chonk') for (let y = 8; y <= 11; y++) for (const x of [0, 13]) at(x, y, inkOf(f))
 }
 
-const formFront = (form: Form | null, ox: number, oy: number, tick: number, f: Flavor, c: SceneCanvas) => {
+const formFront = (form: Form | null, tick: number, f: Flavor, at: At) => {
   if (form === 'ninja') {
-    for (let x = 2; x <= 11; x++) c.put(ox + x, oy + 3, f.red)
+    for (let x = 2; x <= 11; x++) at(x, 3, f.red)
     const flap = tick % 6 < 3 ? 0 : 1
-    c.put(ox + 13, oy + 3 + flap, f.red)
-    c.put(ox + 14, oy + 4 - flap, f.red)
+    at(13, 3 + flap, f.red)
+    at(14, 4 - flap, f.red)
   }
   if (form === 'royal') {
-    for (let x = 3; x <= 10; x++) c.put(ox + x, oy - 1, f.yellow)
-    for (const x of [3, 6, 7, 10]) c.put(ox + x, oy - 2, f.yellow)
-    c.put(ox + 6, oy - 1, f.red)
+    for (let x = 3; x <= 10; x++) at(x, -1, f.yellow)
+    for (const x of [3, 6, 7, 10]) at(x, -2, f.yellow)
+    at(6, -1, f.red)
   }
   if (form === 'cloud') {
     const glow = tick % 16 < 8 ? f.yellow : f.peach
-    for (let x = 4; x <= 9; x++) c.put(ox + x, oy - 2, glow)
-    c.put(ox + 3, oy - 1, glow)
-    c.put(ox + 10, oy - 1, glow)
+    for (let x = 4; x <= 9; x++) at(x, -2, glow)
+    at(3, -1, glow)
+    at(10, -1, glow)
   }
 }
 
@@ -60,53 +69,64 @@ const mini = (cat: Pick<Cat, 'genes'> & { isAsleep?: boolean }, x0: number, y0: 
   }))
 }
 
-export const drawCats = (c: SceneCanvas, home: Home, now: number, tick: number, f: Flavor): CatScene => {
+/** Draws the household; `motion` places and poses the active cat, else it sits at its classic spot. */
+export const drawCats = (c: SceneCanvas, home: Home, now: number, tick: number, f: Flavor, motion?: Motion): CatScene => {
   const cat = activeCat(home)
   const others = home.cats.filter(other => other.id !== cat.id)
-  if (others[0]) mini(others[0], 1, FLOOR_Y - 5, tick, f, c)
-  const fence = [26, 33, 40, 47].filter(x => x + 6 < c.w - 6)
+  const world = worldOf(home)
+  if (others[0]) mini(others[0], world.slots.bed + 1, FLOOR_Y - 5, tick, f, c)
+  const fence = world.perches.filter(x => x + 6 < c.w - 6)
   ;[...others.slice(1), ...home.visitors].slice(0, fence.length)
     .forEach((other, i) => mini(other, fence[i] ?? 26, 9, tick + i * 7, f, c))
 
   const mood = moodOf(cat)
   const stage = stageOf(cat.level)
-  const bob = mood === 'sleeping' ? 1 : tick % 16 < 8 ? 0 : 1
+  const pose = motion ? poseOf(motion) : null
+  const isMoving = pose?.kind === 'walk' || pose?.kind === 'run'
+  const bob = mood === 'sleeping' || pose?.kind === 'sleep' ? 1 : isMoving ? (pose.phase < 0.5 ? 0 : 1)
+    : tick % 16 < 8 ? 0 : 1
   const age = home.effect ? (now - home.effect.at) / 1000 : 99
   const jump = home.effect && ['yarn', 'levelup', 'adopt', 'evolve', 'welcome'].includes(home.effect.kind) && age < 2
     ? -Math.round(3 * Math.sin((age / 1.2) * Math.PI)) : 0
-  const ox = 8
-  const oy = 8 + bob + Math.min(0, jump)
-  const isBlink = mood === 'sleeping' || tick % 40 < 2
+  const x = motion?.x ?? CLASSIC_X
+  const lift = pose?.lift ?? 0
+  const ox = Math.round(x / DESIGN)
+  const oy = 8 + bob + Math.min(0, jump) + Math.round(lift / DESIGN) + (pose?.kind === 'crouch' || pose?.kind === 'loaf' ? 1 : 0)
+  const isMirrored = pose?.facing === 1
+  const at: At = (dx, dy, color) => c.put(ox + (isMirrored ? 15 - dx : dx), oy + dy, color)
+  const isBlink = mood === 'sleeping' || pose?.kind === 'sleep' || pose?.kind === 'groom' || tick % 40 < 2
   const form = formOf(cat)
   const birthday = isBirthday(cat, now)
+  if (motion?.isHidden) return { cat, mood, ox, oy, headRow: Math.floor(oy / 2), birthday }
   if (c.isFine) {
     // The picture canvas draws the cat from its spec; its bob is one design unit instead of a whole scene pixel.
     const p = pen(c)
-    p.disc(62, FLOOR_Y * DESIGN + 1.5, 30, 1.5, mix(f.crust, f.surface2, 0.45))
-    const fineY = (8 + Math.min(0, jump)) * DESIGN + (mood === 'sleeping' ? 2 : bob)
-    drawHiCat(p, ox * DESIGN, fineY, { genes: cat.genes, mood, form, isAdult: stage !== 'kitten', isBirthday: birthday,
-      isBlink, tick }, f)
+    p.disc(x + 30, FLOOR_Y * DESIGN + 1.5, 30, 1.5, mix(f.crust, f.surface2, 0.45))
+    const fineY = (8 + Math.min(0, jump)) * DESIGN + (mood === 'sleeping' ? 2 : bob) + lift
+    drawHiCat(p, x, fineY, { genes: cat.genes, mood, form, isAdult: stage !== 'kitten', isBirthday: birthday,
+      isBlink, tick, ...(pose ? { pose: { kind: pose.kind, phase: pose.phase, facing: pose.facing } } : {}) }, f)
     return { cat, mood, ox, oy, headRow: Math.floor(oy / 2), birthday }
   }
   // Small floor shadow makes the silhouette legible against rugs and quilts.
-  for (let x = 7; x < 24; x++) if (x % 3 !== 0) c.put(x, FLOOR_Y, mix(f.crust, f.surface2, 0.45))
-  formBack(form, ox, oy, tick, f, c)
+  for (let sx = ox - 1; sx < ox + 16; sx++) if (sx % 3 !== 0) c.put(sx, FLOOR_Y, mix(f.crust, f.surface2, 0.45))
+  formBack(form, tick, f, at)
   paneArtOf(cat.genes).frames[0]?.forEach((row, y) => [...row].forEach((ch, x) => {
     let token = ch
     if (token === 'E' && isBlink) token = 'o'
     if (token === 'p' && mood !== 'happy') token = 'f'
-    if (y === 7 && token === 'f' && stage !== 'kitten') return c.put(ox + x, oy + y, f.red)
-    if (token === 'o') return c.put(ox + x, oy + y, inkOf(f))
-    if (token === 'p') return c.put(ox + x, oy + y, f.pink)
-    if (token === 'n') return c.put(ox + x, oy + y, f.red)
+    if (y === 7 && token === 'f' && stage !== 'kitten') return at(x, y, f.red)
+    if (token === 'o') return at(x, y, inkOf(f))
+    if (token === 'p') return at(x, y, f.pink)
+    if (token === 'n') return at(x, y, f.red)
     const color = coatPixel(cat.genes, f, token, x, y)
-    if (color !== undefined) c.put(ox + x, oy + y, color)
+    if (color !== undefined) at(x, y, color)
   }))
-  if (mood === 'grumpy') for (const x of [3, 4, 8, 9]) c.put(ox + x, oy + 4, inkOf(f))
+  if (mood === 'grumpy') for (const gx of [3, 4, 8, 9]) at(gx, 4, inkOf(f))
   const tailColor = coatPixel(cat.genes, f, 'f', 12, 10) ?? f.peach
-  for (const [x, y] of TAIL[mood === 'sleeping' ? 0 : Math.floor(tick / 4) % 2] ?? []) c.put(ox + x, oy + y, tailColor)
-  formFront(form, ox, oy, tick, f, c)
+  const isTailStill = mood === 'sleeping' || pose?.kind === 'sleep' || pose?.kind === 'loaf'
+  for (const [tx, ty] of TAIL[isTailStill ? 0 : Math.floor(tick / (isMoving ? 2 : 4)) % 2] ?? []) at(tx, ty, tailColor)
+  formFront(form, tick, f, at)
   if (birthday) for (const [dx, dy] of [[6, -1], [7, -1], [8, -1], [7, -2], [7, -3]] as const)
-    c.put(ox + dx, oy + dy, dy === -3 ? f.yellow : f.mauve)
+    at(dx, dy, dy === -3 ? f.yellow : f.mauve)
   return { cat, mood, ox, oy, headRow: Math.floor(oy / 2), birthday }
 }

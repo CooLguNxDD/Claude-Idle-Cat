@@ -34,7 +34,9 @@ Then type `/cat` to open the pane. Meow.
 | `/cat weather refresh` | update weather now (at most once per minute) |
 | `/cat weather units c\|f` | choose Celsius/km/h or Fahrenheit/mph |
 | `/cat weather off` | stop weather requests and clear the saved location |
+| `/cat world [id]` | list the worlds, or move the yard to another world file |
 | `f` `e` `n` | Feed (5c) · Pet · Nap/Wake |
+| `j` / `l` / `0` | (Cat tab) pan the yard left / right · follow the cat again (it resumes on its own after 10 s) |
 | `p` | Play: opens the Arcade in your browser |
 | `o` | (Arcade tab) open or reopen the browser arcade |
 | `w` | open/close the cat list |
@@ -55,7 +57,7 @@ Short version: stats drop, coins pile up, cats judge you silently.
 
 - Stats drop and coins build up in real time. Time while you're away counts too, up to 8 hours.
 - Being away never hurts: stats stop at 25, so cats get grumpy but never sad. They'll forgive you. Eventually.
-- Every cat has genes: one of 18 coats, five possible markings, three silhouettes (classic, fluffy, folded ears), eye color, a personality that changes the rules, and a 1-in-64 chance of being shiny ✨. Existing cats retain their original appearance.
+- Every cat has genes: one of 19 coats (each one a breed file in `hooks/content/breeds/`), five possible markings, three silhouettes (classic, fluffy, folded ears), eye color, a personality that changes the rules, and a 1-in-64 chance of being shiny ✨. Existing cats retain their original appearance.
 - The household starts in a Cottage with room for 2 cats. Every cat earns coins. Yes, even the lazy one.
 
 ### 📦 Adopt tab (top-bar arrows, or `/cat shelter`)
@@ -64,7 +66,7 @@ Short version: stats drop, coins pile up, cats judge you silently.
 
 - Roll & adopt opens a pixel parcel and reveals one cat, its rarity and genes. The fee stays at 100c per cat already in your household. It is charged only on success; full houses and insufficient coins consume no roll or shiny charm.
 - Rarity odds: **Common 60%**, **Uncommon 25%**, **Rare 10%**, **Epic 4%**, **Legendary 1%**. Coats within a tier have equal odds; the full pool is visible in the tab. Rarity describes appearance and does not change stats or income.
-- New coats include chocolate, cinnamon, silver, smoke, tortoiseshell, ragdoll, bengal, lynx and the starry Nebula 🌌. Markings and silhouettes roll independently. Duplicate coats are possible, and every successful pull adds a cat; cats are never replaced.
+- New coats include russian blue, chocolate, cinnamon, silver, smoke, tortoiseshell, ragdoll, bengal, lynx and the starry Nebula 🌌. Markings and silhouettes roll independently. Duplicate coats are possible, and every successful pull adds a cat; cats are never replaced.
 - Shiny is a separate 1/64 roll in every rarity tier. The Paw Miles shiny charm guarantees the next successful shelter adoption is shiny.
 - The tab keeps your latest arrival card with Meet and Pull again buttons, shelter-pull count, house expansion link and free adoption of yard visitors. `q` returns to the tab you came from.
 
@@ -74,7 +76,9 @@ Short version: stats drop, coins pile up, cats judge you silently.
 
 - Nyan's shop is open 08:00–22:00 by your clock, with 4 new items every day.
 - Furniture goes in yard spots (bowl, bed, toy, rug, plant, something hanging) and changes the rules: an auto-feeder, sleep regen, coin boosts, slower joy decay, more AFK events, bigger gifts.
+- The yard is wider than the pane and grows with the house: 80 columns for the Cottage, 160 for the House, 240 for the Manor and every bigger house. The view follows the cat; a strip along the top shows where you are. The House unlocks a cat tower and a tunnel, the Manor a big pipe to lounge on, and the cat visits all of them by itself.
 - Tom Mew builds a bigger house (House, Manor, Villa, Mansion, Castle, Palace, and on forever) on an interest-free loan. Every house holds one more cat. The first loan is 400c and each one after doubles (800c, 1.6kc, …). A quarter of income pays it back, and there's no deadline. Best landlord in town.
+- Now and then a named cat drops by instead of a plain stray, like Captain Whiskers, a retired ship's cat with opinions about tuna. Named cats can be adopted too.
 - Stray cats visit the yard, drawn by your decor (each item attracts certain personalities). They sit on the fence for a few hours, leave a gift, and you can adopt them for free. Remember, you were one once.
 
 ### 🎁 Claude helps, and other ways to get paid
@@ -84,6 +88,7 @@ Short version: stats drop, coins pile up, cats judge you silently.
 - Each level gives a skill point for the Skills tab (`s`). There are three branches: **Hunter** (coins, AFK finds, gifts), **Cuddler** (joy, xp) and **Dreamer** (sleep, time away). Resetting skills costs coins.
 - Cats grow from kitten to cat (red collar) at level 5. At level 10 they evolve into the form of their strongest branch: **Ninja** 🥷 (headband), **Royal** 👑 (crown and cape) or **Cloud** ☁️ (halo and wings). A cat with no skills becomes a **Chonk**. (No shame. Chonk is a lifestyle.)
 - The terminal shows an animated pixel-art scene with a day, dusk and night sky that follows your clock. Other surfaces show an ASCII cat.
+- The active cat roams the yard on its own: it walks, trots, hops, pounces, grooms, stretches, loafs and gets the zoomies, picking moves by mood, personality and time of day. Hungry cats head for the bowl, tired ones for the bed, and a napping cat pads to its bed first.
 
 ### 💕 Friends tab (`r`)
 
@@ -101,7 +106,7 @@ Short version: stats drop, coins pile up, cats judge you silently.
 ### 🏅 Miles tab (`m`)
 
 - Five Paw Miles tasks a day, such as "pet 3 times" or "Claude runs 10 tools".
-- 20 achievements, three of them from the arcade, plus a Full palette reward for seeing all 18 coats.
+- 20 achievements, three of them from the arcade, plus a Full palette reward for seeing every coat.
 - A Miles shop with exclusive furniture and a shiny charm.
 
 ### 🕹️ Arcade tab (`g`, or Play `p`)
@@ -226,6 +231,14 @@ hooks/scene/season.ts        seasonal particles when live weather permits them
 hooks/genes.ts               coats, eyes, personalities, shiny odds, coat painting
 hooks/genes/paint.ts         themed coat colors and deterministic markings
 hooks/adoption/             rarity/coat registry and shelter receipts
+hooks/content/breeds/*.ts    one file per coat: label, rarity, theme shades and pattern
+hooks/content/moves/*.ts     one file per move preset: pose, cycle, speed, lift, duration and when it is picked
+hooks/content/cats/*.ts      one file per named cat: fixed genes, bio, catchphrase and how often it visits
+hooks/content/worlds/*.ts    one file per world: width per tier, far layers, furniture slots, landmarks, fence perches
+hooks/world.ts + camera.ts   pure world lookup, landmark unlocks and the follow/pan camera
+hooks/scene/layers.ts        parallax hills, trees and rooftops; scene/landmarks.ts draws the tower, tunnel and pipe
+hooks/motion.ts              pure move planner: picks the next move and steps the cat's position each frame
+hooks/content/index.ts       generated list of every content file (build: node tools/build-content.mjs)
 hooks/scene/shelter.ts       parcel opening and adoption reveal scene
 hooks/scene/font.ts          3x5 pixel font for text drawn on the picture canvas
 hooks/scene/hicat.ts         the active cat's spec for the picture canvas, built from shapes
@@ -257,6 +270,8 @@ hooks/arcade/prizes.ts       random prizes a paid round can win for the cat
 assets/sfx/*.wav             the clips
 tools/gen-sfx.mjs            regenerates the clips
 tools/build-art.mjs          regenerates 24 deterministic 320×180 PNG backgrounds
+tools/build-content.mjs      regenerates hooks/content/index.ts; --check fails when it is stale
+tools/preview.mjs            renders a breed sheet, a move strip, a world panorama or a named cat's portrait to a PNG for a look before committing
 tools/build-themes.mjs       writes themes/*.json (Claude Code custom themes) from hooks/theme.ts
 themes/*.json                the four Catppuccin Claude Code themes (generated, committed)
 hooks/rng.ts                 seeded random numbers (repeatable tests)
@@ -273,9 +288,21 @@ Want to build a tunnel of your own? Run these before you commit:
 claude plugin validate .
 claude plugin test .
 node --test server/arcade.test.mjs
+node tools/build-content.mjs --check
 node tools/build-art.mjs
 node tools/build-web.mjs
 ```
+
+### 🧶 Generator skills
+
+New content is a data file, and four project skills in `.claude/skills/` write one for you in a Claude Code session in this repo. Each writes the file, registers it with `node tools/build-content.mjs`, renders a preview with `node tools/preview.mjs`, then runs the checks.
+
+| Skill | Ask for | Writes |
+| --- | --- | --- |
+| `breed-gen` | a coat: colours, pattern, rarity | `hooks/content/breeds/<id>.ts` |
+| `cat-gen` | a named character who visits the yard | `hooks/content/cats/<id>.ts` |
+| `move-gen` | a move or animation for the roaming cat | `hooks/content/moves/<id>.ts` |
+| `world-gen` | a themed yard with layers and landmarks | `hooks/content/worlds/<id>.ts` |
 
 To type-check, load the plugin once with `--plugin-dir`. That writes `.claude-plugin/types/` (git-ignored). Then run `npx -p typescript@5 tsc -p .`.
 
