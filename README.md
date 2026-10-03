@@ -1,4 +1,4 @@
-# 😺 Claude Idle Cat
+# Claude Idle Cat
 
 > *Once upon a time, a stray cat lived in a cardboard box. Poor. Broke. Zero coins, one very damp box.*
 > *So the cats collect one coin at a time.* 🏗️🐾
