@@ -4,8 +4,6 @@ export const MAX_COLS = 56
 export const HEIGHT = ROWS * 2
 export const FLOOR_Y = 21
 const UPPER_HALF = 0x2580
-// Image pixels per scene pixel: a cell becomes 4x8, room for a 3x5 glyph and its shadow.
-export const IMAGE_SCALE = 4
 
 export const sceneCols = (bodyColumns: number | undefined) =>
   Math.max(MIN_COLS, Math.min(MAX_COLS, (bodyColumns ?? MIN_COLS) - 2))
@@ -16,7 +14,8 @@ type Overlay = { ch: string; fg: number }
 export type RgbaImage = { rgba: string; width: number; height: number }
 export type SceneCanvas = {
   w: number
-  /** True when the canvas also keeps 4x detail for the picture; `fine` draws there. */
+  /** Device pixels per scene pixel: 1 for half-block cells, more for a picture; `fine` draws at it. */
+  scale: number
   isFine: boolean
   put: (x: number, y: number, c: number) => void
   fine: (x: number, y: number, c: number) => void
@@ -36,26 +35,27 @@ const toBase64 = (bytes: Uint8Array) => {
   return out
 }
 
-export const canvas = (w: number, isFine = false): SceneCanvas => {
+export const canvas = (w: number, scale = 1): SceneCanvas => {
+  const k = Math.max(1, Math.round(scale))
   const px = new Uint32Array(w * HEIGHT)
-  const fw = w * IMAGE_SCALE
-  const fh = HEIGHT * IMAGE_SCALE
-  // The 4x layer: every put fills its block, so later coarse layers still cover fine ones.
-  const hi = isFine ? new Uint32Array(fw * fh) : null
+  const fw = w * k
+  const fh = HEIGHT * k
+  // The scaled layer: every put fills its block, so later coarse layers still cover fine ones.
+  const hi = k > 1 ? new Uint32Array(fw * fh) : null
   const over = new Map<number, Overlay>()
   return {
     w,
-    isFine,
+    scale: k,
+    isFine: k > 1,
     put: (x, y, c) => {
       if (x < 0 || x >= w || y < 0 || y >= HEIGHT) return
       px[y * w + x] = c
-      if (hi) for (let dy = 0; dy < IMAGE_SCALE; dy++)
-        hi.fill(c, (y * IMAGE_SCALE + dy) * fw + x * IMAGE_SCALE, (y * IMAGE_SCALE + dy) * fw + (x + 1) * IMAGE_SCALE)
+      if (hi) for (let dy = 0; dy < k; dy++) hi.fill(c, (y * k + dy) * fw + x * k, (y * k + dy) * fw + (x + 1) * k)
     },
     fine: (x, y, c) => {
       if (x < 0 || x >= fw || y < 0 || y >= fh) return
       if (hi) hi[y * fw + x] = c
-      else px[Math.floor(y / IMAGE_SCALE) * w + Math.floor(x / IMAGE_SCALE)] = c
+      else px[y * w + x] = c
     },
     text: (col, row, value, fg) => {
       ;[...value].forEach((ch, i) => {
@@ -76,7 +76,7 @@ export const canvas = (w: number, isFine = false): SceneCanvas => {
       return toBase64(new Uint8Array(cells.buffer))
     },
     image: shadow => {
-      const s = IMAGE_SCALE
+      const s = k
       const width = w * s
       const out = new Uint8Array(width * HEIGHT * s * 4)
       const dot = (x: number, y: number, c: number) => {
@@ -88,13 +88,16 @@ export const canvas = (w: number, isFine = false): SceneCanvas => {
       }
       for (let y = 0; y < HEIGHT * s; y++) for (let x = 0; x < width; x++)
         dot(x, y, (hi ? hi[y * width + x] : px[Math.floor(y / s) * w + Math.floor(x / s)]) ?? 0)
-      // Text overlays draw as pixel glyphs centred in their cell, over the scene rather than replacing it.
+      // Text overlays draw as pixel glyphs centred in their cell, grown in whole steps on larger scales.
+      const g = Math.max(1, Math.floor(s / 4))
+      const safe = (x: number, y: number, c: number) => { if (x >= 0 && x < width && y >= 0 && y < HEIGHT * s) dot(x, y, c) }
       over.forEach(({ ch, fg }, at) => {
-        const x0 = (at % w) * s + ((s - 3) >> 1)
-        const y0 = Math.floor(at / w) * 2 * s + ((2 * s - 5) >> 1)
+        const x0 = (at % w) * s + ((s - 3 * g) >> 1)
+        const y0 = Math.floor(at / w) * 2 * s + ((2 * s - 5 * g) >> 1)
         const lit = glyphPixels(ch)
-        lit.forEach(([x, y]) => dot(x0 + x + 1, y0 + y + 1, shadow))
-        lit.forEach(([x, y]) => dot(x0 + x, y0 + y, fg))
+        for (const [color, off] of [[shadow, g], [fg, 0]] as const) lit.forEach(([x, y]) => {
+          for (let dy = 0; dy < g; dy++) for (let dx = 0; dx < g; dx++) safe(x0 + x * g + dx + off, y0 + y * g + dy + off, color)
+        })
       })
       return { rgba: toBase64(out), width, height: HEIGHT * s }
     },

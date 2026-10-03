@@ -31,3 +31,11 @@ test('the 4x yard animates from frame to frame', async () => {
   const at = (tick: number) => frameImage({ home: withWeather('rain', now), now, tick, hour: 23, flavor: FLAVORS.mocha, cols: 40 }).rgba
   expect(at(1)).not.toBe(at(2))
 })
+
+test('one yard spec renders at 1x, 2x, 4x and 8x', async () => {
+  const now = new Date(2026, 4, 15, 12).getTime()
+  for (const scale of [1, 2, 4, 8]) {
+    const frame = frameImage({ home: withWeather('rain', now), now, tick: 5, hour: 12, flavor: FLAVORS.mocha, cols: 34, scale })
+    expect([frame.width, frame.height]).toEqual([34 * scale, 24 * scale])
+  }
+})

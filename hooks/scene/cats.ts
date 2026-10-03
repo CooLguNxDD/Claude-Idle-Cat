@@ -10,6 +10,7 @@ import type { Flavor } from '../theme'
 import { FLOOR_Y } from './canvas'
 import type { SceneCanvas } from './canvas'
 import { drawHiCat } from './hicat'
+import { DESIGN, pen } from './fine/draw'
 
 export type CatScene = { cat: Cat; mood: ReturnType<typeof moodOf>; ox: number; oy: number; headRow: number; birthday: boolean }
 const TAIL: [number, number][][] = [
@@ -79,11 +80,11 @@ export const drawCats = (c: SceneCanvas, home: Home, now: number, tick: number, 
   const form = formOf(cat)
   const birthday = isBirthday(cat, now)
   if (c.isFine) {
-    // The picture canvas draws the 4x cat; its bob is one fine pixel instead of a whole scene pixel.
-    for (let x = 32; x < 92; x++) for (let y = 0; y < 3; y++)
-      if (((x - 62) / 30) ** 2 + ((y - 1) / 2) ** 2 <= 1) c.fine(x, FLOOR_Y * 4 + y, mix(f.crust, f.surface2, 0.45))
-    const fineY = (8 + Math.min(0, jump)) * 4 + (mood === 'sleeping' ? 2 : bob)
-    drawHiCat(c, ox * 4, fineY, { genes: cat.genes, mood, form, isAdult: stage !== 'kitten', isBirthday: birthday,
+    // The picture canvas draws the cat from its spec; its bob is one design unit instead of a whole scene pixel.
+    const p = pen(c)
+    p.disc(62, FLOOR_Y * DESIGN + 1.5, 30, 1.5, mix(f.crust, f.surface2, 0.45))
+    const fineY = (8 + Math.min(0, jump)) * DESIGN + (mood === 'sleeping' ? 2 : bob)
+    drawHiCat(p, ox * DESIGN, fineY, { genes: cat.genes, mood, form, isAdult: stage !== 'kitten', isBirthday: birthday,
       isBlink, tick }, f)
     return { cat, mood, ox, oy, headRow: Math.floor(oy / 2), birthday }
   }

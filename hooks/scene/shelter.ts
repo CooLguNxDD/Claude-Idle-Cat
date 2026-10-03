@@ -9,8 +9,8 @@ import type { Flavor } from '../theme'
 import { canvas, HEIGHT } from './canvas'
 import type { RgbaImage, SceneCanvas } from './canvas'
 
-const drawShelter = (home: Home, now: number, tick: number, f: Flavor, cols: number, isFine = false): SceneCanvas => {
-  const c = canvas(cols, isFine)
+const drawShelter = (home: Home, now: number, tick: number, f: Flavor, cols: number, scale = 1): SceneCanvas => {
+  const c = canvas(cols, scale)
   const cat = revealedCat(home)
   const age = home.shelter.last ? Math.max(0, (now - home.shelter.last.at) / 1000) : Infinity
   const accent = cat ? f[RARITIES[rarityOf(cat.genes)].color] : f.mauve
@@ -47,5 +47,5 @@ const drawShelter = (home: Home, now: number, tick: number, f: Flavor, cols: num
 
 export const shelterCells = (home: Home, now: number, tick: number, f: Flavor, cols: number): string =>
   drawShelter(home, now, tick, f, cols).pack()
-export const shelterImage = (home: Home, now: number, tick: number, f: Flavor, cols: number): RgbaImage =>
-  drawShelter(home, now, tick, f, cols, true).image(inkOf(f))
+export const shelterImage = (home: Home, now: number, tick: number, f: Flavor, cols: number, scale: number): RgbaImage =>
+  drawShelter(home, now, tick, f, cols, scale).image(inkOf(f))

@@ -21,7 +21,7 @@ import { COATS, COAT_REGISTRY, RARITIES, rarityBadge, rarityOf } from './adoptio
 import { revealedCat } from './adoption/state'
 import { LOAN_SHARE, SHOP_CLOSE, SHOP_OPEN, TIERS, baitOf, dailyStock, furniture, isShopOpen, maxCats, payLoan, place,
   takeLoan, tierOf } from './home'
-import { ROWS, frameCells, frameImage, sceneCols } from './scene'
+import { PICTURE_SCALE, ROWS, frameCells, frameImage, sceneCols } from './scene'
 import type { RgbaImage } from './scene'
 import { shelterCells, shelterImage } from './scene/shelter'
 import { CLIP_FOR, clipAsset, powershellArgv } from './sfx'
@@ -219,7 +219,7 @@ type SceneKind = 'raster' | 'image'
 const sceneCellsOf = (home: Home, view: View, now: number, flavor: Flavor) => view === 'adopt'
   ? shelterCells(home, now, frame, flavor, cols) : frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols })
 const sceneImageOf = (home: Home, view: View, now: number, flavor: Flavor): RgbaImage => view === 'adopt'
-  ? shelterImage(home, now, frame, flavor, cols) : frameImage({ home, now, tick: frame, hour: hourOf(now), flavor, cols })
+  ? shelterImage(home, now, frame, flavor, cols, PICTURE_SCALE) : frameImage({ home, now, tick: frame, hour: hourOf(now), flavor, cols })
 // A denied Image blit that names its alt means the terminal draws no pictures here.
 const isAltDeny = (deny: string) => /\balt\b|placeholder/i.test(deny)
 

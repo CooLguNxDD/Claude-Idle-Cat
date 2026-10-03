@@ -181,6 +181,8 @@ In kitty and Ghostty the pane's scene draws as a real pixel picture at 4× the h
 | `image` | always a picture |
 | `text` | always half-block cells |
 
+The picture's art is a spec, not a bitmap: shapes are laid out on a design grid of 4 units per scene pixel and rasterized at whatever scale the canvas has, with outlines and dithering kept one crisp pixel. `PICTURE_SCALE` in `hooks/scene.ts` sets the detail (2, 4 or 8 all render from the same spec).
+
 ## 🔊 Sound
 
 Short chiptune clips play on level-up, evolution, adoption, achievements, birthdays, gifts and critter finds. Turn them off in `/config` → **Sound effects**.
@@ -223,8 +225,8 @@ hooks/genes/paint.ts         themed coat colors and deterministic markings
 hooks/adoption/             rarity/coat registry and shelter receipts
 hooks/scene/shelter.ts       parcel opening and adoption reveal scene
 hooks/scene/font.ts          3x5 pixel font for text drawn on the picture canvas
-hooks/scene/hicat.ts         the 4x active cat for the picture canvas, built from shapes
-hooks/scene/fine/            4x sky, yard, seasons and weather for the picture canvas
+hooks/scene/hicat.ts         the active cat's spec for the picture canvas, built from shapes
+hooks/scene/fine/            the picture's art spec: a design grid pen, sky, yard, seasons, weather
 hooks/mods.ts                trait × skill multipliers the rules read
 hooks/skills.ts              skill tree, points, evolution forms
 hooks/home.ts                furniture catalog, daily shop, house tiers, Tom Mew loan
