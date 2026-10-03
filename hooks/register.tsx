@@ -904,7 +904,7 @@ export const register: Register = (on, options) => {
           {header}
           <Text italic color={tone.title}>{cat.name}: "{dialogue(cat, now, hourOf(now))}"</Text>
           {home.cats.map(c => {
-            const next = toNextLevel(c.friendship)
+            const nextLevel = toNextLevel(c.friendship)
             const points = c.daily.day === day ? c.daily.points : 0
             const gifted = c.daily.day === day && c.daily.gifted
             const level = friendLevel(c.friendship)
@@ -913,7 +913,7 @@ export const register: Register = (on, options) => {
                 <Button key={`friend-${c.id}`} plain label={`${c.id === cat.id ? '▸' : ' '} ${c.name} · ${levelName(c.friendship)} (${level}/${LEVELS.length})`}
                   onPress={() => change($, prev => switchTo(prev, c.id))} />
                 <Text color={tone.accent}>
-                  {'   '}{next ? `${bar(((c.friendship - (LEVELS[level - 1]?.at ?? 0)) / (next.at - (LEVELS[level - 1]?.at ?? 0))) * 100, 10)} ${next.need} to go` : '★ best friends'}
+                  {'   '}{nextLevel ? `${bar(((c.friendship - (LEVELS[level - 1]?.at ?? 0)) / (nextLevel.at - (LEVELS[level - 1]?.at ?? 0))) * 100, 10)} ${nextLevel.need} to go` : '★ best friends'}
                   {' · '}today {points}/{DAILY_CAP}{gifted ? ' · gifted ✓' : ''}
                 </Text>
                 <Text color={tone.muted}>
@@ -936,7 +936,7 @@ export const register: Register = (on, options) => {
 
     if (view === 'home') {
       const tier = tierOf(home)
-      const next = tierAt(home.tier + 1)
+      const nextTier = tierAt(home.tier + 1)
       const hour = hourOf(now)
       const isOpen = isShopOpen(hour)
       const stock = dailyStock(now)
@@ -955,7 +955,7 @@ export const register: Register = (on, options) => {
                 <Text color={tone.warn}>Tom Mew loan: {fmtCoins(Math.ceil(home.loan))} left ({LOAN_SHARE * 100}% of income pays it) </Text>
                 <Button key="pay" plain label="Pay 100c" onPress={() => change($, prev => payLoan(prev, 100))} />
               </Box>
-            : <Button key="loan" plain label={`Ask Tom Mew to build a ${next.name} · ${fmtCoins(next.loan)} loan · ${next.maxCats} cats`}
+            : <Button key="loan" plain label={`Ask Tom Mew to build a ${nextTier.name} · ${fmtCoins(nextTier.loan)} loan · ${nextTier.maxCats} cats`}
                 onPress={() => change($, prev => takeLoan(prev))} />}
           <Text bold color={tone.accent}>Yard — strays drawn by your decor (pull {baitOf(home).total})</Text>
           {home.visitors.length === 0 && <Text color={tone.muted}>No strays right now. They come and go while you work.</Text>}

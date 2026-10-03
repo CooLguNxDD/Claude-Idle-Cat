@@ -268,7 +268,7 @@ Where everything lives in the playground:
 
 ```
 .claude-plugin/plugin.json   manifest (plugin name: afk-cat)
-.claude-plugin/icon.png      square listing icon, drawn from the pane cat
+.claude-plugin/                 also holds the square listing icon, drawn from the pane cat
 types/index.d.ts             Home and Cat state contract ($.state)
 hooks/hooks.json             names the hooks module
 hooks/register.tsx           wiring: session.start, /cat, tool.call, turn.complete, Pane render, timers
