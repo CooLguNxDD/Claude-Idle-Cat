@@ -4,6 +4,8 @@ import { PERSONALITIES, rollGenes } from './genes'
 import { baitOf, homeMods } from './home'
 import { NAMED_CATS } from './content'
 import type { NamedCat } from './content/types'
+import { isContentAvailable } from './content/availability'
+import { breedOf } from './adoption/registry'
 import { pick, seeded, weighted } from './rng'
 import { worldOf } from './world'
 import type { Rng } from './rng'
@@ -25,6 +27,7 @@ const namedVisitor = (home: Home, now: number, taken: ReadonlySet<string>): Name
   const world = worldOf(home).id
   const roll = seeded(home.nextId * 7919 + Math.floor(now / HOUR))
   for (const cat of NAMED_CATS) {
+    if (!isContentAvailable(cat.appears.available, now) || !isContentAvailable(breedOf(cat.genes.coat).available, now)) continue
     if (taken.has(cat.name) || (cat.appears.worlds && !cat.appears.worlds.includes(world))) continue
     if (roll() < cat.appears.odds) return cat
   }
@@ -48,7 +51,7 @@ export const stepVisitors = (home: Home, now: number, minutes: number, rng: Rng)
   const weights = Object.fromEntries(PERSONALITIES.map(p => [p, 1 + (likes[p] ?? 0)])) as Record<Personality, number>
   let missed = 0
   while (arrivals-- > 0) {
-    const genes = { ...rollGenes(rng), personality: weighted(rng, weights) }
+    const genes = { ...rollGenes(rng, now), personality: weighted(rng, weights) }
     const gift = giftFor(home, genes.personality, rng)
     // Long absences: extra strays visited and left already, paying their gift.
     if (next.visitors.length >= maxVisitors(home)) {

@@ -1,4 +1,5 @@
-import type { LandmarkKind } from '../content/types'
+import type { LandmarkKind, SceneStyle } from '../content/types'
+import { landmarkFlavor } from './styles'
 import { inkOf, mix } from '../theme'
 import type { Flavor } from '../theme'
 import type { SceneCanvas } from './canvas'
@@ -44,7 +45,16 @@ const DRAWERS: Record<LandmarkKind, (p: Pen, x: number, f: Flavor, tick: number)
 }
 
 /** Draws unlocked landmarks on the world-wide canvas. */
-export const drawLandmarks = (c: SceneCanvas, landmarks: readonly Landmark[], f: Flavor, tick: number) => {
+export const drawLandmarks = (c: SceneCanvas, landmarks: readonly Landmark[], f: Flavor, tick: number, style?: SceneStyle) => {
   const p = pen(c)
-  for (const l of landmarks) DRAWERS[l.kind]?.(p, l.x * DESIGN, f, tick)
+  const colors = landmarkFlavor(style, f)
+  for (const l of landmarks) {
+    const x = l.x * DESIGN
+    DRAWERS[l.kind]?.(p, x, colors, tick)
+    const top = FLOOR - (l.kind === 'tower' ? 28 : l.kind === 'pipe' ? 30 : 24)
+    if (style === 'snowy-cabin') p.rect(x + 4, top - 2, l.w * DESIGN - 8, 2, f.isLight ? f.base : f.text)
+    if (style === 'neon-alley') p.rect(x + 4, top, l.w * DESIGN - 8, 1, tick % 16 < 12 ? f.pink : f.sky)
+    if (style === 'space-station') for (let dx = 8; dx < l.w * DESIGN - 8; dx += 12) p.dot(x + dx, top + 3, f.yellow)
+    if (style === 'beach-pier') for (let dx = 8; dx < l.w * DESIGN - 8; dx += 12) p.line(x + dx, top + 2, x + dx, top + 5, f.maroon)
+  }
 }

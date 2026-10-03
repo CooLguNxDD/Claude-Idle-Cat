@@ -1,6 +1,6 @@
 // Renders a content preview PNG to look at before committing: node tools/preview.mjs <breed|move|world|cat> <id> [--out <dir>]
 // Breed: a row per flavor in every marking and silhouette. Move: one cycle, facing left then right.
-// World: the whole manor-size yard in every flavor, at noon and at night. Cat: a named cat's portrait in every flavor.
+// World: manor yard in every flavor at noon and midnight in June, October and December. Cat: portraits in every flavor.
 import { execSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -40,12 +40,14 @@ export const card = (id) => {
     return c.image(f.base)
   })]
 }
-// The full manor yard as one wide pane, at noon and at midnight in each flavor.
+// Summer, Halloween and Christmas, at noon and midnight in each flavor.
 export const panorama = (id) => {
-  const home = { ...newHome(Date.UTC(2026, 5, 1)), tier: 2, world: { id } }
   const cols = WORLDS.find(w => w.id === id).width.manor
-  return FLAVOR_NAMES.flatMap(name => [12, 0].map(hour => [frameImage({ home, now: home.lastTick, tick: 0, hour,
-    flavor: FLAVORS[name], cols })]))
+  return FLAVOR_NAMES.flatMap(name => [5, 9, 11].flatMap(month => [12, 0].map(hour => {
+    const now = new Date(2026, month, 15, hour).getTime()
+    const home = { ...newHome(now), tier: 2, world: { id } }
+    return [frameImage({ home, now, tick: 0, hour, flavor: FLAVORS[name], cols })]
+  })))
 }
 // One cycle of a move at 8x on the classic ginger cat in mocha, with its lift, facing left then right.
 export const strip = (id) => {
@@ -120,6 +122,6 @@ mkdirSync(out, { recursive: true })
 const file = join(out, `${kind}-${id}.png`)
 writeFileSync(file, png)
 const LEGEND = { breed: 'rows: latte, frappe, macchiato, mocha; columns: markings x silhouettes',
-  move: 'rows: facing left, facing right; columns: cycle frames', world: 'rows: each flavor at noon, then midnight',
+  move: 'rows: facing left, facing right; columns: cycle frames', world: 'rows: each flavor in June, October, December, at noon then midnight',
   cat: 'columns: latte, frappe, macchiato, mocha' }
 console.log(`wrote ${file} (${LEGEND[kind]})`)

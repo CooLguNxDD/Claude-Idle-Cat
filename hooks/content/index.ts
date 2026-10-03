@@ -18,6 +18,15 @@ import breedBengal from './breeds/bengal'
 import breedLynx from './breeds/lynx'
 import breedNebula from './breeds/nebula'
 import breedRussianBlue from './breeds/russian-blue'
+import breedBlueCream from './breeds/blue-cream'
+import breedCalicoVoid from './breeds/calico-void'
+import breedCopperBengal from './breeds/copper-bengal'
+import breedGhost from './breeds/ghost'
+import breedGoldenGlitch from './breeds/golden-glitch'
+import breedMoonSmoke from './breeds/moon-smoke'
+import breedSnowshoe from './breeds/snowshoe'
+import breedStarpoint from './breeds/starpoint'
+import breedTigerTabby from './breeds/tiger-tabby'
 import moveGroom from './moves/groom'
 import moveHop from './moves/hop'
 import moveLoaf from './moves/loaf'
@@ -34,7 +43,16 @@ import moveTunnelDash from './moves/tunnel-dash'
 import moveProwl from './moves/prowl'
 import worldBackyard from './worlds/backyard'
 import worldRooftops from './worlds/rooftops'
+import worldBeachPier from './worlds/beach-pier'
+import worldNeonAlley from './worlds/neon-alley'
+import worldSnowyCabin from './worlds/snowy-cabin'
+import worldSpaceStation from './worlds/space-station'
 import catCaptainWhiskers from './cats/captain-whiskers'
+import catAdmiralClaw from './cats/admiral-claw'
+import catBoo from './cats/boo'
+import catMerlinMeow from './cats/merlin-meow'
+import catNova from './cats/nova'
+import catPixel from './cats/pixel'
 import type { Breed, Move, World, NamedCat } from './types'
 
 export const BREEDS: readonly Breed[] = [
@@ -57,6 +75,15 @@ export const BREEDS: readonly Breed[] = [
   breedLynx,
   breedNebula,
   breedRussianBlue,
+  breedBlueCream,
+  breedCalicoVoid,
+  breedCopperBengal,
+  breedGhost,
+  breedGoldenGlitch,
+  breedMoonSmoke,
+  breedSnowshoe,
+  breedStarpoint,
+  breedTigerTabby,
 ]
 export const MOVES: readonly Move[] = [
   moveGroom,
@@ -77,7 +104,16 @@ export const MOVES: readonly Move[] = [
 export const WORLDS: readonly World[] = [
   worldBackyard,
   worldRooftops,
+  worldBeachPier,
+  worldNeonAlley,
+  worldSnowyCabin,
+  worldSpaceStation,
 ]
 export const NAMED_CATS: readonly NamedCat[] = [
   catCaptainWhiskers,
+  catAdmiralClaw,
+  catBoo,
+  catMerlinMeow,
+  catNova,
+  catPixel,
 ]

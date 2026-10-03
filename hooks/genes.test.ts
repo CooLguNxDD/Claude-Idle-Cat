@@ -8,13 +8,15 @@ import { seeded } from './rng'
 import { FLAVORS } from './theme'
 import { COATS } from './adoption/registry'
 
+const NOW = new Date(2026, 9, 15, 12).getTime()
+
 test('rolls cover every coat and land near the shiny odds', async () => {
   const rng = seeded(42)
   const coats = new Set<Coat>()
   let shiny = 0
   const n = 10_000
   for (let i = 0; i < n; i++) {
-    const g = rollGenes(rng)
+    const g = rollGenes(rng, NOW)
     coats.add(g.coat)
     if (g.isShiny) shiny++
   }
@@ -24,7 +26,7 @@ test('rolls cover every coat and land near the shiny odds', async () => {
 })
 
 test('the same seed gives the same cat', async () => {
-  expect(rollGenes(seeded(5))).toEqual(rollGenes(seeded(5)))
+  expect(rollGenes(seeded(5), NOW)).toEqual(rollGenes(seeded(5), NOW))
 })
 
 test('coats paint differently and odd eyes differ per side', async () => {

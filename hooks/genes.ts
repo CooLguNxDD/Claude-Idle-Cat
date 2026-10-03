@@ -16,8 +16,8 @@ export const PERSONALITY_INFO: Record<Personality, string> = {
 
 export const GINGER: Genes = { coat: 'ginger', eyes: 'green', personality: 'playful', isShiny: false }
 
-export const rollGenes = (rng: Rng): Genes => ({
-  coat: rollCoat(rng),
+export const rollGenes = (rng: Rng, now: number): Genes => ({
+  coat: rollCoat(rng, now),
   eyes: weighted(rng, EYE_WEIGHTS),
   personality: pick(rng, PERSONALITIES),
   isShiny: rng() < SHINY_ODDS,

@@ -26,6 +26,8 @@ test('Adopt is its own tab, charges one successful roll and Back returns to the 
     await run('shelter')
     await check('adopt', 'shelter command')
     expect(await ui.find({ type: 'Text', text: /Legendary 1%/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /Epic 4%.*Ghost/ })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: /Ghost: available in October/ })).toBeDefined()
     const coins = stored.coins
     await ui.press({ key: 'adopt' })
     if (surface === 'terminal') {
@@ -44,6 +46,28 @@ test('Adopt is its own tab, charges one successful roll and Back returns to the 
     await check('pet', 'back to cat')
     await ui.unmount()
   }
+})
+
+test('October shelter odds include Ghost and the collection book labels its season', async ($, on) => {
+  const now = new Date(2026, 9, 15, 12).getTime()
+  mock.clock(on, { now })
+  mock.store(on)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('ui.blit', () => ({ value: {} }))
+  const run = (args: string) => $.command.run({ command: 'cat', args, origin: { kind: 'composer' },
+    presentation: { isFullscreen: true, columns: 160 } })
+  await run('show')
+  const ui = await $.ui.mount({ plugin: 'afk-cat', surface: 'terminal', component: 'Pane', requestId: 'afk-cat',
+    props: { title: 'AFK Cat', isFocused: true, bodyColumns: 36, placement: 'dock',
+      scroll: { offset: 0, bodyRows: 50 }, view: {} } })
+  await run('shelter')
+  expect(await ui.find({ type: 'Text', text: /Epic 4%.*Ghost/ })).toBeDefined()
+  for (let i = 0; i < 9 && !(await ui.find({ key: 'tab-book' })); i++) await ui.press({ key: 'tabs-next' })
+  await ui.press({ key: 'tab-book' })
+  expect(await ui.find({ type: 'Text', text: /Coats.*\(October\)/ })).toBeDefined()
+  await ui.unmount()
 })
 
 test('the arrival card offers Pull again while there is room and coins', async ($, on) => {

@@ -8,13 +8,15 @@ import { skyColors } from './weather/sky'
 import { drawWeatherLayer } from './weather'
 import { fineYardGround, fineYardSky } from './fine/yard'
 import { pen } from './fine/draw'
+import type { SceneStyle } from '../content/types'
+import { styledGround, styledSky, worldSky } from './styles'
 
 export type YardState = { season: ReturnType<typeof seasonOf>; festival: ReturnType<typeof festivalOf>; isNight: boolean }
 const STARS: [number, number][] = [[2, 1], [7, 4], [12, 2], [19, 1], [24, 5], [4, 7], [16, 6], [38, 2], [45, 5], [51, 1]]
 
 /** Sky on the pane canvas `c`, then `back` (far scenery), then the fence and ground on the world-wide `ground`. */
 export const drawYard = (c: SceneCanvas, now: number, hour: number, tick: number, f: Flavor, weather: WeatherReading | null = null,
-  ground: SceneCanvas = c, back?: (isNight: boolean) => void): YardState => {
+  ground: SceneCanvas = c, back?: (isNight: boolean) => void, style?: SceneStyle): YardState => {
   const part = dayPartOf(hour)
   const isNight = weather ? !weather.isDay : part === 'night'
   const isDusk = !isNight && part === 'dusk'
@@ -24,6 +26,17 @@ export const drawYard = (c: SceneCanvas, now: number, hour: number, tick: number
   const month = new Date(now).getMonth() + 1
   const season = seasonOf(month)
   const festival = festivalOf(month)
+  if (style) {
+    const [styledTop, styledLow] = worldSky(style, top, low, f, isNight, weather !== null)
+    const fine = { top: styledTop, low: styledLow, isNight, isDusk, isSunVisible: isVisible,
+      hasClouds: !weather && isVisible && !isNight,
+      isWinter: (season === 'winter' && !weather) || weather?.condition === 'snow', hasLights: festival === 'lights' }
+    styledSky(pen(c), style, fine, tick, f)
+    if (weather) drawWeatherLayer({ c, weather, tick, f }, 'sky')
+    back?.(isNight)
+    styledGround(pen(ground), style, fine, tick, f)
+    return { season, festival, isNight }
+  }
   if (c.isFine) {
     const fine = { top, low, isNight, isDusk, isSunVisible: isVisible, hasClouds: !weather && isVisible && !isNight,
       isWinter: (season === 'winter' && !weather) || weather?.condition === 'snow', hasLights: festival === 'lights' }

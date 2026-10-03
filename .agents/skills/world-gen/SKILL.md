@@ -1,6 +1,6 @@
 ---
 name: world-gen
-description: Add a new world (a themed yard the cats live in, with width per house tier, parallax layers, furniture slots and landmarks) to Claude Idle Cat as one data file. Use when asked for a new world, map, yard, level or scene theme.
+description: Add a new world (a themed yard the cats live in, with width per house tier, parallax layers, furniture slots and landmarks) to Codex Idle Cat as one data file. Use when asked for a new world, map, yard, level or scene theme.
 ---
 
 # world-gen: add a world
@@ -47,7 +47,7 @@ node tools/preview.mjs world <id> --out <scratch>   # the whole manor yard, ever
 
 Open the PNG. Check all seasonal rows, live-weather rendering and terminal fallback as well as 1x/2x/4x/8x scales. Check the layers read as distance, the landmarks sit on the ground, and nothing clashes in latte (light) or mocha (dark).
 
-Then the checks from `CLAUDE.md` (`claude plugin validate .`, both `tsc` runs, `claude plugin test .`, `node --test server/arcade.test.mjs`, `node tools/build-content.mjs --check`) and `node tools/build-web.mjs`, committing `server/public/arcade.js` if it changed. `world.test.ts` validates every world file.
+Then the checks from `AGENTS.md` (`Codex plugin validate .`, both `tsc` runs, `Codex plugin test .`, `node --test server/arcade.test.mjs`, `node tools/build-content.mjs --check`) and `node tools/build-web.mjs`, committing `server/public/arcade.js` if it changed. `world.test.ts` validates every world file.
 
 ## 4. Commit
 
