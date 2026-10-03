@@ -57,6 +57,14 @@ test('a sleeping cat pads to its bed and naps; waking starts a new move', () => 
   expect(stepMotion(last, ctx(), seeded(1)).move).not.toBe('nap-curl')
 })
 
+test('a sleepy cat in a manor yard walks the whole way to its bed before it naps', () => {
+  const asleep = ctx({ mood: 'sleeping', maxX: 900, spots: { bowl: 140, bed: 0 } })
+  const path = run({ ...startMotion(800), move: 'walk', left: 99 }, asleep, 1000)
+  const nap = path.find(m => m.move === 'nap-curl')!
+  expect(nap.x).toBeLessThanOrEqual(4)
+  expect(path[path.length - 1]!.move).toBe('nap-curl')
+})
+
 test('a hungry cat walks toward its bowl', () => {
   const toBowl = run(startMotion(20), ctx({ hunger: 20, mood: 'grumpy' }), 60 * FPS).find(m => moveOf(m.move).pose === 'walk')
   expect(toBowl?.target).toBe(140)

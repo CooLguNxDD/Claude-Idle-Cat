@@ -47,6 +47,13 @@ test('the camera keeps the cat in the middle third, stays in the yard and holds 
   expect(followCam(panned, 0, 14, 160, 48, 10 + FOLLOW_AFTER).x).toBe(0)
 })
 
+test('the camera holds still on a pane too narrow for the cat to fit its middle third', () => {
+  let cam = { x: 20, manualUntil: 0 }
+  const seen: number[] = []
+  for (let frame = 0; frame < 6; frame++) seen.push((cam = followCam(cam, 30, 14, 160, 34, frame)).x)
+  expect(new Set(seen.slice(1)).size).toBe(1)
+})
+
 test('the scene scrolls the yard with the camera and draws the landmarks a manor unlocks', () => {
   const home = { ...newHome(0), tier: 2 }
   const base = { home, now: 0, tick: 0, hour: 12, flavor: FLAVORS.mocha, cols: 48 }

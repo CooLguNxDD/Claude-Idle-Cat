@@ -22,9 +22,12 @@ const patterned = (b: Breed, p: Fur, f: Flavor, ch: string, x: number, y: number
     case 'rosettes': return (x * 3 + y * 5) % 11 < 3 || ch === 'd' ? p.dark : p.fur
     case 'undercoat': return y >= 8 ? mix(p.fur, p.belly, pt.blend) : p.fur
     case 'stars': return (x + y * 2) % 7 === 0 ? shadeOf(pt.star, f) : mix(p.fur, p.dark, (x % 5) / 5)
-    default: return p.fur
+    case 'solid': return p.fur
+    default: return unhandled(pt, p.fur)
   }
 }
+// Fails the type check when a pattern kind has no case above; at runtime an unknown kind paints plain fur.
+const unhandled = (_: never, fur: number) => fur
 
 // Sprite coordinates make markings repeatable in both pane and arcade poses.
 export const coatPixel = (g: Genes, f: Flavor, ch: string, x: number, y: number): number | undefined => {

@@ -10,7 +10,8 @@ export const clampCam = (x: number, worldCols: number, paneCols: number) =>
 export const followCam = (cam: Camera, catCol: number, catWidth: number, worldCols: number, paneCols: number, frame: number): Camera => {
   if (frame < cam.manualUntil) return { ...cam, x: clampCam(cam.x, worldCols, paneCols) }
   const left = cam.x + Math.floor(paneCols / 3)
-  const right = cam.x + Math.ceil((paneCols * 2) / 3) - catWidth
+  // A pane too narrow for the cat to fit in its middle third pins it at the left bound, so the view never shakes.
+  const right = Math.max(left, cam.x + Math.ceil((paneCols * 2) / 3) - catWidth)
   const x = catCol < left ? cam.x - (left - catCol) : catCol > right ? cam.x + (catCol - right) : cam.x
   return { ...cam, x: clampCam(x, worldCols, paneCols) }
 }

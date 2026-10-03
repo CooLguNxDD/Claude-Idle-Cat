@@ -107,6 +107,10 @@ const arrive = (m: Motion, move: Move, ctx: MotionCtx): Motion => {
   return { ...m, stage: 'through', isHidden: true, target: spot.exit, facing: toward(spot.exit, m.x, m.facing) }
 }
 
+// A sleepy cat walks for as long as the trip to its bed takes, however wide the yard.
+const toBed = (cur: Motion, bed: number): Motion => ({ ...cur, y: 0, isHidden: false, stage: 'free', move: WALK.id, frame: 0,
+  left: Math.ceil(Math.abs(bed - cur.x) / WALK.speed) + 30 * FPS, target: bed, facing: bed > cur.x ? 1 : -1 })
+
 /** One frame: keep going, or pick the next move when time runs out, the target is reached or the cat falls asleep. */
 export const stepMotion = (m: Motion, ctx: MotionCtx, rng: Rng): Motion => {
   const cur = { ...m, x: clampX(m.x, ctx), target: clampX(m.target, ctx) }
@@ -115,15 +119,13 @@ export const stepMotion = (m: Motion, ctx: MotionCtx, rng: Rng): Motion => {
   const bed = clampX(ctx.spots.bed, ctx)
   // A sleepy cat pads to its bed before curling up, and wakes straight into a new move.
   if (isAsleep && move.pose !== 'sleep' && !(move.id === WALK.id && cur.target === bed && cur.stage === 'free')) {
-    if (Math.abs(cur.x - bed) <= NEAR) return begin(NAP, cur, ctx, rng)
-    return { ...cur, y: 0, isHidden: false, stage: 'free', move: WALK.id, frame: 0, left: 30 * FPS, target: bed,
-      facing: bed > cur.x ? 1 : -1 }
+    return Math.abs(cur.x - bed) <= NEAR ? begin(NAP, cur, ctx, rng) : toBed(cur, bed)
   }
   const isTravelling = cur.stage === 'go' || cur.stage === 'through' || (cur.stage === 'free' && move.speed > 0)
   const isArrived = isTravelling && Math.abs(cur.target - cur.x) < 0.01
   if (isArrived && cur.stage === 'go') return arrive(cur, move, ctx)
   if (cur.left <= 0 || isArrived || (!isAsleep && move.pose === 'sleep')) {
-    if (isAsleep && move.id === WALK.id) return begin(NAP, cur, ctx, rng)
+    if (isAsleep && move.id === WALK.id) return Math.abs(cur.x - bed) <= NEAR ? begin(NAP, cur, ctx, rng) : toBed(cur, bed)
     return begin(pickMove(move, ctx, rng), cur, ctx, rng)
   }
   const speed = cur.stage === 'go' ? Math.max(WALK.speed, move.speed * 0.6) : isTravelling ? move.speed : 0

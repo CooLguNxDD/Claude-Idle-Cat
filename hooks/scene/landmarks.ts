@@ -46,5 +46,5 @@ const DRAWERS: Record<LandmarkKind, (p: Pen, x: number, f: Flavor, tick: number)
 /** Draws unlocked landmarks on the world-wide canvas. */
 export const drawLandmarks = (c: SceneCanvas, landmarks: readonly Landmark[], f: Flavor, tick: number) => {
   const p = pen(c)
-  for (const l of landmarks) DRAWERS[l.kind](p, l.x * DESIGN, f, tick)
+  for (const l of landmarks) DRAWERS[l.kind]?.(p, l.x * DESIGN, f, tick)
 }
