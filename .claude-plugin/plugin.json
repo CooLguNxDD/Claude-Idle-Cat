@@ -14,16 +14,14 @@
     "flavor": {
       "type": "string",
       "title": "Catppuccin flavor",
-      "description": "auto follows Claude Code's theme; daycycle is Latte by day, Frappé at dusk, Mocha at night",
-      "default": "auto",
-      "options": ["auto", "daycycle", "latte", "frappe", "macchiato", "mocha"]
+      "description": "auto follows Claude Code's theme; daycycle is Latte by day, Frappé at dusk, Mocha at night. Also latte, frappe, macchiato, mocha",
+      "default": "auto"
     },
     "skin": {
       "type": "string",
       "title": "Cat interface",
       "description": "full redraws the spinner, turn line, prompt hint, tool rows and a walking-cat band; light only the spinner, turn line and hint; off leaves Claude Code alone",
-      "default": "full",
-      "options": ["full", "light", "off"]
+      "default": "full"
     },
     "sound": {
       "type": "boolean",
@@ -35,8 +33,7 @@
       "type": "string",
       "title": "Pane canvas",
       "description": "auto draws the scene as a 4x pixel picture where the terminal shows images (kitty, Ghostty) and as half-block cells elsewhere; image or text forces one",
-      "default": "auto",
-      "options": ["auto", "image", "text"]
+      "default": "auto"
     }
   }
 }

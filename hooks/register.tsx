@@ -162,23 +162,23 @@ const onArcadeLine = async ($: EngineInterface, line: string) => {
     const location = coordinates(msg.latitude, msg.longitude, 'device')
     if (!location) return
     searchSerial++
-    await change($, h => ({ ...h, weather: setLocation(h.weather, location) }))
+    await change($, prev => ({ ...prev, weather: setLocation(prev.weather, location) }))
     $.ui.toast('Device location saved. Checking the weather…')
     void refreshWeather($)
     return
   }
   if (msg.kind === 'start') {
-    await change($, (h, t) => startGame(h, msg.game, t))
+    await change($, (prev, t) => startGame(prev, msg.game, t))
     return
   }
   if (msg.kind === 'prefs') {
-    await change($, h => ({ ...h, prefs: msg.prefs }))
+    await change($, prev => ({ ...prev, prefs: msg.prefs }))
     return
   }
   let wasOpen = false
-  const home = await change($, (h, t) => {
-    wasOpen = h.arcade.open?.game === msg.game
-    return msg.kind === 'quit' ? quitGame(h) : finishGame(h, msg.game, msg.score, msg.ms, t, Math.random)
+  const home = await change($, (prev, t) => {
+    wasOpen = prev.arcade.open?.game === msg.game
+    return msg.kind === 'quit' ? quitGame(prev) : finishGame(prev, msg.game, msg.score, msg.ms, t, Math.random)
   })
   if (wasOpen && msg.kind === 'result') $.ui.toast(`🎮 ${home.log}`)
 }
@@ -280,8 +280,8 @@ const refreshWeather = async ($: EngineInterface, force = false): Promise<void> 
     return refreshWeather($, force)
   }
   const task = (async () => {
-    const home = await change($, h => locationKey(h.weather.location) === key
-      ? { ...h, weather: { ...h.weather, attemptedAt: now } } : h)
+    const home = await change($, prev => locationKey(prev.weather.location) === key
+      ? { ...prev, weather: { ...prev.weather, attemptedAt: now } } : prev)
     if (locationKey(home.weather.location) !== key) return
     let reading: WeatherReading | null = null
     let error: string | null = null
@@ -291,8 +291,8 @@ const refreshWeather = async ($: EngineInterface, force = false): Promise<void> 
     } catch {
       error = 'Could not reach Open-Meteo. Retrying in 5 minutes.'
     }
-    await change($, h => h.weather.attemptedAt !== now ? h
-      : { ...h, weather: acceptWeather(h.weather, key, reading, error) })
+    await change($, prev => prev.weather.attemptedAt !== now ? prev
+      : { ...prev, weather: acceptWeather(prev.weather, key, reading, error) })
   })()
   weatherJob = { key, task }
   try { await task } finally { if (weatherJob?.task === task) weatherJob = null }
@@ -300,7 +300,7 @@ const refreshWeather = async ($: EngineInterface, force = false): Promise<void> 
 
 const selectWeather = async ($: EngineInterface, location: WeatherLocation) => {
   searchSerial++
-  await change($, h => ({ ...h, weather: setLocation(h.weather, location) }))
+  await change($, prev => ({ ...prev, weather: setLocation(prev.weather, location) }))
   await refreshWeather($)
   return { text: `${latest?.weather.location?.label ?? location.label}\n${weatherSummary(latest!.weather, await $.clock.now())}` }
 }
@@ -309,11 +309,11 @@ const searchWeather = async ($: EngineInterface, query: string): Promise<{ text:
   const name = query.trim()
   if (name.length < 2 || name.length > 100) {
     const text = 'Enter a city name (2–100 characters), e.g. /cat weather London, GB.'
-    await change($, h => ({ ...h, weather: { ...h.weather, candidates: [], notice: text } }))
+    await change($, prev => ({ ...prev, weather: { ...prev.weather, candidates: [], notice: text } }))
     return { text }
   }
   const serial = ++searchSerial
-  await change($, h => ({ ...h, weather: { ...h.weather, candidates: [], notice: `Searching for ${name}…` } }))
+  await change($, prev => ({ ...prev, weather: { ...prev.weather, candidates: [], notice: `Searching for ${name}…` } }))
   let candidates: WeatherLocation[] = []
   let notice = ''
   try {
@@ -324,7 +324,7 @@ const searchWeather = async ($: EngineInterface, query: string): Promise<{ text:
   }
   if (serial !== searchSerial) return { text: 'Location search superseded by your newer choice.' }
   if (candidates.length === 1) return selectWeather($, candidates[0]!)
-  await change($, h => ({ ...h, weather: { ...h.weather, candidates, notice } }))
+  await change($, prev => ({ ...prev, weather: { ...prev.weather, candidates, notice } }))
   return { text: [notice, ...candidates.map((l, i) => `${i + 1}. ${l.label}`),
     candidates.length ? 'Choose in the Weather tab or /cat weather choose <number>.' : ''].filter(Boolean).join('\n') }
 }
@@ -341,12 +341,12 @@ const openWeatherLocation = async ($: EngineInterface): Promise<{ text: string }
 }
 
 const weatherCommand = async ($: EngineInterface, arg: string): Promise<{ text: string }> => {
-  await change($, h => h)
+  await change($, prev => prev)
   const [sub = '', ...rest] = arg.trim().split(/\s+/)
   if (!sub) return { text: `${weatherSummary(latest!.weather, await $.clock.now())}\nSet a city: /cat weather <city> · device: /cat weather system · stop: /cat weather off` }
   if (sub === 'off') {
     searchSerial++
-    await change($, h => ({ ...h, weather: emptyWeather(h.weather.units) }))
+    await change($, prev => ({ ...prev, weather: emptyWeather(prev.weather.units) }))
     return { text: 'Weather disabled and the saved location cleared. The yard follows the seasons.' }
   }
   if (sub === 'system') return openWeatherLocation($)
@@ -357,7 +357,7 @@ const weatherCommand = async ($: EngineInterface, arg: string): Promise<{ text: 
   if (sub === 'units') {
     const units = rest[0]?.toLowerCase()
     if (units !== 'c' && units !== 'f') return { text: 'Usage: /cat weather units c|f' }
-    await change($, h => ({ ...h, weather: { ...h.weather, units } }))
+    await change($, prev => ({ ...prev, weather: { ...prev.weather, units } }))
     return { text: weatherSummary(latest!.weather, await $.clock.now()) }
   }
   if (sub === 'choose') {
@@ -420,7 +420,7 @@ const backupCommand = async ($: EngineInterface, sub: 'export' | 'import', arg: 
   const dir = backupDir(await userHome($))
   const now = await $.clock.now()
   if (sub === 'export') {
-    const home = await change($, h => h)
+    const home = await change($, prev => prev)
     const path = arg || inDir(dir, backupName(now))
     try {
       await $.fs.write(path, toBackup(home, now))
@@ -438,7 +438,7 @@ const backupCommand = async ($: EngineInterface, sub: 'export' | 'import', arg: 
   }
   const parsed = parseBackup(text, now)
   if ('error' in parsed) return { text: `Not imported: ${parsed.error}.` }
-  const current = await change($, h => h)
+  const current = await change($, prev => prev)
   const safety = inDir(dir, backupName(now, '-before-import'))
   try {
     await $.fs.write(safety, toBackup(current, now))
@@ -488,8 +488,8 @@ export const register: Register = (on, options) => {
     $.clock.every(60_000, () => { void refreshWeather($) })
     $.clock.every(TICK_MS, () => void readTheme($).then(() => {
       let auto = 0
-      return change($, (h, t) => {
-        const r = tickTally(h, t)
+      return change($, (prev, t) => {
+        const r = tickTally(prev, t)
         auto = r.deducted
         return r.home
       }, () => auto)
@@ -561,7 +561,7 @@ export const register: Register = (on, options) => {
     if (sub === 'theme') return themeCommand($, arg)
     if (sub === 'world') {
       if (!arg) return { text: `Worlds: ${WORLDS.map(w => `${w.id} (${w.label})`).join(', ')}. Use /cat world <id>.` }
-      return { text: (await change($, h => setWorld(h, arg.trim().toLowerCase()))).log }
+      return { text: (await change($, prev => setWorld(prev, arg.trim().toLowerCase()))).log }
     }
     if (sub === 'weather') {
       await routeTo($, 'weather')
@@ -576,14 +576,14 @@ export const register: Register = (on, options) => {
     }
     if (sub && !['show', 'open', 'rename', 'adopt', 'switch', 'reset'].includes(sub)) return { text: HELP }
     let home: Home
-    if (sub === 'rename' && arg) home = await change($, h => rename(h, arg))
+    if (sub === 'rename' && arg) home = await change($, prev => rename(prev, arg))
     else if (sub === 'adopt') {
       await routeTo($, 'adopt')
-      home = await change($, (h, t) => adopt(h, t, Math.random, arg || undefined))
+      home = await change($, (prev, t) => adopt(prev, t, Math.random, arg || undefined))
     }
-    else if (sub === 'switch') home = await change($, h => (arg ? switchTo(h, arg) : nextCat(h)))
+    else if (sub === 'switch') home = await change($, prev => (arg ? switchTo(prev, arg) : nextCat(prev)))
     else if (sub === 'reset') home = await change($, (_, t) => newHome(t))
-    else home = await change($, h => h)
+    else home = await change($, prev => prev)
     await $.ui.open({ id: PANE, title: 'AFK Cat' })
     if (sub === 'switch') return { text: `${home.log} Cats: ${home.cats.map(c => c.name).join(', ')}.` }
     return { text: 'Your cats are in the pane.' }
@@ -614,7 +614,7 @@ export const register: Register = (on, options) => {
   on('tool.call', async ($, e, next) => {
     sprintUntil = frame + 16
     const ran = await next(e)
-    void queue(() => change($, (h, t) => track(reward(h, rollToolPay(h, Math.random) * rampOf(chatMinutes)), 'tools', 1, t)))
+    void queue(() => change($, (prev, t) => track(reward(prev, rollToolPay(prev, Math.random) * rampOf(chatMinutes)), 'tools', 1, t)))
     return ran
   })
 
@@ -639,9 +639,9 @@ export const register: Register = (on, options) => {
         owedMinutes -= owed
       }
       try {
-        await change($, (h, t) => {
-          const pay = (activePay(h, e.durationMs) + coinRate(h) * owed + spendPay(h, spent)) * ramp
-          const paid = { ...reward(h, pay, 2, t), effect: { kind: 'coins' as const, at: t } }
+        await change($, (prev, t) => {
+          const pay = (activePay(prev, e.durationMs) + coinRate(prev) * owed + spendPay(prev, spent)) * ramp
+          const paid = { ...reward(prev, pay, 2, t), effect: { kind: 'coins' as const, at: t } }
           return track(pay > 0 ? { ...paid, log: `Claude worked ${Math.round(minutes + owed)}m: +${fmtCoins(pay)}` } : paid, 'turns', 1, t)
         }, undefined, settled)
       } catch {
@@ -719,16 +719,16 @@ export const register: Register = (on, options) => {
           <Text color={tone.muted}>Last arrival · {home.shelter.last!.cost === 0 ? 'yard visitor' : `${home.shelter.last!.cost}c`}</Text>
           <Box>
             <Button key="shelter-meet" plain label={`Meet ${reveal.name}`} onPress={async () => {
-              await change($, h => switchTo(h, reveal.id))
+              await change($, prev => switchTo(prev, reveal.id))
               await routeTo($, 'cat')
             }} />
             {room > 0 && home.coins >= price && <Button key="shelter-again" plain label={` Pull again · ${fmtCoins(price)}`}
-              onPress={() => change($, (h, t) => adopt(h, t, Math.random))} />}
+              onPress={() => change($, (prev, t) => adopt(prev, t, Math.random))} />}
           </Box>
         </Box>}
         <Button key="adopt" plain label={room <= 0 ? 'House full · expand in Home'
           : home.coins < price ? `Need ${fmtCoins(price)} to roll & adopt` : `Roll & adopt · ${fmtCoins(price)}`}
-          onPress={() => change($, (h, t) => adopt(h, t, Math.random))} />
+          onPress={() => change($, (prev, t) => adopt(prev, t, Math.random))} />
         {room <= 0 && <Button key="shelter-expand" plain label="Go to Home" onPress={() => routeTo($, 'home')} />}
         <Text color={tone.muted}>One cat per pull. The fee is charged only when adoption succeeds. No cats are replaced.</Text>
         {home.shinyCharm && <Text color={tone.accent}>Shiny charm ready · your next shelter cat will sparkle.</Text>}
@@ -743,7 +743,7 @@ export const register: Register = (on, options) => {
         {home.visitors.map(v => <Box key={`shelter-${v.id}`} flexDirection="column">
           <Text color={css(flavor[RARITIES[rarityOf(v.genes)].color])}>{rarityBadge(v.genes)} · {v.name}</Text>
           <Text color={tone.muted}>{describeGenes(v.genes)}</Text>
-          <Button key={`shelter-adopt-${v.id}`} plain label={`Welcome ${v.name}`} onPress={() => change($, (h, t) => adoptVisitor(h, v.id, t))} />
+          <Button key={`shelter-adopt-${v.id}`} plain label={`Welcome ${v.name}`} onPress={() => change($, (prev, t) => adoptVisitor(prev, v.id, t))} />
         </Box>)}
         <Text italic color={tone.log}>{home.log}</Text>
       </Box>
@@ -767,13 +767,13 @@ export const register: Register = (on, options) => {
           label={`${i + 1}. ${location.label}`} onPress={async () => { await selectWeather($, location) }} />)}
         <Button key="weather-system" plain label="Use device location…" onPress={async () => {
           const result = await openWeatherLocation($)
-          await change($, h => ({ ...h, weather: { ...h.weather, notice: result.text } }))
+          await change($, prev => ({ ...prev, weather: { ...prev.weather, notice: result.text } }))
         }} />
         <Text color={tone.muted}>Opens your browser for location permission. The rounded location is saved with your cats and sent to Open-Meteo.</Text>
         <Box>
           <Button key="weather-refresh" label="Refresh" onPress={() => refreshWeather($, true)} />
           <Button key="weather-units" label={home.weather.units === 'c' ? 'Use °F' : 'Use °C'}
-            onPress={() => change($, h => ({ ...h, weather: { ...h.weather, units: h.weather.units === 'c' ? 'f' : 'c' } }))} />
+            onPress={() => change($, prev => ({ ...prev, weather: { ...prev.weather, units: prev.weather.units === 'c' ? 'f' : 'c' } }))} />
           <Button key="weather-off" label="Off" onPress={async () => { await weatherCommand($, 'off') }} />
         </Box>
         <Text color={tone.muted}>Coordinates: /cat weather at 51.50 -0.12</Text>
@@ -795,7 +795,7 @@ export const register: Register = (on, options) => {
       const star = featured(now)
       const url = arcade.port ? arcadeUrl(arcade.port, arcade.token) : ''
       const play = (id: (typeof GAMES)[number]['id']) => async () => {
-        await change($, (h, t) => startGame(h, id, t))
+        await change($, (prev, t) => startGame(prev, id, t))
         await openArcade($)
       }
       return (
@@ -808,13 +808,13 @@ export const register: Register = (on, options) => {
           <Button key="arcade-open" hotkey="o" plain
             label={arcade.port ? '▸ Show the arcade in the browser again (o)' : '▸ Open the arcade in your browser (o)'}
             onPress={async () => {
-              if (!(await openArcade($, true))) await change($, h => ({ ...h, log: 'The arcade needs Node.js on your PATH.' }))
+              if (!(await openArcade($, true))) await change($, prev => ({ ...prev, log: 'The arcade needs Node.js on your PATH.' }))
             }} />
           {url ? <Text color={tone.muted}>{'   '}<ui.Link href={url}>{`localhost:${arcade.port}`}</ui.Link> · stays up while Claude Code runs</Text> : null}
           {open && (
             <Box flexDirection="column">
               <Text color={tone.ok}>▶ {cat.name} is playing {gameOf(open.game)?.name} in the browser.</Text>
-              <Button key="arcade-quit" plain label="   Quit the round" onPress={() => change($, h => quitGame(h))} />
+              <Button key="arcade-quit" plain label="   Quit the round" onPress={() => change($, prev => quitGame(prev))} />
             </Box>
           )}
           {GAMES.map(g => (
@@ -826,7 +826,7 @@ export const register: Register = (on, options) => {
             </Box>
           ))}
           <Button key="quick-play" plain label="▸ Quick play · toss the yarn ball, no game"
-            onPress={() => change($, (h, t) => act(h, 'play', t))} />
+            onPress={() => change($, (prev, t) => act(prev, 'play', t))} />
           <Text italic color={tone.log}>{home.log}</Text>
         </Box>
       )
@@ -849,9 +849,9 @@ export const register: Register = (on, options) => {
             <Box>
               <Text>{critter(id)?.name} ×{n} </Text>
               {!home.museum.includes(id) && (
-                <Button key={`donate-${id}`} plain label="Donate" onPress={() => change($, (h, t) => donateCritter(h, id, t))} />
+                <Button key={`donate-${id}`} plain label="Donate" onPress={() => change($, (prev, t) => donateCritter(prev, id, t))} />
               )}
-              <Button key={`sell-${id}`} plain label={` Sell ${critter(id)?.value}c`} onPress={() => change($, h => sell(h, id))} />
+              <Button key={`sell-${id}`} plain label={` Sell ${critter(id)?.value}c`} onPress={() => change($, prev => sell(prev, id))} />
             </Box>
           ))}
           <Text bold color={tone.accent}>Cat book</Text>
@@ -889,7 +889,7 @@ export const register: Register = (on, options) => {
           {MILES_SHOP.map(item => (
             <Button key={`miles-${item.id}`} plain
               label={`${home.owned.includes(item.id) || (item.id === 'charm' && home.shinyCharm) ? '✓' : ' '} ${item.name} · ${item.cost} miles · ${item.text}`}
-              onPress={() => change($, h => buyWithMiles(h, item.id))} />
+              onPress={() => change($, prev => buyWithMiles(prev, item.id))} />
           ))}
           <Text italic color={tone.log}>{home.log}</Text>
         </Box>
@@ -911,7 +911,7 @@ export const register: Register = (on, options) => {
             return (
               <Box flexDirection="column">
                 <Button key={`friend-${c.id}`} plain label={`${c.id === cat.id ? '▸' : ' '} ${c.name} · ${levelName(c.friendship)} (${level}/${LEVELS.length})`}
-                  onPress={() => change($, h => switchTo(h, c.id))} />
+                  onPress={() => change($, prev => switchTo(prev, c.id))} />
                 <Text color={tone.accent}>
                   {'   '}{next ? `${bar(((c.friendship - (LEVELS[level - 1]?.at ?? 0)) / (next.at - (LEVELS[level - 1]?.at ?? 0))) * 100, 10)} ${next.need} to go` : '★ best friends'}
                   {' · '}today {points}/{DAILY_CAP}{gifted ? ' · gifted ✓' : ''}
@@ -926,7 +926,7 @@ export const register: Register = (on, options) => {
           <Box flexDirection="column">
             {GIFTS.map(g => (
               <Button key={`gift-${g.id}`} plain label={`${g.name} · ${g.price}c`}
-                onPress={() => change($, (h, t) => giveGift(h, g.id, t))} />
+                onPress={() => change($, (prev, t) => giveGift(prev, g.id, t))} />
             ))}
           </Box>
           <Text italic color={tone.log}>{home.log}</Text>
@@ -953,23 +953,23 @@ export const register: Register = (on, options) => {
           {home.loan > 0
             ? <Box>
                 <Text color={tone.warn}>Tom Mew loan: {fmtCoins(Math.ceil(home.loan))} left ({LOAN_SHARE * 100}% of income pays it) </Text>
-                <Button key="pay" plain label="Pay 100c" onPress={() => change($, h => payLoan(h, 100))} />
+                <Button key="pay" plain label="Pay 100c" onPress={() => change($, prev => payLoan(prev, 100))} />
               </Box>
             : <Button key="loan" plain label={`Ask Tom Mew to build a ${next.name} · ${fmtCoins(next.loan)} loan · ${next.maxCats} cats`}
-                onPress={() => change($, h => takeLoan(h))} />}
+                onPress={() => change($, prev => takeLoan(prev))} />}
           <Text bold color={tone.accent}>Yard — strays drawn by your decor (pull {baitOf(home).total})</Text>
           {home.visitors.length === 0 && <Text color={tone.muted}>No strays right now. They come and go while you work.</Text>}
           {home.visitors.map(v => (
             <Box>
               <Text>{v.name} — {describeGenes(v.genes)} · leaves in {Math.max(0, Math.ceil((v.leavesAt - now) / 3_600_000))}h · gift {v.gift}c </Text>
-              <Button key={`adopt-${v.id}`} plain label={`Adopt ${v.name}`} onPress={() => change($, (h, t) => adoptVisitor(h, v.id, t))} />
+              <Button key={`adopt-${v.id}`} plain label={`Adopt ${v.name}`} onPress={() => change($, (prev, t) => adoptVisitor(prev, v.id, t))} />
             </Box>
           ))}
           <Text bold color={tone.accent}>Placed</Text>
           <Text color={tone.muted}>{tier.slots.map(slot => `${slot}: ${furniture(home.decor[slot])?.name ?? '—'}`).join(' · ')}</Text>
           {spare.map(id => (
             <Button key={`place-${id}`} plain label={`Place ${furniture(id)?.name} (${furniture(id)?.slot})`}
-              onPress={() => change($, h => place(h, id))} />
+              onPress={() => change($, prev => place(prev, id))} />
           ))}
           <Text bold color={tone.accent}>
             Nyan's shop · {isOpen ? `open until ${SHOP_CLOSE}:00 · new stock daily` : `closed · opens at ${SHOP_OPEN}:00`}
@@ -977,7 +977,7 @@ export const register: Register = (on, options) => {
           {stock.map(item => (
             <Button key={`buy-${item.id}`} plain
               label={`${home.owned.includes(item.id) ? '✓' : ' '} ${item.name} · ${item.price}c · ${item.slot} · ${item.perk}`}
-              onPress={() => change($, (h, t) => buyItem(h, item.id, t, hourOf(t)))} />
+              onPress={() => change($, (prev, t) => buyItem(prev, item.id, t, hourOf(t)))} />
           ))}
           <Text bold color={tone.accent}>Catnip market · it's {seasonOf(new Date(now).getMonth() + 1)}</Text>
           {(() => {
@@ -988,8 +988,8 @@ export const register: Register = (on, options) => {
               return (
                 <Box>
                   <Text>Daisy Meow sells catnip at {market.price}c a bundle{holding} </Text>
-                  <Button key="catnip-10" plain label="Buy 10" onPress={() => change($, (h, t) => buyCatnip(h, 10, t, hourOf(t), isShopOpen(hourOf(t))))} />
-                  <Button key="catnip-50" plain label=" Buy 50" onPress={() => change($, (h, t) => buyCatnip(h, 50, t, hourOf(t), isShopOpen(hourOf(t))))} />
+                  <Button key="catnip-10" plain label="Buy 10" onPress={() => change($, (prev, t) => buyCatnip(prev, 10, t, hourOf(t), isShopOpen(hourOf(t))))} />
+                  <Button key="catnip-50" plain label=" Buy 50" onPress={() => change($, (prev, t) => buyCatnip(prev, 50, t, hourOf(t), isShopOpen(hourOf(t))))} />
                 </Box>
               )
             }
@@ -997,7 +997,7 @@ export const register: Register = (on, options) => {
               return (
                 <Box>
                   <Text>Nyan buys catnip for {market.price}c right now{holding} </Text>
-                  {held > 0 && <Button key="catnip-sell" plain label="Sell all" onPress={() => change($, (h, t) => sellCatnip(h, t, hourOf(t), isShopOpen(hourOf(t))))} />}
+                  {held > 0 && <Button key="catnip-sell" plain label="Sell all" onPress={() => change($, (prev, t) => sellCatnip(prev, t, hourOf(t), isShopOpen(hourOf(t))))} />}
                 </Box>
               )
             }
@@ -1030,14 +1030,14 @@ export const register: Register = (on, options) => {
                 const why = !check.ok && check.reason !== 'maxed' && check.reason !== 'no skill points' ? ` (${check.reason})` : ''
                 return (
                   <Button key={`skill-${sk.id}`} plain label={`${mark} ${sk.name} ${rank}/${sk.maxRank} · ${sk.perk}${why}`}
-                    onPress={() => change($, h => learnSkill(h, sk.id))} />
+                    onPress={() => change($, prev => learnSkill(prev, sk.id))} />
                 )
               })}
             </Box>
           ))}
           <Text italic color={tone.log}>{home.log}</Text>
           <Button key="respec" plain label={`Reset skills · ${respecPrice(cat)}c`}
-            onPress={() => change($, (h, t) => respec(h, t))} />
+            onPress={() => change($, (prev, t) => respec(prev, t))} />
         </Box>
       )
     }
@@ -1055,7 +1055,7 @@ export const register: Register = (on, options) => {
           <Button key={`cat-${c.id}`} plain
             label={`   ${c.id === cat.id ? '●' : '○'} ${c.name} · ${RARITIES[rarityOf(c.genes)].label} · Lv${c.level} ${stageName(c)} · ${moodOf(c)}`}
             onPress={async () => {
-              await change($, h => switchTo(h, c.id))
+              await change($, prev => switchTo(prev, c.id))
               await update($, catListRef, () => false)
             }} />
         ))}
@@ -1087,7 +1087,7 @@ export const register: Register = (on, options) => {
           {ACTIONS.map(a => (
             <Button key={a.action} label={a.label} hotkey={a.hotkey}
               onPress={async () => {
-                if (a.action !== 'play') return change($, (h, t) => act(h, a.action, t))
+                if (a.action !== 'play') return change($, (prev, t) => act(prev, a.action, t))
                 await routeTo($, 'arcade')
                 await openArcade($)
               }} />
