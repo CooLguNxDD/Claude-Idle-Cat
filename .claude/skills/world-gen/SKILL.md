@@ -45,7 +45,9 @@ node tools/build-content.mjs
 node tools/preview.mjs world <id> --out <scratch>   # the whole manor yard, every flavor in June, October and December, at noon and midnight
 ```
 
-Open the PNG. Check all seasonal rows, live-weather rendering and terminal fallback as well as 1x/2x/4x/8x scales. Check the layers read as distance, the landmarks sit on the ground, and nothing clashes in latte (light) or mocha (dark).
+Open the PNG: it shows the manor yard at 4x without live weather, across all flavors and seasonal rows at noon and midnight. Check the layers read as distance, the landmarks sit on the ground, and nothing clashes in latte (light) or mocha (dark).
+
+Use `hooks/scene/styles.test.ts` for terminal fallback, 1x/2x/4x/8x scales and live-weather rendering checks; those outputs are not included in the PNG.
 
 Then the checks from `CLAUDE.md` (`claude plugin validate .`, both `tsc` runs, `claude plugin test .`, `node --test server/arcade.test.mjs`, `node tools/build-content.mjs --check`) and `node tools/build-web.mjs`, committing `server/public/arcade.js` if it changed. `world.test.ts` validates every world file.
 

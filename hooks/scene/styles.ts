@@ -22,7 +22,7 @@ export const worldSky = (style: SceneStyle, top: number, low: number, f: Flavor,
 export const styledSky = (p: Pen, style: SceneStyle, y: FineYard, tick: number, f: Flavor) => {
   if (style !== 'space-station') return fineYardSky(p, y, tick, f)
   fineSky(p, y.top, y.low)
-  fineStars(p, tick, f, p.W)
+  if (y.isNight && y.isSunVisible) fineStars(p, tick, f, p.W)
   const x = p.W - 30
   p.disc(x, 20, 9, 9, mix(f.blue, f.sky, 0.4))
   p.disc(x - 3, 18, 3, 5, f.green)

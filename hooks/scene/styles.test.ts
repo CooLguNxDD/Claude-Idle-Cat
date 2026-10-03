@@ -5,6 +5,9 @@ import { newHome } from '../game'
 import { frameCells, frameImage } from '../scene'
 import { FLAVORS, FLAVOR_NAMES } from '../theme'
 import { landmarksOf, setWorld, worldCols } from '../world'
+import { canvas } from './canvas'
+import { pen } from './fine/draw'
+import { styledSky } from './styles'
 
 const themed = WORLDS.filter(w => w.scene)
 const now = new Date(2026, 9, 15, 12).getTime()
@@ -13,6 +16,19 @@ const withWeather = (home: Home, condition: WeatherCondition, isDay: boolean): H
   weather: { ...home.weather, location: { label: 'Yard', latitude: 0, longitude: 0, source: 'city' },
     current: { code: 0, condition, temperatureC: 5, windKph: 30, windDegrees: 270, cloudPercent: 80, precipitationMm: 1,
       isDay, observedAt: now, fetchedAt: now, utcOffset: 0 } },
+})
+
+test('station stars animate only on visible nights in every flavor and scale', () => {
+  for (const flavor of Object.values(FLAVORS)) for (const scale of [1, 2, 4, 8])
+    for (const isNight of [false, true]) for (const isSunVisible of [false, true]) {
+      const at = (tick: number) => {
+        const c = canvas(56, scale)
+        styledSky(pen(c), 'space-station', { top: flavor.crust, low: flavor.base, isNight, isSunVisible,
+          isDusk: false, hasClouds: false, isWinter: false, hasLights: false }, tick, flavor)
+        return c.image(flavor.base).rgba
+      }
+      expect(at(0) === at(1)).toBe(!(isNight && isSunVisible))
+    }
 })
 
 test('new worlds select without changing furniture and retain movement geometry at each tier', () => {
