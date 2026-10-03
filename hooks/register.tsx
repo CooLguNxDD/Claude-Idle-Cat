@@ -10,9 +10,9 @@ import { backupDir, backupName, inDir, parseBackup, pickBase, toBackup } from '.
 import { buyCatnip, marketNow, seasonOf, sellCatnip, weekOf } from './calendar'
 import { ACHIEVEMENTS, MILES_SHOP, buyWithMiles, settle, tasksFor, track } from './collection'
 import { CRITTERS, critter, isAvailable, sell } from './critters'
-import { act, activeCat, adopt, adoptPrice, adoptVisitor, bar, buyItem, checkIn, coinRate, donateCritter, giveGift,
-  learnSkill, migrate, moodOf, newHome, nextCat, rename, respec, reward, stageName, switchTo, tick, welcomeBack,
-  xpToNext } from './game'
+import { act, activeCat, adopt, adoptPrice, adoptVisitor, bar, buyItem, checkIn, donateCritter, giveGift, idleRate,
+  learnSkill, migrate, moodOf, newHome, nextCat, rename, respec, reward, spendPay, stageName, switchTo, tick, toolPay,
+  turnPay, welcomeBack, xpToNext } from './game'
 import { CATCHPHRASE_LEVEL, DAILY_CAP, GIFTS, LEVELS, NICKNAME_LEVEL, PHOTO_LEVEL, dayOf, dialogue, friendLevel,
   levelName, toNextLevel } from './friends'
 import type { Action } from './game'
@@ -85,6 +85,8 @@ let band = { id: '', cols: 0, mode: 'off' as 'off' | 'raster' | 'text' }
 let runX = 0
 // Frame number until which the cat sprints; a tool call starts it.
 let sprintUntil = 0
+// Session spend (US dollars) already paid out; each finished reply pays what it added.
+let paidUsd = 0
 let flavorNow: (now: number) => Flavor = () => FLAVORS.mocha
 // The browser arcade's server: started on first use, killed with the module; the token guards it.
 const arcade = { port: 0, token: newToken(Math.random), starting: null as Promise<number> | null, pushed: '', isOpened: false }
@@ -441,6 +443,7 @@ export const register: Register = (on, options) => {
       description: 'Open your AFK cats (/cat hide, /cat shelter, /cat adopt [name], /cat switch <name>, /cat rename <name>, /cat weather <city>, /cat export, /cat import <file>, /cat help)',
     })
     await readTheme($)
+    paidUsd = (await $.session.usage()).cost?.usd ?? 0
     const saved = (await $.store.get('home')) ?? (await $.store.get('cat'))
     let bonus = 0
     const home = await change($, (_, t) => {
@@ -574,12 +577,19 @@ export const register: Register = (on, options) => {
   on('tool.call', async ($, e, next) => {
     sprintUntil = frame + 16
     const ran = await next(e)
-    void change($, (h, t) => track(reward(h, 1), 'tools', 1, t))
+    void change($, (h, t) => track(reward(h, toolPay(h)), 'tools', 1, t))
     return ran
   })
 
   on('turn.complete', async ($, e, next) => {
-    void change($, (h, t) => track({ ...reward(h, 3, 2, t), effect: { kind: 'coins', at: t } }, 'turns', 1, t))
+    const usd = (await $.session.usage()).cost?.usd ?? paidUsd
+    const spent = usd - paidUsd
+    paidUsd = usd
+    void change($, (h, t) => {
+      const bonus = spendPay(h, spent)
+      const paid = { ...reward(h, turnPay(h) + bonus, 2, t), effect: { kind: 'coins' as const, at: t } }
+      return track(bonus > 0 ? { ...paid, log: `Claude worked hard: +${turnPay(h) + bonus}c` } : paid, 'turns', 1, t)
+    })
     return next(e)
   })
 
@@ -997,7 +1007,7 @@ export const register: Register = (on, options) => {
           XP {bar((cat.xp / xpToNext(cat.level)) * 100, 10)} {cat.xp}/{xpToNext(cat.level)}
         </Text>
         <Text color={tone.coin}>
-          Coins {fmtCoins(home.coins)} (+{coinRate(home).toFixed(1)}/min)
+          Coins {fmtCoins(home.coins)} (+{idleRate(home).toFixed(1)}/min idle · +{toolPay(home)}/tool)
           {freePoints(cat) > 0 ? ` · ${freePoints(cat)} skill point${freePoints(cat) > 1 ? 's' : ''} to spend (s)` : ''}
         </Text>
         <Text italic color={tone.log}>{home.log}</Text>

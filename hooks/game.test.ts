@@ -1,8 +1,8 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Home } from '../types'
-import { DECAY_FLOOR, act, activeCat, adopt, checkIn, coinRate, migrate, moodOf, newHome, nextCat, stageOf, switchTo,
-  tick } from './game'
+import { DECAY_FLOOR, IDLE_SHARE, SPEND_CAP_MINUTES, act, activeCat, adopt, checkIn, coinRate, migrate, moodOf, newHome,
+  nextCat, spendPay, stageOf, switchTo, tick, toolPay, turnPay } from './game'
 import { seeded } from './rng'
 import { ROWS, frameCells } from './scene'
 import { FLAVORS } from './theme'
@@ -62,6 +62,23 @@ test('adoption rolls genes, picks a free name and respects the house size', asyn
   expect(activeCat(nextCat(nextCat(two))).id).toBe('c2')
   expect(nextCat(newHome(0)).log).toMatch(/only cat/)
   expect(coinRate(two)).toBeGreaterThan(coinRate(newHome(0)))
+})
+
+test('idle time pays a share of the full rate; Claude\'s work pays minutes of it', async () => {
+  const home = newHome(0)
+  expect(tick(home, 30 * 60_000, noEvents).coins - home.coins).toBe(coinRate(home) * IDLE_SHARE * 30)
+  expect([toolPay(home), turnPay(home)]).toEqual([1, 3])
+  const pro = { ...home, cats: home.cats.map(c => ({ ...c, level: 20 })) }
+  expect(toolPay(pro)).toBeGreaterThan(toolPay(home))
+  expect(turnPay(pro)).toBeGreaterThan(turnPay(home))
+})
+
+test('a reply\'s spend pays coins, never below zero and capped per reply', async () => {
+  const home = { ...newHome(0), cats: newHome(0).cats.map(c => ({ ...c, level: 10 })) }
+  expect(spendPay(home, 0)).toBe(0)
+  expect(spendPay(home, -1)).toBe(0)
+  expect(spendPay(home, 0.5)).toBeGreaterThan(spendPay(home, 0.1))
+  expect(spendPay(home, 1_000)).toBe(Math.round(coinRate(home) * SPEND_CAP_MINUTES))
 })
 
 test('daily streak pays once per day and resets after a gap', async () => {
