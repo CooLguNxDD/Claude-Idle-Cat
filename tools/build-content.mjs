@@ -10,6 +10,7 @@ const KINDS = [
   { dir: 'breeds', list: 'BREEDS', type: 'Breed', prefix: 'breed' },
   { dir: 'moves', list: 'MOVES', type: 'Move', prefix: 'move' },
   { dir: 'worlds', list: 'WORLDS', type: 'World', prefix: 'world' },
+  { dir: 'cats', list: 'NAMED_CATS', type: 'NamedCat', prefix: 'cat' },
 ]
 const isCheck = process.argv.includes('--check')
 
@@ -17,7 +18,7 @@ const previous = existsSync(barrel) ? readFileSync(barrel, 'utf8') : ''
 const problems = []
 const camel = id => id.replace(/-([a-z0-9])/g, (_, c) => c.toUpperCase())
 const sections = KINDS.map(kind => {
-  const files = readdirSync(join(content, kind.dir)).filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+  const files = (existsSync(join(content, kind.dir)) ? readdirSync(join(content, kind.dir)) : []).filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts'))
     .map(f => f.slice(0, -3))
   for (const id of files) {
     if (!/^[a-z][a-z0-9-]*$/.test(id)) problems.push(`${kind.dir}/${id}.ts: file names must be lowercase kebab-case`)

@@ -40,6 +40,8 @@ On this machine `~/.claude/settings.json` sets `env.CLAUDE_CODE_PLUGIN_DIRS` to 
 - Each breed is one file in `hooks/content/breeds/<id>.ts` (`defineBreed`: label, rarity, theme shades, pattern). Shades are theme tokens or mixes, so every flavor works.
 - Each move preset is one file in `hooks/content/moves/<id>.ts` (`defineMove`: pose, cycle, speed, lift, seconds, `when`). `hooks/motion.ts` picks and steps moves; the motion lives in memory in `register.tsx`, never in the save.
 - Each world is one file in `hooks/content/worlds/<id>.ts` (`defineWorld`: width per tier, layers, slots, landmarks, perches). The scene draws the sky on the pane and the fence, decor, landmarks and cats on a world-wide `view()` scrolled by the camera.
+- Each named cat is one file in `hooks/content/cats/<id>.ts` (`defineCat`); it replaces a stray at `appears.odds`, rolled from its own seed so plain strays draw the same numbers.
+- The `breed-gen`, `cat-gen`, `move-gen` and `world-gen` skills in `.claude/skills/` write these files; keep them in step when a spec changes.
 - After adding or removing a content file run `node tools/build-content.mjs`; it rewrites `index.ts`, keeps existing entries in place and appends new ones, so seeded rolls stay stable.
 - `node tools/preview.mjs breed <id>` writes a portrait sheet PNG (rows are flavors); `move <id>` writes one cycle of frames. Look before committing.
 - Breeds are drawn in the browser too: rebuild `server/public/arcade.js` after changing one. An unknown coat paints as `FALLBACK_BREED`, so removing a file never breaks a save.

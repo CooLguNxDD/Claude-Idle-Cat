@@ -1,6 +1,6 @@
 // Renders a content preview PNG to look at before committing: node tools/preview.mjs <breed|move|world|cat> <id> [--out <dir>]
 // Breed: a row per flavor in every marking and silhouette. Move: one cycle, facing left then right.
-// World: the whole manor-size yard in every flavor, at noon and at night.
+// World: the whole manor-size yard in every flavor, at noon and at night. Cat: a named cat's portrait in every flavor.
 import { execSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -12,8 +12,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const [kind, id] = process.argv.slice(2)
 const outAt = process.argv.indexOf('--out')
 const out = resolve(outAt > 0 ? process.argv[outAt + 1] : join(tmpdir(), 'idle-cat-previews'))
-if (!['breed', 'move', 'world'].includes(kind) || !id) {
-  console.error('usage: node tools/preview.mjs <breed|move|world> <id> [--out <dir>]')
+if (!['breed', 'move', 'world', 'cat'].includes(kind) || !id) {
+  console.error('usage: node tools/preview.mjs <breed|move|world|cat> <id> [--out <dir>]')
   process.exit(1)
 }
 
@@ -24,10 +24,22 @@ import { canvas } from './hooks/scene/canvas'
 import { pen } from './hooks/scene/fine/draw'
 import { drawHiCat } from './hooks/scene/hicat'
 import { FLAVORS, FLAVOR_NAMES } from './hooks/theme'
-import { MOVES, WORLDS } from './hooks/content'
+import { MOVES, NAMED_CATS, WORLDS } from './hooks/content'
 import { newHome } from './hooks/game'
 import { frameImage } from './hooks/scene'
-export const ids = { breed: COATS, move: MOVES.map(m => m.id), world: WORLDS.map(w => w.id) }
+export const ids = { breed: COATS, move: MOVES.map(m => m.id), world: WORLDS.map(w => w.id), cat: NAMED_CATS.map(c => c.id) }
+// A named cat's portrait at 8x, one flavor per column.
+export const card = (id) => {
+  const named = NAMED_CATS.find(c => c.id === id)
+  return [FLAVOR_NAMES.map(name => {
+    const f = FLAVORS[name]
+    const c = canvas(24, 8)
+    for (let y = 0; y < 24; y++) for (let x = 0; x < 24; x++) c.put(x, y, f.base)
+    drawHiCat(pen(c), 16, 24, { genes: { isShiny: false, ...named.genes }, mood: 'happy', form: null, isAdult: true,
+      isBirthday: false, isBlink: false, tick: 0 }, f)
+    return c.image(f.base)
+  })]
+}
 // The full manor yard as one wide pane, at noon and at midnight in each flavor.
 export const panorama = (id) => {
   const home = { ...newHome(Date.UTC(2026, 5, 1)), tier: 2, world: { id } }
@@ -61,13 +73,13 @@ const dir = mkdtempSync(join(tmpdir(), 'idle-cat-preview-'))
 const bundle = join(dir, 'preview.mjs')
 execSync(`npx -y esbuild@0.25 --bundle --format=esm --platform=node --loader=ts --outfile=${JSON.stringify(bundle)}`,
   { cwd: root, input: entry, stdio: ['pipe', 'ignore', 'pipe'] })
-const { ids, sheet, strip, panorama } = await import(pathToFileURL(bundle).href)
+const { ids, sheet, strip, panorama, card } = await import(pathToFileURL(bundle).href)
 if (!ids[kind].includes(id)) {
   console.error(`no ${kind} ${id}; known: ${ids[kind].join(', ')}`)
   process.exit(1)
 }
 
-const rows = kind === 'breed' ? sheet(id) : kind === 'move' ? strip(id) : panorama(id)
+const rows = { breed: sheet, move: strip, world: panorama, cat: card }[kind](id)
 const tile = rows[0][0]
 const width = tile.width * rows[0].length
 const height = tile.height * rows.length
@@ -108,5 +120,6 @@ mkdirSync(out, { recursive: true })
 const file = join(out, `${kind}-${id}.png`)
 writeFileSync(file, png)
 const LEGEND = { breed: 'rows: latte, frappe, macchiato, mocha; columns: markings x silhouettes',
-  move: 'rows: facing left, facing right; columns: cycle frames', world: 'rows: each flavor at noon, then midnight' }
+  move: 'rows: facing left, facing right; columns: cycle frames', world: 'rows: each flavor at noon, then midnight',
+  cat: 'columns: latte, frappe, macchiato, mocha' }
 console.log(`wrote ${file} (${LEGEND[kind]})`)

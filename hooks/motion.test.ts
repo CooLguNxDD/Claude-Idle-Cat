@@ -25,7 +25,7 @@ test('every move file is valid and the planner can pick it', () => {
   const picked = new Set<string>()
   const rng = seeded(3)
   for (const mood of ['happy', 'ok', 'grumpy', 'sleeping'] as const) for (const personality of ['lazy', 'playful', 'shy'] as const)
-    for (const hour of [7, 15]) for (let i = 0; i < 200; i++) picked.add(pickMove(undefined, ctx({ mood, personality, hour, maxX: 800, landmarks: YARD }), rng).id)
+    for (const hour of [3, 7, 15, 22]) for (let i = 0; i < 200; i++) picked.add(pickMove(undefined, ctx({ mood, personality, hour, maxX: 800, landmarks: YARD }), rng).id)
   expect([...picked].sort()).toEqual(MOVES.map(m => m.id).sort())
 })
 

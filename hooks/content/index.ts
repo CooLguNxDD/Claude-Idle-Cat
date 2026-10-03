@@ -17,6 +17,7 @@ import breedRagdoll from './breeds/ragdoll'
 import breedBengal from './breeds/bengal'
 import breedLynx from './breeds/lynx'
 import breedNebula from './breeds/nebula'
+import breedRussianBlue from './breeds/russian-blue'
 import moveGroom from './moves/groom'
 import moveHop from './moves/hop'
 import moveLoaf from './moves/loaf'
@@ -30,8 +31,11 @@ import moveZoomies from './moves/zoomies'
 import movePipeLounge from './moves/pipe-lounge'
 import moveTowerPerch from './moves/tower-perch'
 import moveTunnelDash from './moves/tunnel-dash'
+import moveProwl from './moves/prowl'
 import worldBackyard from './worlds/backyard'
-import type { Breed, Move, World } from './types'
+import worldRooftops from './worlds/rooftops'
+import catCaptainWhiskers from './cats/captain-whiskers'
+import type { Breed, Move, World, NamedCat } from './types'
 
 export const BREEDS: readonly Breed[] = [
   breedGinger,
@@ -52,6 +56,7 @@ export const BREEDS: readonly Breed[] = [
   breedBengal,
   breedLynx,
   breedNebula,
+  breedRussianBlue,
 ]
 export const MOVES: readonly Move[] = [
   moveGroom,
@@ -67,7 +72,12 @@ export const MOVES: readonly Move[] = [
   movePipeLounge,
   moveTowerPerch,
   moveTunnelDash,
+  moveProwl,
 ]
 export const WORLDS: readonly World[] = [
   worldBackyard,
+  worldRooftops,
+]
+export const NAMED_CATS: readonly NamedCat[] = [
+  catCaptainWhiskers,
 ]

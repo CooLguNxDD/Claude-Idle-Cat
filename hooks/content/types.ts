@@ -1,4 +1,4 @@
-import type { Personality, Rarity, Slot } from '../../types'
+import type { Eyes, Marking, Personality, Rarity, Silhouette, Slot } from '../../types'
 import type { Mood } from '../game'
 import { COLOR_TOKENS, inkOf, mix } from '../theme'
 import type { ColorName, Flavor } from '../theme'
@@ -153,3 +153,27 @@ export const worldProblems = (w: World): string[] => {
   if (w.perches.some(x => x < 0 || x + 7 > w.width.cottage)) out.push(`${w.id}: perches must sit inside the cottage`)
   return out
 }
+
+/** A named character: fixed genes plus a bio and catchphrase. It visits as a rare stray and can be adopted. */
+export type NamedCat = {
+  id: string
+  name: string
+  genes: { coat: string; eyes: Eyes; personality: Personality; marking?: Marking; silhouette?: Silhouette }
+  bio: string
+  catchphrase: string
+  /** Chance (0 to 1) that a stray arriving in one of `worlds` (all worlds when missing) is this cat. */
+  appears: { odds: number; worlds?: readonly string[] }
+}
+
+export const defineCat = (cat: NamedCat): NamedCat => cat
+
+/** Every problem with a named cat against the registries; empty means it can visit. */
+export const catProblems = (c: NamedCat, coats: readonly string[], worlds: readonly string[], all: readonly NamedCat[]): string[] => [
+  ...(/^[a-z][a-z0-9-]*$/.test(c.id) ? [] : [`id ${c.id} must be lowercase kebab-case`]),
+  ...(c.name.trim() && c.name.length <= 20 ? [] : [`${c.id}: name must be 1 to 20 characters`]),
+  ...(all.filter(o => o.name === c.name).length > 1 ? [`${c.id}: another named cat is called ${c.name}`] : []),
+  ...(coats.includes(c.genes.coat) ? [] : [`${c.id}: unknown coat ${c.genes.coat}`]),
+  ...(c.bio.length <= 80 && c.catchphrase.length <= 40 ? [] : [`${c.id}: bio stays under 80 and catchphrase under 40 characters`]),
+  ...(c.appears.odds > 0 && c.appears.odds <= 0.25 ? [] : [`${c.id}: appears.odds is above 0 and at most 0.25`]),
+  ...(c.appears.worlds ?? []).filter(w => !worlds.includes(w)).map(w => `${c.id}: unknown world ${w}`),
+]
