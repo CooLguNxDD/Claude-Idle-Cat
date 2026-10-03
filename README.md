@@ -7,8 +7,6 @@
 It's a Tamagotchi with an idle-game loop: look after the cat, earn coins, buy upgrades and come back for streak bonuses. Claude does the work, the cat does the napping. Everybody wins.
 
 ![Claude Idle Cat demo](docs/video/claude-idle-cat-x-20s.gif)
-
-*20-second tour. [Watch the full-quality MP4](docs/video/claude-idle-cat-x-20s.mp4).*
 ## 📦 Install
 
 Needs Claude Code v2.1.287 or later (mods are on by default). This repo is its own plugin marketplace:
@@ -243,7 +241,7 @@ The mod both fetches from the network (`http.fetch`) and runs programs (`process
 **Programs.** The whole command cannot be one fixed string, because the plugin path, the clip name, the script path, and the loopback port are known only at runtime. The programs are only these:
 
 - `powershell`, and only when `OS` is `Windows_NT`. The arguments are `-NoProfile`, `-NonInteractive`, `-Command`, and `(New-Object Media.SoundPlayer '<plugin>/assets/sfx/<clip>.wav').PlaySync()`. The clip is one of `levelup`, `evolve`, `adopt`, `award`, `coin` from this plugin's `assets/sfx/`. This plays a sound because Claude Code has no audio player on Windows. macOS plays the same files with `$.audio.play`. Linux stays silent.
-- `node`, to start this plugin's `server/arcade.mjs`. That file is readable JavaScript in the repository. It listens on `127.0.0.1` only. The child is given `ARCADE_TOKEN` so the browser page can talk to that one process. The mod does not set your own environment variables.
+- `node`, to start this plugin's `server/arcade.mjs`. That file is readable JavaScript in the repository. It listens on `127.0.0.1` only. The child is given `ARCADE_TOKEN` so the browser page can talk to that one process. It is a random one-time value the mod generates each session. It is not an API key or any credential from your machine, it is never read from your environment or files, and it is only sent to `127.0.0.1`. The mod does not set your own environment variables.
 - `rundll32` with `url.dll,FileProtocolHandler` on Windows, or `open` and then `xdg-open` elsewhere. They open only `http://localhost:<port>/` (the arcade) or `http://localhost:<port>/location` (the device-location page) on the port `server/arcade.mjs` just printed.
 
 **Hosts.** `http.fetch` contacts only these hosts:

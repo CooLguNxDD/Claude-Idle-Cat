@@ -1,2 +1,4 @@
 * text=auto eol=lf
 *.wav binary
+CLAUDE.md export-ignore
+AGENTS.md export-ignore
