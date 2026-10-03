@@ -1,12 +1,12 @@
 # Claude Idle Cat
 
-> *Once upon a time, a stray cat lived in a cardboard box. Poor. Broke. Zero coins, one very damp box.*
-> *So the cats collect one coin at a time.* 🏗️🐾
-
 `afk-cat`: An AFK virtual-pet cat that lives inside Claude Code as a mod (a plugin of function hooks).
 It's a Tamagotchi with an idle-game loop: look after the cat, earn coins, buy upgrades and come back for streak bonuses. Claude does the work, the cat does the napping. Everybody wins.
 
 ![Claude Idle Cat demo](docs/video/claude-idle-cat-x-20s.gif)
+
+> *Once upon a time, a stray cat lived in a cardboard box. Poor. Broke. Zero coins, one very damp box.*
+> *So the cats collect one coin at a time.* 🏗️🐾
 
 ## 📦 Install
 
