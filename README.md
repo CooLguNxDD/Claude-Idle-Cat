@@ -7,6 +7,7 @@
 It's a Tamagotchi with an idle-game loop: look after the cat, earn coins, buy upgrades and come back for streak bonuses. Claude does the work, the cat does the napping. Everybody wins.
 
 ![Claude Idle Cat demo](docs/video/claude-idle-cat-x-20s.gif)
+
 ## 📦 Install
 
 Needs Claude Code v2.1.287 or later (mods are on by default). This repo is its own plugin marketplace:
