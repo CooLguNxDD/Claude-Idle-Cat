@@ -11,8 +11,8 @@ import { buyCatnip, marketNow, seasonOf, sellCatnip, weekOf } from './calendar'
 import { ACHIEVEMENTS, MILES_SHOP, buyWithMiles, settle, tasksFor, track } from './collection'
 import { CRITTERS, critter, isAvailable, sell } from './critters'
 import { act, activeCat, adopt, adoptPrice, adoptVisitor, bar, buyItem, checkIn, donateCritter, giveGift, idleRate,
-  learnSkill, migrate, moodOf, newHome, nextCat, rename, respec, reward, spendPay, stageName, switchTo, tick, toolPay,
-  turnPay, welcomeBack, xpToNext } from './game'
+  learnSkill, migrate, moodOf, newHome, nextCat, rename, respec, reward, rollToolPay, spendPay, stageName, switchTo, tick,
+  TOOL_CHANCE, toolPay, turnPay, welcomeBack, xpToNext } from './game'
 import { CATCHPHRASE_LEVEL, DAILY_CAP, GIFTS, LEVELS, NICKNAME_LEVEL, PHOTO_LEVEL, dayOf, dialogue, friendLevel,
   levelName, toNextLevel } from './friends'
 import type { Action } from './game'
@@ -87,6 +87,8 @@ let runX = 0
 let sprintUntil = 0
 // Session spend (US dollars) already paid out; each finished reply pays what it added.
 let paidUsd = 0
+// Coins gained this prompt and this chat; the prompt resets on turn.start, both on session.start.
+const earned = { prompt: 0, chat: 0 }
 let flavorNow: (now: number) => Flavor = () => FLAVORS.mocha
 // The browser arcade's server: started on first use, killed with the module; the token guards it.
 const arcade = { port: 0, token: newToken(Math.random), starting: null as Promise<number> | null, pushed: '', isOpened: false }
@@ -113,6 +115,9 @@ const change = async ($: EngineInterface, fn: (home: Home, now: number) => Home)
     return (home = { ...settle(fn(before, now), now), rev: before.rev + 1 })
   })
   latest = home
+  const gain = Math.max(0, home.coins - before.coins)
+  earned.prompt += gain
+  earned.chat += gain
   const clip = home.effect && home.effect !== before.effect ? CLIP_FOR[home.effect.kind] : undefined
   if (clip && isSoundOn) void playClip($, clip).catch(() => undefined)
   for (const a of ACHIEVEMENTS) if (!(a.id in before.achievements) && a.id in home.achievements) $.ui.toast(`🏆 ${a.name}: ${a.text} (+${a.miles} miles)`)
@@ -452,6 +457,9 @@ export const register: Register = (on, options) => {
       bonus = day.bonus
       return saved ? welcomeBack(loaded, day.home, t) : day.home
     })
+    // Time away and the streak bonus are not this chat's earnings.
+    earned.prompt = 0
+    earned.chat = 0
     if (home.effect?.kind === 'welcome') $.ui.toast(home.log)
     if (bonus > 0) $.ui.toast(`Day ${home.streak} streak bonus: +${bonus}c`)
     void refreshWeather($)
@@ -577,8 +585,13 @@ export const register: Register = (on, options) => {
   on('tool.call', async ($, e, next) => {
     sprintUntil = frame + 16
     const ran = await next(e)
-    void change($, (h, t) => track(reward(h, toolPay(h)), 'tools', 1, t))
+    void change($, (h, t) => track(reward(h, rollToolPay(h, Math.random)), 'tools', 1, t))
     return ran
+  })
+
+  on('turn.start', async ($, e, next) => {
+    earned.prompt = 0
+    return next(e)
   })
 
   on('turn.complete', async ($, e, next) => {
@@ -589,7 +602,7 @@ export const register: Register = (on, options) => {
       const bonus = spendPay(h, spent)
       const paid = { ...reward(h, turnPay(h) + bonus, 2, t), effect: { kind: 'coins' as const, at: t } }
       return track(bonus > 0 ? { ...paid, log: `Claude worked hard: +${turnPay(h) + bonus}c` } : paid, 'turns', 1, t)
-    })
+    }).then(() => $.ui.toast(`💰 +${fmtCoins(earned.prompt)} this prompt · +${fmtCoins(earned.chat)} this chat`))
     return next(e)
   })
 
@@ -1007,7 +1020,7 @@ export const register: Register = (on, options) => {
           XP {bar((cat.xp / xpToNext(cat.level)) * 100, 10)} {cat.xp}/{xpToNext(cat.level)}
         </Text>
         <Text color={tone.coin}>
-          Coins {fmtCoins(home.coins)} (+{idleRate(home).toFixed(1)}/min idle · +{toolPay(home)}/tool)
+          Coins {fmtCoins(home.coins)} (+{idleRate(home).toFixed(1)}/min idle · +{toolPay(home)}/tool, {TOOL_CHANCE * 100}% of calls)
           {freePoints(cat) > 0 ? ` · ${freePoints(cat)} skill point${freePoints(cat) > 1 ? 's' : ''} to spend (s)` : ''}
         </Text>
         <Text italic color={tone.log}>{home.log}</Text>

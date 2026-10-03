@@ -22,10 +22,11 @@ const MAX_AFK_MS = 8 * 60 * MINUTE
 const EVENTS_PER_MIN = 0.02
 // Idle time earns a share of the full rate; Claude's work pays in minutes of it.
 export const IDLE_SHARE = 0.5
-const TOOL_MINUTES = 0.5
+const TOOL_MINUTES = 0.4
+// Only some tool calls pay, so a long run of calls is a few tips, not a steady wage.
+export const TOOL_CHANCE = 0.35
 const TURN_MINUTES = 2
-const MINUTES_PER_USD = 20
-export const SPEND_CAP_MINUTES = 30
+const MINUTES_PER_USD = 5
 // Time away never pushes a stat below this: cats get grumpy, never sad.
 export const DECAY_FLOOR = 25
 
@@ -132,10 +133,12 @@ export const catRate = (home: Home, cat: Cat) =>
 export const coinRate = (home: Home) => home.cats.reduce((sum, cat) => sum + catRate(home, cat), 0)
 export const idleRate = (home: Home) => coinRate(home) * IDLE_SHARE
 export const toolPay = (home: Home) => Math.max(1, Math.round(coinRate(home) * TOOL_MINUTES))
+// A tool call pays toolPay with probability TOOL_CHANCE, else nothing.
+export const rollToolPay = (home: Home, rng: Rng) => (rng() < TOOL_CHANCE ? toolPay(home) : 0)
 export const turnPay = (home: Home) => Math.max(3, Math.round(coinRate(home) * TURN_MINUTES))
-// What a reply's API spend (US dollars) pays, capped per reply.
+// What a reply's API spend (US dollars) pays; no cap.
 export const spendPay = (home: Home, usd: number) =>
-  Math.round(coinRate(home) * Math.min(Math.max(0, usd) * MINUTES_PER_USD, SPEND_CAP_MINUTES))
+  Math.round(coinRate(home) * Math.max(0, usd) * MINUTES_PER_USD)
 
 const gainXp = (home: Home, id: string, xp: number, now: number): Home => {
   let log = home.log

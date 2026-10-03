@@ -83,7 +83,7 @@ Short version: stats drop, coins pile up, cats judge you silently.
 
 ### 🎁 Claude helps, and other ways to get paid
 
-- Claude helps, and pays better than napping: each tool call pays 30 seconds of the household's full rate (at least 1c). Each finished reply pays 2 minutes of it (at least 3c) and +2xp, plus a bonus for what the reply cost: $1 of session spend (as `/cost` totals it) is worth 20 minutes, capped at 30 minutes per reply.
+- Claude helps, and pays better than napping: about 1 tool call in 3 pays a tip of 24 seconds of the household's full rate (at least 1c). Each finished reply pays 2 minutes of it (at least 3c) and +2xp, plus a bonus for what the reply cost: $1 of session spend (as `/cost` totals it) is worth 5 minutes, with no cap. Each finished reply toasts the coins you gained during that prompt and during this chat (idle income and gifts included; spending isn't subtracted).
 - A daily check-in bonus grows with your streak (up to 7 days). Random AFK events give extra coins.
 - Each level gives a skill point for the Skills tab (`s`). There are three branches: **Hunter** (coins, AFK finds, gifts), **Cuddler** (joy, xp) and **Dreamer** (sleep, time away). Resetting skills costs coins.
 - Cats grow from kitten to cat (red collar) at level 5. At level 10 they evolve into the form of their strongest branch: **Ninja** 🥷 (headband), **Royal** 👑 (crown and cape) or **Cloud** ☁️ (halo and wings). A cat with no skills becomes a **Chonk**. (No shame. Chonk is a lifestyle.)

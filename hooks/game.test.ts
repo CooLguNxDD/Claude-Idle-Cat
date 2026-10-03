@@ -1,8 +1,8 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Home } from '../types'
-import { DECAY_FLOOR, IDLE_SHARE, SPEND_CAP_MINUTES, act, activeCat, adopt, checkIn, coinRate, migrate, moodOf, newHome,
-  nextCat, spendPay, stageOf, switchTo, tick, toolPay, turnPay } from './game'
+import { DECAY_FLOOR, IDLE_SHARE, TOOL_CHANCE, act, activeCat, adopt, checkIn, coinRate, migrate, moodOf, newHome,
+  nextCat, rollToolPay, spendPay, stageOf, switchTo, tick, toolPay, turnPay } from './game'
 import { seeded } from './rng'
 import { ROWS, frameCells } from './scene'
 import { FLAVORS } from './theme'
@@ -73,12 +73,23 @@ test('idle time pays a share of the full rate; Claude\'s work pays minutes of it
   expect(turnPay(pro)).toBeGreaterThan(turnPay(home))
 })
 
-test('a reply\'s spend pays coins, never below zero and capped per reply', async () => {
+test('a reply\'s spend pays coins, never below zero and with no cap', async () => {
   const home = { ...newHome(0), cats: newHome(0).cats.map(c => ({ ...c, level: 10 })) }
   expect(spendPay(home, 0)).toBe(0)
   expect(spendPay(home, -1)).toBe(0)
   expect(spendPay(home, 0.5)).toBeGreaterThan(spendPay(home, 0.1))
-  expect(spendPay(home, 1_000)).toBe(Math.round(coinRate(home) * SPEND_CAP_MINUTES))
+  expect(spendPay(home, 100)).toBeGreaterThan(spendPay(home, 10))
+})
+
+test('only some tool calls pay', async () => {
+  const home = newHome(0)
+  expect(rollToolPay(home, () => 0)).toBe(toolPay(home))
+  expect(rollToolPay(home, () => TOOL_CHANCE - 0.001)).toBe(toolPay(home))
+  expect(rollToolPay(home, () => TOOL_CHANCE)).toBe(0)
+  const rng = seeded(11)
+  const paid = Array.from({ length: 2_000 }, () => rollToolPay(home, rng)).filter(n => n > 0).length
+  expect(paid / 2_000).toBeGreaterThan(TOOL_CHANCE - 0.05)
+  expect(paid / 2_000).toBeLessThan(TOOL_CHANCE + 0.05)
 })
 
 test('daily streak pays once per day and resets after a gap', async () => {
