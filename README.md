@@ -68,7 +68,7 @@ Short version: stats drop, coins pile up, cats judge you silently.
 - Rarity odds: **Common 60%**, **Uncommon 25%**, **Rare 10%**, **Epic 4%**, **Legendary 1%**. Coats within a tier have equal odds; the full pool is visible in the tab. Rarity describes appearance and does not change stats or income.
 - New coats include russian blue, chocolate, cinnamon, silver, smoke, tortoiseshell, ragdoll, bengal, lynx and the starry Nebula 🌌. Markings and silhouettes roll independently. Duplicate coats are possible, and every successful pull adds a cat; cats are never replaced.
 - Shiny is a separate 1/64 roll in every rarity tier. The Paw Miles shiny charm guarantees the next successful shelter adoption is shiny.
-- The tab keeps your latest arrival card, a Meet button, shelter-pull count, house expansion link and free adoption of yard visitors. `q` returns to the tab you came from.
+- The tab keeps your latest arrival card with Meet and Pull again buttons, shelter-pull count, house expansion link and free adoption of yard visitors. `q` returns to the tab you came from.
 
 ### 🏠 Home tab (`h`)
 
@@ -76,8 +76,8 @@ Short version: stats drop, coins pile up, cats judge you silently.
 
 - Nyan's shop is open 08:00–22:00 by your clock, with 4 new items every day.
 - Furniture goes in yard spots (bowl, bed, toy, rug, plant, something hanging) and changes the rules: an auto-feeder, sleep regen, coin boosts, slower joy decay, more AFK events, bigger gifts.
-- The yard is wider than the pane and grows with the house: 80 columns for the Cottage, 160 for the House, 240 for the Manor. The view follows the cat; a strip along the top shows where you are. The House unlocks a cat tower and a tunnel, the Manor a big pipe to lounge on, and the cat visits all of them by itself.
-- Tom Mew builds a bigger house (House, then Manor) on an interest-free loan. A quarter of income pays it back, and there's no deadline. Best landlord in town.
+- The yard is wider than the pane and grows with the house: 80 columns for the Cottage, 160 for the House, 240 for the Manor and every bigger house. The view follows the cat; a strip along the top shows where you are. The House unlocks a cat tower and a tunnel, the Manor a big pipe to lounge on, and the cat visits all of them by itself.
+- Tom Mew builds a bigger house (House, Manor, Villa, Mansion, Castle, Palace, and on forever) on an interest-free loan. Every house holds one more cat. The first loan is 400c and each one after doubles (800c, 1.6kc, …). A quarter of income pays it back, and there's no deadline. Best landlord in town.
 - Now and then a named cat drops by instead of a plain stray, like Captain Whiskers, a retired ship's cat with opinions about tuna. Named cats can be adopted too.
 - Stray cats visit the yard, drawn by your decor (each item attracts certain personalities). They sit on the fence for a few hours, leave a gift, and you can adopt them for free. Remember, you were one once.
 
