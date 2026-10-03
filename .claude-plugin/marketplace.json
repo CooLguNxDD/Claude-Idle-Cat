@@ -6,7 +6,7 @@
     {
       "name": "afk-cat",
       "source": ".",
-      "version": "0.3.0",
+      "version": "0.0.1",
       "description": "A Tamagotchi-style AFK cat that lives in a Claude Code pane, earns coins while you idle and while Claude works"
     }
   ]
