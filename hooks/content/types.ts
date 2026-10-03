@@ -1,4 +1,4 @@
-import type { Personality, Rarity } from '../../types'
+import type { Personality, Rarity, Slot } from '../../types'
 import type { Mood } from '../game'
 import { COLOR_TOKENS, inkOf, mix } from '../theme'
 import type { ColorName, Flavor } from '../theme'
@@ -76,6 +76,8 @@ export type Move = {
   when: { moods?: readonly Mood[]; personality?: Partial<Record<Personality, number>>; hours?: readonly [number, number]; weight: number }
   /** Moves that may follow; empty or missing means any. */
   next?: readonly string[]
+  /** Walks to this landmark first, then perches on it or runs through it; skipped where the yard has none. */
+  seek?: LandmarkKind
 }
 
 export const defineMove = (move: Move): Move => move
@@ -92,4 +94,62 @@ export const moveProblems = (m: Move, all: readonly Move[]): string[] => [
   ...(m.when.weight >= 0 ? [] : [`${m.id}: weight must not be negative`]),
   ...(m.when.hours && !m.when.hours.every(h => Number.isInteger(h) && h >= 0 && h <= 24) ? [`${m.id}: hours are 0 to 24`] : []),
   ...(m.next ?? []).filter(id => !all.some(o => o.id === id)).map(id => `${m.id}: next names unknown move ${id}`),
+  ...(m.seek && !LANDMARK_KINDS.includes(m.seek) ? [`${m.id}: unknown landmark ${m.seek}`] : []),
+  ...(m.seek && m.speed === 0 ? [`${m.id}: a seek move needs a speed to get there`] : []),
 ]
+
+/** Far scenery drawn behind the fence; parallax 0 stays put, 1 moves with the yard. */
+export type LayerKind = 'hills' | 'trees' | 'rooftops'
+export const LAYER_KINDS: readonly LayerKind[] = ['hills', 'trees', 'rooftops']
+/** Things the cat can visit; each kind's size and perch live in `scene/landmarks.ts`. */
+export type LandmarkKind = 'tower' | 'tunnel' | 'pipe'
+export const LANDMARK_KINDS: readonly LandmarkKind[] = ['tower', 'tunnel', 'pipe']
+export const LANDMARK_WIDTH: Record<LandmarkKind, number> = { tower: 12, tunnel: 22, pipe: 16 }
+/** How far above the floor a cat sits on each landmark, in design units (negative is up); 0 means it runs through. */
+export const LANDMARK_PERCH: Record<LandmarkKind, number> = { tower: -28, tunnel: 0, pipe: -30 }
+export const TIER_KEYS = ['cottage', 'house', 'manor'] as const
+
+export type World = {
+  id: string
+  label: string
+  /** Yard width in scene columns for each house tier; it only grows. */
+  width: Record<(typeof TIER_KEYS)[number], number>
+  layers: readonly { kind: LayerKind; parallax: number; tint: Shade }[]
+  /** Scene x of each furniture slot; all sit inside the cottage width. */
+  slots: Record<Slot, number>
+  /** Scene x of each landmark and the tier (0 cottage, 1 house, 2 manor) that unlocks it. */
+  landmarks: readonly { kind: LandmarkKind; x: number; tier: 0 | 1 | 2 }[]
+  /** Fence-top spots for the other cats and visiting strays, in scene x. */
+  perches: readonly number[]
+}
+
+export const defineWorld = (world: World): World => world
+
+const SLOTS: readonly Slot[] = ['bowl', 'bed', 'toy', 'rug', 'plant', 'hanging']
+
+/** Every problem with a world spec; empty means the yard can draw it. */
+export const worldProblems = (w: World): string[] => {
+  const widths = TIER_KEYS.map(k => w.width[k])
+  const out: string[] = []
+  if (!/^[a-z][a-z0-9-]*$/.test(w.id)) out.push(`id ${w.id} must be lowercase kebab-case`)
+  if (widths.some(n => !Number.isInteger(n) || n < 56 || n > 320)) out.push(`${w.id}: widths are whole columns from 56 to 320`)
+  if (widths.some((n, i) => i > 0 && n < widths[i - 1]!)) out.push(`${w.id}: widths must not shrink with the tier`)
+  for (const layer of w.layers) {
+    if (!LAYER_KINDS.includes(layer.kind)) out.push(`${w.id}: unknown layer ${layer.kind}`)
+    if (!(layer.parallax >= 0 && layer.parallax < 1)) out.push(`${w.id}: layer parallax is 0 to below 1`)
+    out.push(...shadeProblem(layer.tint, `${w.id}.layers.${layer.kind}`))
+  }
+  for (const slot of SLOTS) {
+    const x = w.slots[slot]
+    if (!(Number.isInteger(x) && x >= 0 && x <= w.width.cottage - 14)) out.push(`${w.id}: slot ${slot} must sit inside the cottage`)
+  }
+  for (const l of w.landmarks) {
+    if (!LANDMARK_KINDS.includes(l.kind)) out.push(`${w.id}: unknown landmark ${l.kind}`)
+    else if (l.x < 0 || l.x + LANDMARK_WIDTH[l.kind] > widths[l.tier]!) out.push(`${w.id}: ${l.kind} at ${l.x} is outside the tier ${l.tier} yard`)
+  }
+  const spans = w.landmarks.filter(l => LANDMARK_KINDS.includes(l.kind))
+    .map(l => [l.x, l.x + LANDMARK_WIDTH[l.kind]] as const).sort((a, b) => a[0] - b[0])
+  if (spans.some((s, i) => i > 0 && s[0] < spans[i - 1]![1])) out.push(`${w.id}: landmarks overlap`)
+  if (w.perches.some(x => x < 0 || x + 7 > w.width.cottage)) out.push(`${w.id}: perches must sit inside the cottage`)
+  return out
+}

@@ -34,7 +34,9 @@ Then type `/cat` to open the pane. Meow.
 | `/cat weather refresh` | update weather now (at most once per minute) |
 | `/cat weather units c\|f` | choose Celsius/km/h or Fahrenheit/mph |
 | `/cat weather off` | stop weather requests and clear the saved location |
+| `/cat world [id]` | list the worlds, or move the yard to another world file |
 | `f` `e` `n` | Feed (5c) · Pet · Nap/Wake |
+| `j` / `l` / `0` | (Cat tab) pan the yard left / right · follow the cat again (it resumes on its own after 10 s) |
 | `p` | Play: opens the Arcade in your browser |
 | `o` | (Arcade tab) open or reopen the browser arcade |
 | `w` | open/close the cat list |
@@ -74,6 +76,7 @@ Short version: stats drop, coins pile up, cats judge you silently.
 
 - Nyan's shop is open 08:00–22:00 by your clock, with 4 new items every day.
 - Furniture goes in yard spots (bowl, bed, toy, rug, plant, something hanging) and changes the rules: an auto-feeder, sleep regen, coin boosts, slower joy decay, more AFK events, bigger gifts.
+- The yard is wider than the pane and grows with the house: 80 columns for the Cottage, 160 for the House, 240 for the Manor. The view follows the cat; a strip along the top shows where you are. The House unlocks a cat tower and a tunnel, the Manor a big pipe to lounge on, and the cat visits all of them by itself.
 - Tom Mew builds a bigger house (House, then Manor) on an interest-free loan. A quarter of income pays it back, and there's no deadline. Best landlord in town.
 - Stray cats visit the yard, drawn by your decor (each item attracts certain personalities). They sit on the fence for a few hours, leave a gift, and you can adopt them for free. Remember, you were one once.
 
@@ -229,6 +232,9 @@ hooks/genes/paint.ts         themed coat colors and deterministic markings
 hooks/adoption/             rarity/coat registry and shelter receipts
 hooks/content/breeds/*.ts    one file per coat: label, rarity, theme shades and pattern
 hooks/content/moves/*.ts     one file per move preset: pose, cycle, speed, lift, duration and when it is picked
+hooks/content/worlds/*.ts    one file per world: width per tier, far layers, furniture slots, landmarks, fence perches
+hooks/world.ts + camera.ts   pure world lookup, landmark unlocks and the follow/pan camera
+hooks/scene/layers.ts        parallax hills, trees and rooftops; scene/landmarks.ts draws the tower, tunnel and pipe
 hooks/motion.ts              pure move planner: picks the next move and steps the cat's position each frame
 hooks/content/index.ts       generated list of every content file (build: node tools/build-content.mjs)
 hooks/scene/shelter.ts       parcel opening and adoption reveal scene
@@ -263,7 +269,7 @@ assets/sfx/*.wav             the clips
 tools/gen-sfx.mjs            regenerates the clips
 tools/build-art.mjs          regenerates 24 deterministic 320×180 PNG backgrounds
 tools/build-content.mjs      regenerates hooks/content/index.ts; --check fails when it is stale
-tools/preview.mjs            renders a breed's portrait sheet or a move's frame strip to a PNG for a look before committing
+tools/preview.mjs            renders a breed's portrait sheet, a move's frame strip or a world panorama to a PNG for a look before committing
 tools/build-themes.mjs       writes themes/*.json (Claude Code custom themes) from hooks/theme.ts
 themes/*.json                the four Catppuccin Claude Code themes (generated, committed)
 hooks/rng.ts                 seeded random numbers (repeatable tests)

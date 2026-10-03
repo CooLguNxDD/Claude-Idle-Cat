@@ -22,6 +22,22 @@ export type SceneCanvas = {
   text: (col: number, row: number, value: string, fg: number) => void
   pack: () => string
   image: (shadow: number) => RgbaImage
+  /** Device columns that reach the screen, for drawers that walk every pixel of a band. */
+  span?: readonly [number, number]
+}
+
+/** A canvas `cols` wide drawn through `c` with its left edge `camX` scene columns off screen; fine pixels keep sub-column steps. */
+export const view = (c: SceneCanvas, cols: number, camX: number): SceneCanvas => {
+  const coarse = Math.round(camX)
+  const dev = Math.round(camX * c.scale)
+  return {
+    ...c,
+    w: cols,
+    put: (x, y, color) => c.put(x - coarse, y, color),
+    fine: (x, y, color) => (c.isFine ? c.fine(x - dev, y, color) : c.put(x - coarse, y, color)),
+    text: (col, row, value, fg) => c.text(col - coarse, row, value, fg),
+    span: [dev, dev + c.w * c.scale],
+  }
 }
 
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'

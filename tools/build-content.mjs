@@ -9,6 +9,7 @@ const barrel = join(content, 'index.ts')
 const KINDS = [
   { dir: 'breeds', list: 'BREEDS', type: 'Breed', prefix: 'breed' },
   { dir: 'moves', list: 'MOVES', type: 'Move', prefix: 'move' },
+  { dir: 'worlds', list: 'WORLDS', type: 'World', prefix: 'world' },
 ]
 const isCheck = process.argv.includes('--check')
 

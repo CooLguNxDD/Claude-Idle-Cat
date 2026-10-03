@@ -21,10 +21,15 @@ import { COATS, RARITIES, breedOf, rarityBadge, rarityOf } from './adoption/regi
 import { revealedCat } from './adoption/state'
 import { LOAN_SHARE, SHOP_CLOSE, SHOP_OPEN, TIERS, baitOf, dailyStock, furniture, isShopOpen, maxCats, payLoan, place,
   takeLoan, tierOf } from './home'
-import { PICTURE_SCALE, ROWS, frameCells, frameImage, sceneCols } from './scene'
+import { PICTURE_SCALE, ROWS, frameCells, frameImage, sceneCols, yardCols } from './scene'
 import type { RgbaImage } from './scene'
 import { CLASSIC_X } from './scene/cats'
 import { motionCtxOf, startMotion, stepMotion } from './motion'
+import { followCam, panCam } from './camera'
+import type { Camera } from './camera'
+import { setWorld } from './world'
+import { WORLDS } from './content'
+import { DESIGN } from './scene/fine/draw'
 import { seeded } from './rng'
 import type { Rng } from './rng'
 import { shelterCells, shelterImage } from './scene/shelter'
@@ -63,6 +68,8 @@ let frame = 0
 // Where the active cat is in the yard and what it is doing; kept in memory, never in the save.
 let motion = startMotion(CLASSIC_X)
 let motionRng: Rng | null = null
+// The pane's window onto the yard; it follows the cat until a pan holds it for a while.
+let camera: Camera = { x: 0, manualUntil: 0 }
 // What the frame loop paints: the pane's view, element and last frame, whether it is mounted, and an in-flight guard.
 const paint = { view: 'cat' as View, kind: 'raster' as SceneKind, last: '', isMounted: false, isBusy: false, busyAt: 0 }
 // Set once an Image scene draws its text alt: this terminal shows no pictures, so the pane keeps to the Raster.
@@ -225,10 +232,11 @@ const hourOf = (now: number) => new Date(now).getHours()
 
 type SceneKind = 'raster' | 'image'
 const sceneCellsOf = (home: Home, view: View, now: number, flavor: Flavor) => view === 'adopt'
-  ? shelterCells(home, now, frame, flavor, cols) : frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion })
+  ? shelterCells(home, now, frame, flavor, cols) : frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion,
+    camX: camera.x })
 const sceneImageOf = (home: Home, view: View, now: number, flavor: Flavor): RgbaImage => view === 'adopt'
   ? shelterImage(home, now, frame, flavor, cols, PICTURE_SCALE)
-  : frameImage({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion })
+  : frameImage({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion, camX: camera.x })
 // A denied Image blit that names its alt means the terminal draws no pictures here.
 const isAltDeny = (deny: string) => /\balt\b|placeholder/i.test(deny)
 
@@ -359,7 +367,9 @@ const HELP = [
   '/cat import <file> — load a backup (your current save is backed up first)',
   '/cat weather <city> — real weather; system for device location, off to clear, refresh to update',
   '/cat theme <latte|frappe|macchiato|mocha> — switch Claude Code to that Catppuccin theme',
+  '/cat world [id] — list the worlds, or move the yard to another one',
   'In the pane: ‹ › tabs · q back · c a s h r b m g t visible tab shortcuts · f e n feed/pet/nap · p arcade · w cat list',
+  'On the Cat tab: j and l pan the yard · 0 follows the cat again',
 ].join('\n')
 
 // Sets Claude Code's own theme to one of this mod's Catppuccin themes, found in the theme row's options.
@@ -467,6 +477,7 @@ export const register: Register = (on, options) => {
         if (paint.isMounted) {
           motionRng ??= seeded(now)
           motion = stepMotion(motion, motionCtxOf(latest, cols, hourOf(now)), motionRng)
+          camera = followCam(camera, Math.round(motion.x / DESIGN), 14, yardCols(latest, cols), cols, frame)
         }
         // Skips the scene while the pane is closed and when a frame would repaint the same cells.
         if (paint.isMounted && paint.kind === 'raster') {
@@ -508,6 +519,10 @@ export const register: Register = (on, options) => {
     }
     if (sub === 'export' || sub === 'import') return backupCommand($, sub, arg)
     if (sub === 'theme') return themeCommand($, arg)
+    if (sub === 'world') {
+      if (!arg) return { text: `Worlds: ${WORLDS.map(w => `${w.id} (${w.label})`).join(', ')}. Use /cat world <id>.` }
+      return { text: (await change($, h => setWorld(h, arg.trim().toLowerCase()))).log }
+    }
     if (sub === 'weather') {
       await routeTo($, 'weather')
       const result = await weatherCommand($, arg)
@@ -984,6 +999,16 @@ export const register: Register = (on, options) => {
           {freePoints(cat) > 0 ? ` · ${freePoints(cat)} skill point${freePoints(cat) > 1 ? 's' : ''} to spend (s)` : ''}
         </Text>
         <Text italic color={tone.log}>{home.log}</Text>
+        {yardCols(home, cols) > cols && (
+          <Box>
+            <Button key="pan-left" plain hotkey="j" label="◂ yard (j)"
+              onPress={() => { camera = panCam(camera, -1, yardCols(home, cols), cols, frame) }} />
+            <Button key="pan-follow" plain hotkey="0" label={`follow ${cat.name} (0)`}
+              onPress={() => { camera = { ...camera, manualUntil: 0 } }} />
+            <Button key="pan-right" plain hotkey="l" label="yard ▸ (l)"
+              onPress={() => { camera = panCam(camera, 1, yardCols(home, cols), cols, frame) }} />
+          </Box>
+        )}
         <Box>
           {ACTIONS.map(a => (
             <Button key={a.action} label={a.label} hotkey={a.hotkey}

@@ -12,7 +12,9 @@ import { pen } from './fine/draw'
 export type YardState = { season: ReturnType<typeof seasonOf>; festival: ReturnType<typeof festivalOf>; isNight: boolean }
 const STARS: [number, number][] = [[2, 1], [7, 4], [12, 2], [19, 1], [24, 5], [4, 7], [16, 6], [38, 2], [45, 5], [51, 1]]
 
-export const drawYard = (c: SceneCanvas, now: number, hour: number, tick: number, f: Flavor, weather: WeatherReading | null = null): YardState => {
+/** Sky on the pane canvas `c`, then `back` (far scenery), then the fence and ground on the world-wide `ground`. */
+export const drawYard = (c: SceneCanvas, now: number, hour: number, tick: number, f: Flavor, weather: WeatherReading | null = null,
+  ground: SceneCanvas = c, back?: (isNight: boolean) => void): YardState => {
   const part = dayPartOf(hour)
   const isNight = weather ? !weather.isDay : part === 'night'
   const isDusk = !isNight && part === 'dusk'
@@ -27,7 +29,8 @@ export const drawYard = (c: SceneCanvas, now: number, hour: number, tick: number
       isWinter: (season === 'winter' && !weather) || weather?.condition === 'snow', hasLights: festival === 'lights' }
     fineYardSky(pen(c), fine, tick, f)
     if (weather) drawWeatherLayer({ c, weather, tick, f }, 'sky')
-    fineYardGround(pen(c), fine, tick, f)
+    back?.(isNight)
+    fineYardGround(pen(ground), fine, tick, f)
     return { season, festival, isNight }
   }
   for (let y = 0; y < HEIGHT; y++) for (let x = 0; x < c.w; x++) c.put(x, y, mix(top, low, y / 20))
@@ -45,18 +48,20 @@ export const drawYard = (c: SceneCanvas, now: number, hour: number, tick: number
         c.put(x0 + dx, 3 + dy, mix(f.base, f.sky, 0.3))
   }
   if (weather) drawWeatherLayer({ c, weather, tick, f }, 'sky')
+  back?.(isNight)
+  const g = ground
   const wood = mix(f.peach, f.surface2, 0.55)
-  for (let x = 0; x < c.w; x++) {
-    for (const y of [15, 18]) c.put(x, y, wood)
-    if (x % 6 === 0) for (let y = 14; y < FLOOR_Y; y++) c.put(x, y, mix(wood, f.crust, 0.25))
+  for (let x = 0; x < g.w; x++) {
+    for (const y of [15, 18]) g.put(x, y, wood)
+    if (x % 6 === 0) for (let y = 14; y < FLOOR_Y; y++) g.put(x, y, mix(wood, f.crust, 0.25))
   }
-  for (let y = FLOOR_Y; y < HEIGHT; y++) for (let x = 0; x < c.w; x++)
-    c.put(x, y, (x + y * 3) % 7 === 0 ? mix(f.peach, f.crust, 0.6) : mix(f.peach, f.crust, 0.4))
-  if (season === 'winter' && !weather) for (let x = 0; x < c.w; x++) {
-    c.put(x, FLOOR_Y, f.isLight ? f.base : f.text)
-    c.put(x, 14, f.isLight ? f.base : f.text)
+  for (let y = FLOOR_Y; y < HEIGHT; y++) for (let x = 0; x < g.w; x++)
+    g.put(x, y, (x + y * 3) % 7 === 0 ? mix(f.peach, f.crust, 0.6) : mix(f.peach, f.crust, 0.4))
+  if (season === 'winter' && !weather) for (let x = 0; x < g.w; x++) {
+    g.put(x, FLOOR_Y, f.isLight ? f.base : f.text)
+    g.put(x, 14, f.isLight ? f.base : f.text)
   }
-  if (festival === 'lights') for (let x = 1; x < c.w; x += 3)
-    c.put(x, 14, [f.red, f.green, f.yellow, f.blue][(x + (tick >> 2)) % 4] ?? f.red)
+  if (festival === 'lights') for (let x = 1; x < g.w; x += 3)
+    g.put(x, 14, [f.red, f.green, f.yellow, f.blue][(x + (tick >> 2)) % 4] ?? f.red)
   return { season, festival, isNight }
 }

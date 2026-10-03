@@ -27,7 +27,11 @@ import moveStretch from './moves/stretch'
 import moveTrot from './moves/trot'
 import moveWalk from './moves/walk'
 import moveZoomies from './moves/zoomies'
-import type { Breed, Move } from './types'
+import movePipeLounge from './moves/pipe-lounge'
+import moveTowerPerch from './moves/tower-perch'
+import moveTunnelDash from './moves/tunnel-dash'
+import worldBackyard from './worlds/backyard'
+import type { Breed, Move, World } from './types'
 
 export const BREEDS: readonly Breed[] = [
   breedGinger,
@@ -60,4 +64,10 @@ export const MOVES: readonly Move[] = [
   moveTrot,
   moveWalk,
   moveZoomies,
+  movePipeLounge,
+  moveTowerPerch,
+  moveTunnelDash,
+]
+export const WORLDS: readonly World[] = [
+  worldBackyard,
 ]

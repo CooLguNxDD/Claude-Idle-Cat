@@ -12,6 +12,7 @@ import type { SceneCanvas } from './canvas'
 import { drawHiCat } from './hicat'
 import { DESIGN, pen } from './fine/draw'
 import { poseOf } from '../motion'
+import { worldOf } from '../world'
 import type { Motion } from '../motion'
 
 // The active cat's left edge, in design units, when nothing is moving it.
@@ -72,8 +73,9 @@ const mini = (cat: Pick<Cat, 'genes'> & { isAsleep?: boolean }, x0: number, y0: 
 export const drawCats = (c: SceneCanvas, home: Home, now: number, tick: number, f: Flavor, motion?: Motion): CatScene => {
   const cat = activeCat(home)
   const others = home.cats.filter(other => other.id !== cat.id)
-  if (others[0]) mini(others[0], 1, FLOOR_Y - 5, tick, f, c)
-  const fence = [26, 33, 40, 47].filter(x => x + 6 < c.w - 6)
+  const world = worldOf(home)
+  if (others[0]) mini(others[0], world.slots.bed + 1, FLOOR_Y - 5, tick, f, c)
+  const fence = world.perches.filter(x => x + 6 < c.w - 6)
   ;[...others.slice(1), ...home.visitors].slice(0, fence.length)
     .forEach((other, i) => mini(other, fence[i] ?? 26, 9, tick + i * 7, f, c))
 
@@ -95,6 +97,7 @@ export const drawCats = (c: SceneCanvas, home: Home, now: number, tick: number, 
   const isBlink = mood === 'sleeping' || pose?.kind === 'sleep' || pose?.kind === 'groom' || tick % 40 < 2
   const form = formOf(cat)
   const birthday = isBirthday(cat, now)
+  if (motion?.isHidden) return { cat, mood, ox, oy, headRow: Math.floor(oy / 2), birthday }
   if (c.isFine) {
     // The picture canvas draws the cat from its spec; its bob is one design unit instead of a whole scene pixel.
     const p = pen(c)

@@ -98,6 +98,8 @@ export type Home = {
   prefs: { glow: boolean; crt: boolean }
   weather: WeatherState
   shelter: Shelter
+  // Which world file the yard is drawn from; an unknown id falls back to the first world.
+  world: { id: string }
 }
 
 declare module 'claude-code' {

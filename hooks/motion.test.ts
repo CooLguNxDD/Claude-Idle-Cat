@@ -11,7 +11,8 @@ import { CLASSIC_X } from './scene/cats'
 import { FLAVORS } from './theme'
 
 const ctx = (over: Partial<MotionCtx> = {}): MotionCtx => ({ mood: 'happy', personality: 'playful', hour: 12, hunger: 90,
-  energy: 90, minX: 0, maxX: 160, spots: { bowl: 140, bed: 0 }, ...over })
+  energy: 90, minX: 0, maxX: 160, spots: { bowl: 140, bed: 0 }, landmarks: [], ...over })
+const YARD = [{ kind: 'tower' as const, x: 300, w: 48 }, { kind: 'tunnel' as const, x: 400, w: 88 }, { kind: 'pipe' as const, x: 560, w: 64 }]
 const run = (m: Motion, c: MotionCtx, frames: number, seed = 7) => {
   const rng = seeded(seed)
   const seen: Motion[] = []
@@ -24,7 +25,7 @@ test('every move file is valid and the planner can pick it', () => {
   const picked = new Set<string>()
   const rng = seeded(3)
   for (const mood of ['happy', 'ok', 'grumpy', 'sleeping'] as const) for (const personality of ['lazy', 'playful', 'shy'] as const)
-    for (const hour of [7, 15]) for (let i = 0; i < 200; i++) picked.add(pickMove(undefined, ctx({ mood, personality, hour }), rng).id)
+    for (const hour of [7, 15]) for (let i = 0; i < 200; i++) picked.add(pickMove(undefined, ctx({ mood, personality, hour, maxX: 800, landmarks: YARD }), rng).id)
   expect([...picked].sort()).toEqual(MOVES.map(m => m.id).sort())
 })
 
@@ -85,9 +86,33 @@ test('every pose draws in both renderers, facing both ways, and the classic spot
   expect(images.has(classic)).toBe(false)
 })
 
-test('the planner context places the bowl beside the bowl sprite and keeps the cat on screen', () => {
-  const c = motionCtxOf(newHome(0), 48, 9)
-  expect(c.maxX).toBe(32 * 4)
-  expect(c.spots.bowl).toBe((48 - 23) * 4)
+test('the planner context reads the world: its width, bowl, bed and unlocked landmarks', () => {
+  const home = newHome(0)
+  const c = motionCtxOf(home, 48, 9)
+  expect(c.maxX).toBe((80 - 16) * 4)
+  expect(c.spots.bowl).toBe((60 - 14) * 4)
+  expect(c.landmarks).toEqual([])
+  expect(motionCtxOf({ ...home, tier: 2 }, 48, 9).landmarks.map(l => l.kind)).toEqual(['tower', 'tunnel', 'pipe'])
   expect(c.mood).toBe('happy')
+})
+
+test('a seek move walks to the tower and perches on top, and a tunnel dash hides the cat until the far mouth', () => {
+  const c = ctx({ maxX: 800, landmarks: YARD })
+  let m: Motion = { ...startMotion(100), move: 'tower-perch', left: 80, target: 300 + (48 - 56) / 2, stage: 'go', facing: 1 }
+  const rng = seeded(5)
+  for (let i = 0; i < 200 && m.stage === 'go'; i++) m = stepMotion(m, c, rng)
+  expect(m.stage).toBe('stay')
+  expect(m.y).toBe(-28)
+  expect(poseOf(m).lift).toBe(-28)
+  let t: Motion = { ...startMotion(320), move: 'tunnel-dash', left: 40, target: 400 - 28, stage: 'go', facing: 1 }
+  const hidden: boolean[] = []
+  for (let i = 0; i < 300 && t.move === 'tunnel-dash'; i++) hidden.push((t = stepMotion(t, c, rng)).isHidden)
+  expect(hidden).toContain(true)
+  expect(t.isHidden).toBe(false)
+  expect(t.x).toBeGreaterThan(400 + 44)
+})
+
+test('seek moves are skipped in a yard without their landmark', () => {
+  const rng = seeded(9)
+  for (let i = 0; i < 500; i++) expect(pickMove(undefined, ctx(), rng).seek).toBeUndefined()
 })

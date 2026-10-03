@@ -70,7 +70,8 @@ export const pen = (c: SceneCanvas): Pen => {
       for (let i = 0; i <= steps; i++) rect(Math.round(x0 + ((x1 - x0) * i) / steps), Math.round(y0 + ((y1 - y0) * i) / steps), 1, 1, ink)
     },
     fill: (y0, y1, ink) => {
-      for (let dy = Math.round(y0 * u); dy < Math.round(y1 * u); dy++) for (let dx = 0; dx < c.w * c.scale; dx++) {
+      const [x0, x1] = c.span ?? [0, c.w * c.scale]
+      for (let dy = Math.round(y0 * u); dy < Math.round(y1 * u); dy++) for (let dx = Math.max(0, x0); dx < Math.min(x1, c.w * c.scale); dx++) {
         const v = inkAt(ink, dx, dy, dx / u, dy / u)
         if (v !== undefined) c.fine(dx, dy, v)
       }
