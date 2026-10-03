@@ -182,7 +182,10 @@ const tickCat = (home: Home, cat: Cat, min: number): Cat => {
 }
 
 // Advances real time since lastTick for every cat; offline time is capped at 8h.
-export const tick = (home: Home, now: number, rng: Rng = Math.random): Home => {
+export const tick = (home: Home, now: number, rng: Rng = Math.random): Home => tickTally(home, now, rng).home
+
+// tick, plus the coins it spent on its own (loan repayment, auto-feeder), so earnings count gross.
+export const tickTally = (home: Home, now: number, rng: Rng = Math.random): { home: Home; deducted: number } => {
   const cap = MAX_AFK_MS + Math.max(...home.cats.map(c => modsOf(c).offlineHours)) * 60 * MINUTE
   const min = Math.min(Math.max(0, now - home.lastTick), cap) / MINUTE
   const income = idleRate(home) * min
@@ -193,6 +196,7 @@ export const tick = (home: Home, now: number, rng: Rng = Math.random): Home => {
     lastTick: now,
     frame: home.frame + 1,
   }, income)
+  let deducted = home.loan - next.loan
   const deco = homeMods(home)
   for (const cat of home.cats) {
     const woke = cat.isAsleep && !next.cats.find(c => c.id === cat.id)?.isAsleep
@@ -201,6 +205,7 @@ export const tick = (home: Home, now: number, rng: Rng = Math.random): Home => {
   if (deco.autoFeed) {
     for (const cat of next.cats) {
       if (cat.hunger < 40 && next.coins >= 5) {
+        deducted += 5
         next = withCat({ ...next, coins: next.coins - 5, effect: fx('fish', now),
           log: `The auto-feeder served ${cat.name} a fish.` }, cat.id, c => ({ ...c, hunger: clamp(c.hunger + 30) }))
       }
@@ -222,7 +227,7 @@ export const tick = (home: Home, now: number, rng: Rng = Math.random): Home => {
       log: found.length === 1 ? `${who} brought home a ${names[0]}!` : `The cats brought home ${found.length} critters!` },
     'catch', found.length, now)
   }
-  return celebrate(spoil(stepVisitors(next, now, min, rng), now), now)
+  return { home: celebrate(spoil(stepVisitors(next, now, min, rng), now), now), deducted }
 }
 
 // Once per calendar day: a bonus that grows with the streak (capped at 7 days).

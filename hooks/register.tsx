@@ -11,8 +11,8 @@ import { buyCatnip, marketNow, seasonOf, sellCatnip, weekOf } from './calendar'
 import { ACHIEVEMENTS, MILES_SHOP, buyWithMiles, settle, tasksFor, track } from './collection'
 import { CRITTERS, critter, isAvailable, sell } from './critters'
 import { act, activeCat, adopt, adoptPrice, adoptVisitor, bar, buyItem, checkIn, donateCritter, giveGift, idleRate,
-  learnSkill, migrate, moodOf, newHome, nextCat, rename, respec, reward, rollToolPay, spendPay, stageName, switchTo, tick,
-  TOOL_CHANCE, activeMinutes, activePay, rampOf, toolPay, welcomeBack, xpToNext } from './game'
+  learnSkill, migrate, moodOf, newHome, nextCat, rename, respec, reward, rollToolPay, spendPay, stageName, switchTo,
+  tick, tickTally, TOOL_CHANCE, activeMinutes, activePay, rampOf, toolPay, welcomeBack, xpToNext } from './game'
 import { CATCHPHRASE_LEVEL, DAILY_CAP, GIFTS, LEVELS, NICKNAME_LEVEL, PHOTO_LEVEL, dayOf, dialogue, friendLevel,
   levelName, toNextLevel } from './friends'
 import type { Action } from './game'
@@ -107,7 +107,8 @@ const playClip = async ($: EngineInterface, clip: Clip) => {
 }
 
 // Applies a change to the household, then saves it so it survives restarts.
-const change = async ($: EngineInterface, fn: (home: Home, now: number) => Home) => {
+// `deducted` reports coins fn spent on its own, so they still count as earned.
+const change = async ($: EngineInterface, fn: (home: Home, now: number) => Home, deducted?: () => number) => {
   const now = await $.clock.now()
   const stored = await $.store.get('home')
   let home!: Home
@@ -117,7 +118,7 @@ const change = async ($: EngineInterface, fn: (home: Home, now: number) => Home)
     return (home = { ...settle(fn(before, now), now), rev: before.rev + 1 })
   })
   latest = home
-  const gain = Math.max(0, home.coins - before.coins)
+  const gain = Math.max(0, home.coins - before.coins + (deducted?.() ?? 0))
   earned.prompt += gain
   earned.chat += gain
   const clip = home.effect && home.effect !== before.effect ? CLIP_FOR[home.effect.kind] : undefined
@@ -395,6 +396,16 @@ const themeCommand = async ($: EngineInterface, arg: string) => {
   return { text: `Theme set to ${option}.` }
 }
 
+// The session's spend in US dollars, or fallback when the host can't say.
+const sessionUsd = async ($: EngineInterface, fallback: number) => {
+  try {
+    const usd = (await $.session.usage()).cost?.usd
+    return typeof usd === 'number' && Number.isFinite(usd) ? usd : fallback
+  } catch {
+    return fallback
+  }
+}
+
 const userHome = async ($: EngineInterface) => (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
 
 // /cat export writes a dated backup; /cat import checks one, backs up the current save, then loads it.
@@ -450,7 +461,7 @@ export const register: Register = (on, options) => {
       description: 'Open your AFK cats (/cat hide, /cat shelter, /cat adopt [name], /cat switch <name>, /cat rename <name>, /cat weather <city>, /cat export, /cat import <file>, /cat help)',
     })
     await readTheme($)
-    paidUsd = (await $.session.usage()).cost?.usd ?? 0
+    paidUsd = await sessionUsd($, 0)
     const saved = (await $.store.get('home')) ?? (await $.store.get('cat'))
     let bonus = 0
     const home = await change($, (_, t) => {
@@ -467,7 +478,14 @@ export const register: Register = (on, options) => {
     if (bonus > 0) $.ui.toast(`Day ${home.streak} streak bonus: +${bonus}c`)
     void refreshWeather($)
     $.clock.every(60_000, () => { void refreshWeather($) })
-    $.clock.every(TICK_MS, () => void readTheme($).then(() => change($, (h, t) => tick(h, t))))
+    $.clock.every(TICK_MS, () => void readTheme($).then(() => {
+      let auto = 0
+      return change($, (h, t) => {
+        const r = tickTally(h, t)
+        auto = r.deducted
+        return r.home
+      }, () => auto)
+    }))
     // Keeps the arcade server alive; it shuts itself down two minutes after the pings stop.
     $.clock.every(30_000, () => {
       if (!arcade.port) return
@@ -598,7 +616,7 @@ export const register: Register = (on, options) => {
   })
 
   on('turn.complete', async ($, e, next) => {
-    const usd = (await $.session.usage()).cost?.usd ?? paidUsd
+    const usd = await sessionUsd($, paidUsd)
     const spent = usd - paidUsd
     paidUsd = usd
     const ramp = rampOf(chatMinutes)
@@ -607,7 +625,7 @@ export const register: Register = (on, options) => {
       const pay = (activePay(h, e.durationMs) + spendPay(h, spent)) * ramp
       const paid = { ...reward(h, pay, 2, t), effect: { kind: 'coins' as const, at: t } }
       return track(pay > 0 ? { ...paid, log: `Claude worked ${Math.round(activeMinutes(e.durationMs))}m: +${fmtCoins(pay)}` } : paid, 'turns', 1, t)
-    }).then(() => $.ui.toast(`💰 +${fmtCoins(earned.prompt)} this prompt · +${fmtCoins(earned.chat)} this chat · ×${ramp.toFixed(1)} session`))
+    }).then(() => $.ui.toast(`💰 +${fmtCoins(earned.prompt)} this prompt · +${fmtCoins(earned.chat)} this chat · ×${ramp.toFixed(1)} session`)).catch(() => undefined)
     return next(e)
   })
 

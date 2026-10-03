@@ -70,3 +70,34 @@ test('each reply toasts the coins earned this prompt and this chat', async ($, o
   const second = (activePay(stored, TEN_MIN) + spendPay(stored, 0.5)) * ramp
   expect(await reply('t2')).toBe(`💰 +${fmtCoins(second)} this prompt · +${fmtCoins(first + second)} this chat · ×${ramp.toFixed(1)} session`)
 })
+
+test('a failed or garbled usage read still starts the session and pays active time', async ($, on) => {
+  const now = 1_700_000_000_000
+  const clock = mock.clock(on, { now })
+  const cats = newHome(now).cats.map(c => ({ ...c, level: 10 }))
+  let stored: Home = { ...newHome(now), cats, coins: 0, rev: 100 }
+  let isBroken = true
+  on('store.get', () => ({ value: stored }))
+  on('store.set', ($, e) => { stored = e.value as Home; return { value: undefined } })
+  on('session.usage', () => {
+    if (isBroken) throw new Error('no ledger')
+    return { value: { startedAt: 0, context: { window: 200_000 }, rateLimits: [], cost: { usd: NaN } } }
+  })
+  on('command.register', () => ({ value: { command: 'cat' } }))
+  on('config.list', () => ({ value: [] }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('ui.status', () => ({ value: undefined }))
+  on('turn.complete', () => ({ text: '' }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+  const finish = async () => {
+    const before = stored.coins
+    await $.turn.complete({ answer: 'ok', durationMs: TEN_MIN, isAborted: false, turnId: 't', reason: 'answer' })
+    await clock.advance(10)
+    return stored.coins - before
+  }
+  expect(near(await finish(), activePay(stored, TEN_MIN))).toBe(true)
+  isBroken = false
+  expect(near(await finish(), activePay(stored, TEN_MIN) * rampOf(10))).toBe(true)
+  expect(Number.isFinite(stored.coins)).toBe(true)
+})

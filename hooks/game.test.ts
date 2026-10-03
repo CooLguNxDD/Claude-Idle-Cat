@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 
 import type { Home } from '../types'
 import { ACTIVE_CAP_MINUTES, DECAY_FLOOR, IDLE_SHARE, TOOL_CHANCE, act, activeCat, activePay, adopt, checkIn, coinRate,
-  migrate, moodOf, newHome, nextCat, rampOf, rollToolPay, spendPay, stageOf, switchTo, tick, toolPay } from './game'
+  migrate, moodOf, newHome, nextCat, idleRate, rampOf, rollToolPay, spendPay, stageOf, switchTo, tick, tickTally, toolPay } from './game'
 import { seeded } from './rng'
 import { ROWS, frameCells } from './scene'
 import { FLAVORS } from './theme'
@@ -48,6 +48,15 @@ test('a placed auto-feeder feeds every hungry cat', async () => {
   const two = adopt(once, 1, seeded(1))
   const hungry = { ...two, lastTick: 0, cats: two.cats.map(c => ({ ...c, hunger: 10 })) }
   expect(tick(hungry, 60_000, noEvents).cats.every(c => c.hunger > 30)).toBe(true)
+})
+
+test('a tick reports what the auto-feeder spent, so earnings count gross income', async () => {
+  const once: Home = { ...rich(newHome(0)), owned: [...newHome(0).owned, 'feeder'], decor: { ...newHome(0).decor, bowl: 'feeder' } }
+  const two = adopt(once, 1, seeded(1))
+  const hungry = { ...two, lastTick: 0, cats: two.cats.map(c => ({ ...c, hunger: 10 })) }
+  const { home, deducted } = tickTally(hungry, 60_000, noEvents)
+  expect(deducted).toBe(10)
+  expect(Math.abs(home.coins + deducted - hungry.coins - idleRate(hungry))).toBeLessThan(1e-9)
 })
 
 test('adoption rolls genes, picks a free name and respects the house size', async () => {
