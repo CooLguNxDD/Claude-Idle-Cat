@@ -139,7 +139,7 @@ const onArcadeLine = async ($: EngineInterface, line: string) => {
   let wasOpen = false
   const home = await change($, (h, t) => {
     wasOpen = h.arcade.open?.game === msg.game
-    return msg.kind === 'quit' ? quitGame(h) : finishGame(h, msg.game, msg.score, msg.ms, t)
+    return msg.kind === 'quit' ? quitGame(h) : finishGame(h, msg.game, msg.score, msg.ms, t, Math.random)
   })
   if (wasOpen && msg.kind === 'result') $.ui.toast(`🎮 ${home.log}`)
 }

@@ -1,14 +1,17 @@
 // Arcade economy: rounds cost energy, medals pay minutes of idle income, three paid plays per game a day.
 import type { Arcade, Cat, GameId, Home } from '../../types'
 import { track } from '../collection'
+import { addToPocket } from '../critters'
 import { befriend, dayOf } from '../friends'
 import { activeCat, coinRate, reward } from '../game'
 import { seeded } from '../rng'
+import type { Rng } from '../rng'
 import { branchPoints } from '../skills'
 import type { GameMods } from './game'
 import { GAMES, gameOf, isGameId } from './games'
 import { medalOf } from './medals'
 import type { Medal } from './medals'
+import { rollPrize } from './prizes'
 
 export const ENERGY_COST = 10
 export const PAID_PLAYS = 3
@@ -61,7 +64,8 @@ export const parseMessage = (data: unknown): ArcadeMessage | null => {
 }
 
 // Pays a finished round, only for the round that was started; the score is clamped to what its time allows.
-export const finishGame = (home: Home, game: GameId, posted: number, postedMs: number, now: number): Home => {
+// A paid round also rolls for a random prize.
+export const finishGame = (home: Home, game: GameId, posted: number, postedMs: number, now: number, rng: Rng): Home => {
   const open = home.arcade.open
   const g = gameOf(game)
   if (!open || open.game !== game || !g) return home
@@ -76,6 +80,7 @@ export const finishGame = (home: Home, game: GameId, posted: number, postedMs: n
   const xp = isPaid && medal ? XP[medal] : 0
   const joy = 15 + Math.min(15, Math.floor((score / g.medals[2]) * 15))
   const cat = activeCat(home)
+  const prize = isPaid ? rollPrize(home, cat, medal, rng) : null
   const parts = [
     `${cat.name} scored ${score} in ${g.name}`,
     medal ? `${medal} medal` : 'no medal',
@@ -83,6 +88,7 @@ export const finishGame = (home: Home, game: GameId, posted: number, postedMs: n
     xp ? `+${xp}xp` : '',
     `+${joy} joy`,
     isBest ? 'new best!' : '',
+    prize?.text ?? '',
   ].filter(Boolean)
   const next: Home = withActive({
     ...home,
@@ -90,6 +96,7 @@ export const finishGame = (home: Home, game: GameId, posted: number, postedMs: n
       best: { ...arcade.best, [game]: Math.max(score, arcade.best[game] ?? 0) }, golds: arcade.golds + (medal === 'gold' ? 1 : 0) },
     effect: { kind: medal === 'gold' ? 'award' : medal ? 'medal' : 'yarn', at: now },
     log: parts.join(' · ').replace(/([^!])$/, '$1.'),
-  }, c => befriend({ ...c, joy: clamp(c.joy + joy) }, medal ? 3 : 1, now))
-  return track(reward(next, coins, xp, now), 'games', 1, now)
+  }, c => (prize?.cat ?? (x => x))(befriend({ ...c, joy: clamp(c.joy + joy) }, medal ? 3 : 1, now)))
+  const won = prize?.critter ? addToPocket(next, [prize.critter]) : next
+  return track(reward(won, coins + (prize?.coins ?? 0), xp + (prize?.xp ?? 0), now), 'games', 1, now)
 }
