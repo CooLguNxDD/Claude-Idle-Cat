@@ -39,8 +39,8 @@ test('the picture canvas is 4x the scene and draws banners as pixel glyphs', asy
 })
 
 type Blit = { kind: 'cells' | 'image'; frame: string }
-// Opens the pane on a terminal; `answer` decides each scene blit's reply.
-const openPane = async ($: Parameters<TestBody>[0], on: Parameters<TestBody>[1], answer: (b: Blit) => string | undefined) => {
+// Opens the pane on a terminal; `answer` decides each scene blit's reply, or returns a promise to hold it.
+const openPane = async ($: Parameters<TestBody>[0], on: Parameters<TestBody>[1], answer: (b: Blit) => string | undefined | Promise<never>) => {
   const clock = mock.clock(on, { now: 1_700_000_000_000 })
   mock.store(on)
   on('ui.open', () => ({ value: { isPlaced: true } }))
@@ -57,6 +57,7 @@ const openPane = async ($: Parameters<TestBody>[0], on: Parameters<TestBody>[1],
     if (blits.at(-1)?.frame === blit.frame) throw new Error('a frame repeated the last one')
     blits.push(blit)
     const deny = answer(blit)
+    if (deny instanceof Promise) return deny
     return { value: deny ? { deny } : {} }
   })
   await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
@@ -73,7 +74,7 @@ const openPane = async ($: Parameters<TestBody>[0], on: Parameters<TestBody>[1],
 test('the frame loop skips repeat frames and stops painting once the pane is gone', async ($, on) => {
   const state = { isGone: false }
   const { clock, ui, blits } = await openPane($, on, () => (state.isGone ? 'not mounted' : undefined))
-  expect(await ui.find({ key: 'scene', type: 'Image' })).toBeDefined()
+  expect(String((await ui.find({ key: 'scene', type: 'Image' }))?.props.alt)).toMatch(/Mochi \(\w+\) in the yard/)
   await clock.advance(1000)
   expect(blits.length).toBeGreaterThan(0)
   expect(blits.every(b => b.kind === 'image')).toBe(true)
@@ -90,5 +91,16 @@ test('a terminal that draws the picture as its alt falls back to half-block cell
   await clock.advance(1000)
   expect(await ui.find({ key: 'scene', type: 'Raster' })).toBeDefined()
   expect(blits.some(b => b.kind === 'cells')).toBe(true)
+  await ui.unmount()
+})
+
+test('a blit that never answers stalls the scene for two seconds at most', async ($, on) => {
+  const state = { isHung: true }
+  const { clock, ui, blits } = await openPane($, on, () => (state.isHung ? new Promise<never>(() => {}) : undefined))
+  await clock.advance(500)
+  expect(blits.length).toBe(1)
+  state.isHung = false
+  await clock.advance(2500)
+  expect(blits.length).toBeGreaterThan(1)
   await ui.unmount()
 })

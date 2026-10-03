@@ -46,6 +46,7 @@ const SERVER = 'server/arcade.mjs'
 const SERVER_START_MS = 10_000
 const TICK_MS = 10_000
 const FRAME_MS = 125
+const STALL_MS = 2000
 const homeRef = { plugin: 'afk-cat', key: 'home' } as const
 const routeRef = { plugin: 'afk-cat', key: 'route' } as const
 const catListRef = { plugin: 'afk-cat', key: 'isCatListOpen' } as const
@@ -56,7 +57,7 @@ let latest: Home | null = null
 let cols = 34
 let frame = 0
 // What the frame loop paints: the pane's view, element and last frame, whether it is mounted, and an in-flight guard.
-const paint = { view: 'cat' as View, kind: 'raster' as SceneKind, last: '', isMounted: false, isBusy: false }
+const paint = { view: 'cat' as View, kind: 'raster' as SceneKind, last: '', isMounted: false, isBusy: false, busyAt: 0 }
 // Set once an Image scene draws its text alt: this terminal shows no pictures, so the pane keeps to the Raster.
 let isImageBlocked = false
 // Claude Code's own theme row, read for the `auto` flavor.
@@ -445,11 +446,14 @@ export const register: Register = (on, options) => {
       if (band.mode === 'text') $.ui.invalidate('ui.render')
     })
     $.clock.every(FRAME_MS, async () => {
-      if (!latest || paint.isBusy) return
+      if (!latest) return
+      const now = await $.clock.now()
+      // A frame still waiting on its blit holds the next one back, but never past STALL_MS.
+      if (paint.isBusy && now - paint.busyAt < STALL_MS) return
       paint.isBusy = true
+      paint.busyAt = now
       try {
         frame += 1
-        const now = await $.clock.now()
         const flavor = flavorAt(now)
         // Skips the scene while the pane is closed and when a frame would repaint the same cells.
         if (paint.isMounted && paint.kind === 'raster') {
@@ -576,8 +580,11 @@ export const register: Register = (on, options) => {
     paint.kind = isImage ? 'image' : 'raster'
     paint.last = sceneImage?.rgba ?? sceneCells
     paint.isMounted = paint.last !== ''
+    // What the picture shows, for screen readers and terminals that draw the alt instead.
+    const sceneAlt = view !== 'adopt' ? `${cat.name} (${mood}) in the yard`
+      : reveal ? `${reveal.name} at the adoption shelter` : 'A mystery parcel at the adoption shelter'
     const scene = sceneImage && 'Image' in ui
-      ? <ui.Image key={SCENE} columns={cols} rows={ROWS} source={sceneImage} alt=" " />
+      ? <ui.Image key={SCENE} columns={cols} rows={ROWS} source={sceneImage} alt={sceneAlt} />
       : 'Raster' in ui ? <ui.Raster key={SCENE} columns={cols} rows={ROWS} cells={sceneCells} />
       : view === 'adopt' && !reveal ? <Text color={tone.accent}>{'   /─────\\\n   │  ?  │\n   └─────┘'}</Text>
         : <Box flexDirection="column">{catArt(mood, home.frame, formOf(cat)).map(line => <Text>{line}</Text>)}</Box>
