@@ -9,6 +9,7 @@ import { inkOf, mix } from '../theme'
 import type { Flavor } from '../theme'
 import { FLOOR_Y } from './canvas'
 import type { SceneCanvas } from './canvas'
+import { drawHiCat } from './hicat'
 
 export type CatScene = { cat: Cat; mood: ReturnType<typeof moodOf>; ox: number; oy: number; headRow: number; birthday: boolean }
 const TAIL: [number, number][][] = [
@@ -76,6 +77,16 @@ export const drawCats = (c: SceneCanvas, home: Home, now: number, tick: number, 
   const oy = 8 + bob + Math.min(0, jump)
   const isBlink = mood === 'sleeping' || tick % 40 < 2
   const form = formOf(cat)
+  const birthday = isBirthday(cat, now)
+  if (c.isFine) {
+    // The picture canvas draws the 4x cat; its bob is one fine pixel instead of a whole scene pixel.
+    for (let x = 32; x < 92; x++) for (let y = 0; y < 3; y++)
+      if (((x - 62) / 30) ** 2 + ((y - 1) / 2) ** 2 <= 1) c.fine(x, FLOOR_Y * 4 + y, mix(f.crust, f.surface2, 0.45))
+    const fineY = (8 + Math.min(0, jump)) * 4 + (mood === 'sleeping' ? 2 : bob)
+    drawHiCat(c, ox * 4, fineY, { genes: cat.genes, mood, form, isAdult: stage !== 'kitten', isBirthday: birthday,
+      isBlink, tick }, f)
+    return { cat, mood, ox, oy, headRow: Math.floor(oy / 2), birthday }
+  }
   // Small floor shadow makes the silhouette legible against rugs and quilts.
   for (let x = 7; x < 24; x++) if (x % 3 !== 0) c.put(x, FLOOR_Y, mix(f.crust, f.surface2, 0.45))
   formBack(form, ox, oy, tick, f, c)
@@ -94,7 +105,6 @@ export const drawCats = (c: SceneCanvas, home: Home, now: number, tick: number, 
   const tailColor = coatPixel(cat.genes, f, 'f', 12, 10) ?? f.peach
   for (const [x, y] of TAIL[mood === 'sleeping' ? 0 : Math.floor(tick / 4) % 2] ?? []) c.put(ox + x, oy + y, tailColor)
   formFront(form, ox, oy, tick, f, c)
-  const birthday = isBirthday(cat, now)
   if (birthday) for (const [dx, dy] of [[6, -1], [7, -1], [8, -1], [7, -2], [7, -3]] as const)
     c.put(ox + dx, oy + dy, dy === -3 ? f.yellow : f.mauve)
   return { cat, mood, ox, oy, headRow: Math.floor(oy / 2), birthday }

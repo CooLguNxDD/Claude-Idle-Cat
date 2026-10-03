@@ -13,11 +13,11 @@ import { inkOf } from './theme'
 
 export { ROWS, sceneCols }
 export type { RgbaImage }
-export type SceneInput = { home: Home; now: number; tick: number; hour: number; flavor: Flavor; cols: number }
+export type SceneInput = { home: Home; now: number; tick: number; hour: number; flavor: Flavor; cols: number; isFine?: boolean }
 
 // The terminal stays 12 half-block rows; each renderer contributes one scene layer.
-export const drawScene = ({ home, now, tick, hour, flavor, cols }: SceneInput): SceneCanvas => {
-  const c = canvas(cols)
+export const drawScene = ({ home, now, tick, hour, flavor, cols, isFine }: SceneInput): SceneCanvas => {
+  const c = canvas(cols, isFine)
   const weather = liveWeather(home.weather, now)
   const localHour = weather ? new Date(now + weather.utcOffset * 1000).getUTCHours() : hour
   const yard = drawYard(c, now, localHour, tick, flavor, weather)
@@ -31,4 +31,4 @@ export const drawScene = ({ home, now, tick, hour, flavor, cols }: SceneInput): 
 }
 
 export const frameCells = (input: SceneInput): string => drawScene(input).pack()
-export const frameImage = (input: SceneInput): RgbaImage => drawScene(input).image(inkOf(input.flavor))
+export const frameImage = (input: SceneInput): RgbaImage => drawScene({ ...input, isFine: true }).image(inkOf(input.flavor))

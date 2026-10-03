@@ -16,7 +16,10 @@ type Overlay = { ch: string; fg: number }
 export type RgbaImage = { rgba: string; width: number; height: number }
 export type SceneCanvas = {
   w: number
+  /** True when the canvas also keeps 4x detail for the picture; `fine` draws there. */
+  isFine: boolean
   put: (x: number, y: number, c: number) => void
+  fine: (x: number, y: number, c: number) => void
   text: (col: number, row: number, value: string, fg: number) => void
   pack: () => string
   image: (shadow: number) => RgbaImage
@@ -33,12 +36,27 @@ const toBase64 = (bytes: Uint8Array) => {
   return out
 }
 
-export const canvas = (w: number): SceneCanvas => {
+export const canvas = (w: number, isFine = false): SceneCanvas => {
   const px = new Uint32Array(w * HEIGHT)
+  const fw = w * IMAGE_SCALE
+  const fh = HEIGHT * IMAGE_SCALE
+  // The 4x layer: every put fills its block, so later coarse layers still cover fine ones.
+  const hi = isFine ? new Uint32Array(fw * fh) : null
   const over = new Map<number, Overlay>()
   return {
     w,
-    put: (x, y, c) => { if (x >= 0 && x < w && y >= 0 && y < HEIGHT) px[y * w + x] = c },
+    isFine,
+    put: (x, y, c) => {
+      if (x < 0 || x >= w || y < 0 || y >= HEIGHT) return
+      px[y * w + x] = c
+      if (hi) for (let dy = 0; dy < IMAGE_SCALE; dy++)
+        hi.fill(c, (y * IMAGE_SCALE + dy) * fw + x * IMAGE_SCALE, (y * IMAGE_SCALE + dy) * fw + (x + 1) * IMAGE_SCALE)
+    },
+    fine: (x, y, c) => {
+      if (x < 0 || x >= fw || y < 0 || y >= fh) return
+      if (hi) hi[y * fw + x] = c
+      else px[Math.floor(y / IMAGE_SCALE) * w + Math.floor(x / IMAGE_SCALE)] = c
+    },
     text: (col, row, value, fg) => {
       ;[...value].forEach((ch, i) => {
         if (col + i >= 0 && col + i < w && row >= 0 && row < ROWS) over.set(row * w + col + i, { ch, fg })
@@ -68,7 +86,8 @@ export const canvas = (w: number): SceneCanvas => {
         out[i + 2] = c & 255
         out[i + 3] = 255
       }
-      for (let y = 0; y < HEIGHT * s; y++) for (let x = 0; x < width; x++) dot(x, y, px[Math.floor(y / s) * w + Math.floor(x / s)] ?? 0)
+      for (let y = 0; y < HEIGHT * s; y++) for (let x = 0; x < width; x++)
+        dot(x, y, (hi ? hi[y * width + x] : px[Math.floor(y / s) * w + Math.floor(x / s)]) ?? 0)
       // Text overlays draw as pixel glyphs centred in their cell, over the scene rather than replacing it.
       over.forEach(({ ch, fg }, at) => {
         const x0 = (at % w) * s + ((s - 3) >> 1)
