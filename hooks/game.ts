@@ -22,11 +22,15 @@ const MAX_AFK_MS = 8 * 60 * MINUTE
 const EVENTS_PER_MIN = 0.02
 // Idle time earns a share of the full rate; Claude's work pays in minutes of it.
 export const IDLE_SHARE = 0.5
-const TOOL_MINUTES = 0.4
+const TOOL_MINUTES = 0.15
 // Only some tool calls pay, so a long run of calls is a few tips, not a steady wage.
-export const TOOL_CHANCE = 0.35
-const TURN_MINUTES = 2
-const MINUTES_PER_USD = 5
+export const TOOL_CHANCE = 0.2
+const MINUTES_PER_USD = 8
+// A reply pays its active time, up to this many minutes: a long sleep or an unanswered prompt can't farm it.
+export const ACTIVE_CAP_MINUTES = 30
+// Claude's pay in a chat grows from 1x to RAMP_MAX over its first RAMP_MINUTES of active time.
+const RAMP_MINUTES = 60
+const RAMP_MAX = 2
 // Time away never pushes a stat below this: cats get grumpy, never sad.
 export const DECAY_FLOOR = 25
 
@@ -132,13 +136,20 @@ export const catRate = (home: Home, cat: Cat) =>
   (cat.isAsleep ? modsOf(cat).sleepCoin : 1)
 export const coinRate = (home: Home) => home.cats.reduce((sum, cat) => sum + catRate(home, cat), 0)
 export const idleRate = (home: Home) => coinRate(home) * IDLE_SHARE
-export const toolPay = (home: Home) => Math.max(1, Math.round(coinRate(home) * TOOL_MINUTES))
+export const toolPay = (home: Home) => coinRate(home) * TOOL_MINUTES
 // A tool call pays toolPay with probability TOOL_CHANCE, else nothing.
 export const rollToolPay = (home: Home, rng: Rng) => (rng() < TOOL_CHANCE ? toolPay(home) : 0)
-export const turnPay = (home: Home) => Math.max(3, Math.round(coinRate(home) * TURN_MINUTES))
+// Active minutes a reply counts for: its wall-clock length, capped.
+export const activeMinutes = (durationMs: number) =>
+  Number.isFinite(durationMs) ? Math.min(Math.max(0, durationMs) / MINUTE, ACTIVE_CAP_MINUTES) : 0
+// What a reply pays for the time it ran: one active minute is one minute of the full rate.
+export const activePay = (home: Home, durationMs: number) => coinRate(home) * activeMinutes(durationMs)
+// Pay multiplier for a chat that has run this many active minutes.
+export const rampOf = (chatMinutes: number) =>
+  1 + (RAMP_MAX - 1) * Math.min(Math.max(0, chatMinutes) / RAMP_MINUTES, 1)
 // What a reply's API spend (US dollars) pays; no cap.
 export const spendPay = (home: Home, usd: number) =>
-  Math.round(coinRate(home) * Math.max(0, usd) * MINUTES_PER_USD)
+  coinRate(home) * Math.max(0, usd) * MINUTES_PER_USD
 
 const gainXp = (home: Home, id: string, xp: number, now: number): Home => {
   let log = home.log

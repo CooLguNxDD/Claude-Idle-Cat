@@ -12,7 +12,7 @@ import { ACHIEVEMENTS, MILES_SHOP, buyWithMiles, settle, tasksFor, track } from 
 import { CRITTERS, critter, isAvailable, sell } from './critters'
 import { act, activeCat, adopt, adoptPrice, adoptVisitor, bar, buyItem, checkIn, donateCritter, giveGift, idleRate,
   learnSkill, migrate, moodOf, newHome, nextCat, rename, respec, reward, rollToolPay, spendPay, stageName, switchTo, tick,
-  TOOL_CHANCE, toolPay, turnPay, welcomeBack, xpToNext } from './game'
+  TOOL_CHANCE, activeMinutes, activePay, rampOf, toolPay, welcomeBack, xpToNext } from './game'
 import { CATCHPHRASE_LEVEL, DAILY_CAP, GIFTS, LEVELS, NICKNAME_LEVEL, PHOTO_LEVEL, dayOf, dialogue, friendLevel,
   levelName, toNextLevel } from './friends'
 import type { Action } from './game'
@@ -89,6 +89,8 @@ let sprintUntil = 0
 let paidUsd = 0
 // Coins gained this prompt and this chat; the prompt resets on turn.start, both on session.start.
 const earned = { prompt: 0, chat: 0 }
+// Active minutes this chat has run; Claude's pay ramps up with it.
+let chatMinutes = 0
 let flavorNow: (now: number) => Flavor = () => FLAVORS.mocha
 // The browser arcade's server: started on first use, killed with the module; the token guards it.
 const arcade = { port: 0, token: newToken(Math.random), starting: null as Promise<number> | null, pushed: '', isOpened: false }
@@ -460,6 +462,7 @@ export const register: Register = (on, options) => {
     // Time away and the streak bonus are not this chat's earnings.
     earned.prompt = 0
     earned.chat = 0
+    chatMinutes = 0
     if (home.effect?.kind === 'welcome') $.ui.toast(home.log)
     if (bonus > 0) $.ui.toast(`Day ${home.streak} streak bonus: +${bonus}c`)
     void refreshWeather($)
@@ -585,7 +588,7 @@ export const register: Register = (on, options) => {
   on('tool.call', async ($, e, next) => {
     sprintUntil = frame + 16
     const ran = await next(e)
-    void change($, (h, t) => track(reward(h, rollToolPay(h, Math.random)), 'tools', 1, t))
+    void change($, (h, t) => track(reward(h, rollToolPay(h, Math.random) * rampOf(chatMinutes)), 'tools', 1, t))
     return ran
   })
 
@@ -598,11 +601,13 @@ export const register: Register = (on, options) => {
     const usd = (await $.session.usage()).cost?.usd ?? paidUsd
     const spent = usd - paidUsd
     paidUsd = usd
+    const ramp = rampOf(chatMinutes)
+    chatMinutes += activeMinutes(e.durationMs)
     void change($, (h, t) => {
-      const bonus = spendPay(h, spent)
-      const paid = { ...reward(h, turnPay(h) + bonus, 2, t), effect: { kind: 'coins' as const, at: t } }
-      return track(bonus > 0 ? { ...paid, log: `Claude worked hard: +${turnPay(h) + bonus}c` } : paid, 'turns', 1, t)
-    }).then(() => $.ui.toast(`💰 +${fmtCoins(earned.prompt)} this prompt · +${fmtCoins(earned.chat)} this chat`))
+      const pay = (activePay(h, e.durationMs) + spendPay(h, spent)) * ramp
+      const paid = { ...reward(h, pay, 2, t), effect: { kind: 'coins' as const, at: t } }
+      return track(pay > 0 ? { ...paid, log: `Claude worked ${Math.round(activeMinutes(e.durationMs))}m: +${fmtCoins(pay)}` } : paid, 'turns', 1, t)
+    }).then(() => $.ui.toast(`💰 +${fmtCoins(earned.prompt)} this prompt · +${fmtCoins(earned.chat)} this chat · ×${ramp.toFixed(1)} session`))
     return next(e)
   })
 
@@ -1020,7 +1025,7 @@ export const register: Register = (on, options) => {
           XP {bar((cat.xp / xpToNext(cat.level)) * 100, 10)} {cat.xp}/{xpToNext(cat.level)}
         </Text>
         <Text color={tone.coin}>
-          Coins {fmtCoins(home.coins)} (+{idleRate(home).toFixed(1)}/min idle · +{toolPay(home)}/tool, {TOOL_CHANCE * 100}% of calls)
+          Coins {fmtCoins(home.coins)} (+{idleRate(home).toFixed(1)}/min idle · ×{rampOf(chatMinutes).toFixed(1)} session · +{toolPay(home).toFixed(1)}/tool, {TOOL_CHANCE * 100}% of calls)
           {freePoints(cat) > 0 ? ` · ${freePoints(cat)} skill point${freePoints(cat) > 1 ? 's' : ''} to spend (s)` : ''}
         </Text>
         <Text italic color={tone.log}>{home.log}</Text>

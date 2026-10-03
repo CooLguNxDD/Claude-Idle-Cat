@@ -1,8 +1,8 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Home } from '../types'
-import { DECAY_FLOOR, IDLE_SHARE, TOOL_CHANCE, act, activeCat, adopt, checkIn, coinRate, migrate, moodOf, newHome,
-  nextCat, rollToolPay, spendPay, stageOf, switchTo, tick, toolPay, turnPay } from './game'
+import { ACTIVE_CAP_MINUTES, DECAY_FLOOR, IDLE_SHARE, TOOL_CHANCE, act, activeCat, activePay, adopt, checkIn, coinRate,
+  migrate, moodOf, newHome, nextCat, rampOf, rollToolPay, spendPay, stageOf, switchTo, tick, toolPay } from './game'
 import { seeded } from './rng'
 import { ROWS, frameCells } from './scene'
 import { FLAVORS } from './theme'
@@ -67,10 +67,29 @@ test('adoption rolls genes, picks a free name and respects the house size', asyn
 test('idle time pays a share of the full rate; Claude\'s work pays minutes of it', async () => {
   const home = newHome(0)
   expect(tick(home, 30 * 60_000, noEvents).coins - home.coins).toBe(coinRate(home) * IDLE_SHARE * 30)
-  expect([toolPay(home), turnPay(home)]).toEqual([1, 3])
   const pro = { ...home, cats: home.cats.map(c => ({ ...c, level: 20 })) }
   expect(toolPay(pro)).toBeGreaterThan(toolPay(home))
-  expect(turnPay(pro)).toBeGreaterThan(turnPay(home))
+  expect(activePay(pro, 60_000)).toBeGreaterThan(activePay(home, 60_000))
+})
+
+test('a reply pays its active time, so a quick prompt earns almost nothing', async () => {
+  const home = { ...newHome(0), cats: newHome(0).cats.map(c => ({ ...c, level: 10 })) }
+  const rate = coinRate(home)
+  expect(activePay(home, 0)).toBe(0)
+  expect(activePay(home, -5)).toBe(0)
+  expect(activePay(home, Number.NaN)).toBe(0)
+  expect(Math.abs(activePay(home, 10_000) - rate / 6) < 1e-9).toBe(true)
+  expect(Math.abs(activePay(home, 10 * 60_000) - rate * 10) < 1e-9).toBe(true)
+  expect(Math.abs(activePay(home, 3 * 60 * 60_000) - rate * ACTIVE_CAP_MINUTES) < 1e-9).toBe(true)
+  expect(toolPay({ ...newHome(0) })).toBeLessThan(1)
+})
+
+test('the session ramp grows from 1x to 2x over an hour of active time', async () => {
+  expect(rampOf(0)).toBe(1)
+  expect(rampOf(30)).toBe(1.5)
+  expect(rampOf(60)).toBe(2)
+  expect(rampOf(600)).toBe(2)
+  expect(rampOf(-5)).toBe(1)
 })
 
 test('a reply\'s spend pays coins, never below zero and with no cap', async () => {
@@ -79,6 +98,13 @@ test('a reply\'s spend pays coins, never below zero and with no cap', async () =
   expect(spendPay(home, -1)).toBe(0)
   expect(spendPay(home, 0.5)).toBeGreaterThan(spendPay(home, 0.1))
   expect(spendPay(home, 100)).toBeGreaterThan(spendPay(home, 10))
+})
+
+test('work pay keeps its fraction instead of rounding to whole coins', async () => {
+  const home = { ...newHome(0), cats: newHome(0).cats.map(c => ({ ...c, level: 7 })) }
+  expect(Number.isInteger(toolPay(home))).toBe(false)
+  expect(Number.isInteger(activePay(home, 12_345))).toBe(false)
+  expect(Number.isInteger(spendPay(home, 0.013))).toBe(false)
 })
 
 test('only some tool calls pay', async () => {
