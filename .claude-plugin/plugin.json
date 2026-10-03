@@ -8,6 +8,7 @@
   "repository": "https://github.com/CooLguNxDD/Claude-Idle-Cat",
   "license": "MIT",
   "metadata": { "claudeCode": "2.1.287" },
+  "types": "./types/index.d.ts",
   "experimental": { "themes": "./themes/" },
   "userConfig": {
     "flavor": {
