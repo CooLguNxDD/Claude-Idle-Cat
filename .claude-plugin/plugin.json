@@ -40,6 +40,12 @@
       "title": "Claude reactions",
       "description": "on animates and shows lines; quiet animates; off disables reactions",
       "default": "on"
+    },
+    "speech": {
+      "type": "string",
+      "title": "Cat speech",
+      "description": "on speaks about the yard and Claude; quiet skips idle and tool chatter; off keeps the hourly idle line only",
+      "default": "on"
     }
   }
 }

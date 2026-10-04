@@ -1,7 +1,7 @@
 import { ACHIEVEMENTS } from '../collection'
 import { expect, test } from 'claude-code/testing'
-import { BEHAVIORS, EVENTS, EXPEDITIONS, FURNITURE, GOALS, INTERACTIONS, MATERIALS, MOVES, QUESTS, REACTIONS, SHOP, SKILL_FILES, WORLDS } from './index'
-import { behaviorProblems, eventProblems, expeditionProblems, furnitureProblems, goalProblems, interactionProblems, materialProblems, questProblems, reactionProblems, shopProblems, skillProblems, unlockProblems, worldProblems } from './types'
+import { BEHAVIORS, EVENTS, EXPEDITIONS, FURNITURE, GOALS, INTERACTIONS, MATERIALS, MOVES, QUESTS, REACTIONS, SHOP, SKILL_FILES, SPEECH, WORLDS } from './index'
+import { behaviorProblems, eventProblems, expeditionProblems, furnitureProblems, goalProblems, interactionProblems, materialProblems, questProblems, reactionProblems, shopProblems, skillProblems, speechProblems, unlockProblems, worldProblems } from './types'
 import { dailyStock } from '../home'
 import { newHome } from '../game'
 import { skillTotals } from '../skills'
@@ -17,6 +17,7 @@ test('all content modules validate and every registry has unique ids', () => {
     [QUESTS, QUESTS.flatMap(s => questProblems(s, MATERIALS, FURNITURE))],
     [BEHAVIORS, BEHAVIORS.flatMap(s => behaviorProblems(s, MOVES))],
     [GOALS, GOALS.flatMap(goalProblems)],
+    [SPEECH, SPEECH.flatMap(s => speechProblems(s, { behaviors: BEHAVIORS, interactions: INTERACTIONS }))],
     [WORLDS, WORLDS.flatMap(w => worldProblems(w, MATERIALS, WORLDS))],
   ] as const) {
     expect(problems).toEqual([])
@@ -43,6 +44,7 @@ test('validators reject excess bonuses, broken references, NaN and out-of-season
   expect(interactionProblems({ ...INTERACTIONS[0]!, roles: { lead: 'missing', partner: 'sit' } }, MOVES).length).toBeGreaterThan(0)
   expect(behaviorProblems({ ...BEHAVIORS[0]!, move: 'missing', seconds: 601 }, MOVES).length).toBeGreaterThan(0)
   expect(goalProblems({ ...GOALS[0]!, need: { ...GOALS[0]!.need, weight: 11 } }).length).toBeGreaterThan(0)
+  expect(speechProblems({ ...SPEECH[0]!, on: 'idle', role: 'lead', lines: ['{nope}'] }, { behaviors: BEHAVIORS, interactions: INTERACTIONS }).length).toBeGreaterThan(0)
   expect(worldProblems({ ...WORLDS[0]!, cost: { coins: -1 } }, MATERIALS, WORLDS).length).toBeGreaterThan(0)
   expect(shopProblems({ ...SHOP[0]!, cost: { materials: { unknown: 1 } } }, MATERIALS, FURNITURE).length).toBeGreaterThan(0)
 })

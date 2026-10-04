@@ -101,7 +101,7 @@ claude plugin tag --push
 
 ## Content modules v2
 
-The append-only barrel has fifteen registries: breeds (28), moves (23), worlds (6), named cats (6), reactions (5), interactions (5), expeditions (7), quests (6), events (2), skills (21), furniture (29), shop (17), materials (7), behaviors (4), goals (4). Each item is one file. New kinds use schemas and `*Problems()` validators in `hooks/content/progression.ts`, re-exported from `types.ts`. `hooks/content/registries.test.ts` validates every file and reference.
+The append-only barrel has sixteen registries: breeds (28), moves (23), worlds (6), named cats (6), reactions (5), interactions (5), expeditions (7), quests (6), events (2), skills (21), furniture (29), shop (17), materials (7), behaviors (4), goals (4), speech. Speech lines are content files; the spoken line, recent lines and cooldowns live in memory in `register.tsx` and are never written to the save. `hooks/friends.ts` must not import `SPEECH` — the arcade rewards module imports friends, and the arcade bundle stays content-free. Each item is one file. New kinds use schemas and `*Problems()` validators in `hooks/content/progression.ts`, re-exported from `types.ts`. `hooks/content/registries.test.ts` validates every file and reference.
 
 `SKILLS`, `CATALOG`, and `MILES_SHOP` retain their legacy module exports. The first barrel was seeded in the exact old 12-skill, 24-furniture and four-shop order; never sort existing imports. `legacy-fixture.ts` captures the 40-day stock sequence and old skill totals from f199b33. Nyan excludes cost/tier-gated Curio furniture, so appending the late pack preserves stock.
 
@@ -111,7 +111,7 @@ Pure engines: `reactions.ts` + `reactions/signals.ts`, `pair.ts`, `expeditions.t
 
 `expTime`, `matRolls`, `rareOdds`, `bond`, `party`, `expOffline`, `stardust`, `harmony`, and `oracle` extend skill effects; additive effects start at zero. Furniture expedition multipliers use capped per-item values. Coin loot is capped at 240 coin-rate minutes at departure; duration remains 10–720 minutes after all bonuses.
 
-All fifteen generator skills are byte-identical under `.claude/skills/` and `.agents/skills/`. `behavior-gen` and `goal-gen` write GOAP content. Run `node --test tools/content.test.mjs` for mirrors and builder order. Preview supports `interaction <id>` and `furniture <id>` alongside existing kinds. The Expeditions Client keyboard row posts only left/right/return keys to `register.tsx`; all mutations still pass through `change()`.
+All sixteen generator skills are byte-identical under `.claude/skills/` and `.agents/skills/`. `speech-gen` writes speech banks. `behavior-gen` and `goal-gen` write GOAP content. Run `node --test tools/content.test.mjs` for mirrors and builder order. Preview supports `interaction <id>` and `furniture <id>` alongside existing kinds. The Expeditions Client keyboard row posts only left/right/return keys to `register.tsx`; all mutations still pass through `change()`.
 
 ## Settings menu
 

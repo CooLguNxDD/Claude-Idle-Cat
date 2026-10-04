@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 
 import type { Cat } from '../types'
 import { act, activeCat, giveGift, migrate, newCat, newHome, welcomeBack } from './game'
-import { DAILY_CAP, GIFTS, LEVELS, befriend, dayOf, dialogue, friendLevel, giftById, receiveGift } from './friends'
+import { DAILY_CAP, GIFTS, LEVELS, befriend, dayOf, decorate, dialogue, friendLevel, giftById, receiveGift } from './friends'
 
 const DAY = 86_400_000
 const local = (day: number, hour = 9) => new Date(2026, 0, 1 + day, hour).getTime()
@@ -38,6 +38,12 @@ test('levels unlock nickname and catchphrase in dialogue, and it remembers gifts
   const gifted = { ...cat('greedy'), lastGift: { id: 'tuna', day: dayOf(local(1)) } }
   expect(dialogue(gifted, local(1), 3)).toMatch(/favorite/)
   expect(dialogue(gifted, local(2), 3)).toMatch(/Still thinking about that tuna/)
+})
+
+test('decorate adds a nickname and catchphrase once friendship is high enough', async () => {
+  expect(decorate(cat('playful'), 'Hi', 1)).toBe('Hi')
+  expect(decorate(cat('playful', LEVELS[4]!.at), 'Hi', 1)).toMatch(/buddy/)
+  expect(decorate(cat('playful', LEVELS[4]!.at), 'Hi', 1)).toMatch(/nya!/)
 })
 
 test('the household pays for gifts and logs level-ups', async () => {

@@ -3,7 +3,7 @@ import type { Flavor } from '../theme'
 import type { SceneCanvas } from './canvas'
 import type { CatScene } from './cats'
 
-export const drawEffects = (c: SceneCanvas, home: Home, now: number, tick: number, f: Flavor, cat: CatScene) => {
+export const drawEffects = (c: SceneCanvas, home: Home, now: number, tick: number, f: Flavor, cat: CatScene, speech?: { glyph: string; at: number }) => {
   const { ox, headRow, mood, birthday } = cat
   const age = home.effect ? (now - home.effect.at) / 1000 : 99
   const fresh = (kind: string, secs: number) => home.effect?.kind === kind && age < secs
@@ -27,6 +27,10 @@ export const drawEffects = (c: SceneCanvas, home: Home, now: number, tick: numbe
   if (fresh('shop', 2)) banner('NEW ITEM!', 1)
   if (fresh('adopt', 3)) banner('WELCOME!', 1)
   if (birthday && tick % 16 < 12) banner('HAPPY BIRTHDAY!', 0)
+  if (speech && now >= speech.at && now - speech.at < 9_000) {
+    const bob = Math.floor((now - speech.at) / 450) % 2
+    c.text(ox + 6, headRow - 2 - bob, speech.glyph, f.yellow)
+  }
   if (fresh('catch', 3)) c.text(ox + 6, headRow - 2 - (Math.floor(age * 2) % 2), '!', f.yellow)
   if (fresh('award', 4)) banner('ACHIEVEMENT!', 0)
   if (fresh('welcome', 4)) banner('WELCOME BACK!', 1)
