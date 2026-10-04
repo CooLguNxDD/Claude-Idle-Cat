@@ -36,6 +36,7 @@ test('every legacy skill total is unchanged on the captured fixed cat', () => {
 })
 test('validators reject excess bonuses, broken references, NaN and out-of-season metadata', () => {
   expect(furnitureProblems({ ...FURNITURE[0]!, mods: { coin: 2.51 } }, MATERIALS).length).toBeGreaterThan(0)
+  expect(furnitureProblems({ ...FURNITURE[0]!, slot: 'bed', bowl: { cap: 30, portion: 30 } }, MATERIALS).length).toBeGreaterThan(0)
   expect(skillProblems({ ...SKILL_FILES[0]!, per: { expTime: -0.5 } }, SKILL_FILES).length).toBeGreaterThan(0)
   expect(expeditionProblems({ ...EXPEDITIONS[0]!, minutes: 9 }, MATERIALS).length).toBeGreaterThan(0)
   expect(expeditionProblems({ ...EXPEDITIONS[0]!, loot: { ...EXPEDITIONS[0]!.loot, coins: [0, 241] } }, MATERIALS).length).toBeGreaterThan(0)

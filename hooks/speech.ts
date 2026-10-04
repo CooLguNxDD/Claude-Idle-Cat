@@ -1,4 +1,5 @@
 import type { Cat, Home } from '../types'
+import { bowlOf } from './bowl'
 import { SPEECH } from './content'
 import type { Speech, SpeechTrigger } from './content/types'
 import { decorate, friendLevel, giftById, dayOf } from './friends'
@@ -35,6 +36,7 @@ const eligible = (bank: Speech, ev: SpeechEvent, cat: Cat, home: Home, hour: num
   if (when.moods && !when.moods.includes(moodOf(cat))) return false
   if (when.minFriend !== undefined && friendLevel(cat.friendship) < when.minFriend) return false
   if (when.minBond !== undefined && (!ev.buddyId || bondLevel(home, cat.id, ev.buddyId) < when.minBond)) return false
+  if (when.minBowl !== undefined && bowlOf(home).cap < when.minBowl) return false
   return inHours(when.hours, hour)
 }
 
@@ -49,7 +51,7 @@ export const speak = (home: Home, ev: SpeechEvent, now: number, hour: number, rn
   const cat = home.cats.find(c => c.id === ev.catId)
   if (!cat) return null
   const buddy = ev.buddyId ? home.cats.find(c => c.id === ev.buddyId)?.name ?? ev.vars?.buddy ?? '' : ev.vars?.buddy ?? ''
-  const vars = { name: cat.name, buddy, food: '', gift: '', tool: '', weather: '', ...ev.vars }
+  const vars = { name: cat.name, buddy, food: '', gift: '', tool: '', weather: '', bowl: bowlOf(home).name, ...ev.vars }
   const filled = SPEECH.filter(bank => eligible(bank, ev, cat, home, hour))
     .map(bank => ({ bank, lines: bank.lines.map(line => fill(line, vars)).filter((line): line is string => !!line) }))
     .filter(row => row.lines.length)
@@ -70,7 +72,7 @@ const effectEvent = (before: Home, after: Home): SpeechEvent | null => {
   const kind = after.effect.kind
   if (kind === 'hearts') return { on: 'pet', catId }
   if (kind === 'yarn') return { on: 'play', catId }
-  if (kind === 'fish' && after.bowl.food > before.bowl.food && after.log !== AUTO_FEED_LOG) return { on: 'fill', catId, vars: { food: String(after.bowl.food) } }
+  if (kind === 'fish' && after.bowl.food > before.bowl.food && after.log !== AUTO_FEED_LOG) return { on: 'fill', catId, vars: { food: String(after.bowl.food), bowl: bowlOf(after).name } }
   if (kind === 'gift') {
     const cat = activeCat(after)
     const gift = cat.lastGift ? giftById(cat.lastGift.id) : undefined

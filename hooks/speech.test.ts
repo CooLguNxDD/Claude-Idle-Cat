@@ -49,7 +49,7 @@ test('eventsOf notices care, gifts, waking and strays', () => {
   expect(eventsOf(before, act(before, 'pet', now), now)[0]?.on).toBe('pet')
   expect(eventsOf(before, act(before, 'play', now), now)[0]?.on).toBe('play')
   const filled = fillBowl({ ...before, coins: 100 }, 2, now)
-  expect(eventsOf(before, filled, now)[0]).toMatchObject({ on: 'fill', vars: { food: '5' } })
+  expect(eventsOf(before, filled, now)[0]).toMatchObject({ on: 'fill', vars: { food: '5', bowl: 'Basic bowl' } })
   const fed = { ...before, bowl: { food: before.bowl.food + 1 }, effect: { kind: 'fish' as const, at: now }, log: AUTO_FEED_LOG }
   expect(eventsOf(before, fed, now).some(e => e.on === 'fill')).toBe(false)
   const gifted = giveGift({ ...before, coins: 100 }, 'tuna', now)
@@ -63,6 +63,16 @@ test('eventsOf notices care, gifts, waking and strays', () => {
   const stray = { ...before, visitors: [{ id: 'v1', name: 'Pip', genes: before.cats[0]!.genes, arrivedAt: now, leavesAt: now + 1, gift: 1 }] }
   expect(eventsOf(before, stray, now).some(e => e.on === 'stray')).toBe(true)
   expect(GIFTS.length).toBeGreaterThan(0)
+})
+
+test('{bowl} is filled and minBowl keeps fancy lines off smaller bowls', () => {
+  const recent = ['Crunch crunch. Done.', 'The bowl is quieter now.', 'I left some. Maybe.', 'Fed. For the next minute.', 'More. There should be more.', 'I finished. The bowl did not.', 'Seconds? I mean firsts again.', 'That portion was a suggestion.']
+  const placed = (id: string) => home('playful', { decor: { ...newHome(now).decor, bowl: id }, owned: [...newHome(now).owned, id] })
+  const fancy = speak(placed('goldbowl'), { on: 'done', catId: 'c1', about: ['eat-bowl'] }, now, 12, seeded(1), recent)
+  expect(fancy?.text).toMatch(/Golden bowl/)
+  expect(fancy?.text).not.toMatch(/\{bowl\}/)
+  expect(speak(placed('sushi'), { on: 'done', catId: 'c1', about: ['eat-bowl'] }, now, 12, seeded(1), recent)?.text).not.toMatch(/expensive|Golden bowl/)
+  expect(speak(home(), { on: 'done', catId: 'c1', about: ['eat-bowl'] }, now, 12, seeded(1), recent)?.text).not.toMatch(/expensive/)
 })
 
 test('quoteOf changes across the hour on a gift day and stays put within it', () => {

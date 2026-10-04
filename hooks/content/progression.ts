@@ -56,7 +56,7 @@ export const SPEECH_TRIGGERS = ['idle', 'plan', 'done', 'bowl.empty', 'wake', 'p
   'claude.prompt', 'claude.tool', 'claude.done', 'claude.error', 'test.pass', 'test.fail'] as const
 export type SpeechTrigger = typeof SPEECH_TRIGGERS[number]
 export type Speech = { id: string; on: SpeechTrigger; about?: readonly string[]; role?: 'lead' | 'partner'
-  when: { personality?: readonly Personality[]; moods?: readonly Mood[]; minFriend?: number; minBond?: number; hours?: readonly [number, number]; weight: number }
+  when: { personality?: readonly Personality[]; moods?: readonly Mood[]; minFriend?: number; minBond?: number; minBowl?: number; hours?: readonly [number, number]; weight: number }
   lines: readonly string[]; glyph?: '!' | '?' | '\u2665' | 'z' | '*' }
 export const defineSpeech = (s: Speech) => s
 export const defineEvent = (s: GameEvent) => s
@@ -90,6 +90,14 @@ export const furnitureProblems = (s: FurnitureSpec, mats: readonly Material[] = 
     ...(!whole(s.price, 0, 1e9) || !whole(s.bait, 0, 10) ? ['invalid price or bait'] : []),
     ...(s.minTier !== undefined && !whole(s.minTier, 3, 6) ? ['minTier is 3 to 6'] : []), ...costProblems(s.cost ?? {}, mats),
     ...Object.entries(s.mods).filter(([k, v]) => k === 'autoFeed' ? typeof v !== 'boolean' : !caps[k] || !range(v as number, caps[k]![0], caps[k]![1])).map(([k]) => `invalid mod ${k}`),
+    ...(!s.bowl ? [] : [
+      ...(s.slot !== 'bowl' ? ['bowl stats only on the bowl slot'] : []),
+      ...(!whole(s.bowl.cap, 4, 24) ? ['bowl cap is 4 to 24'] : []),
+      ...(!whole(s.bowl.portion, 10, 60) ? ['bowl portion is 10 to 60'] : []),
+      ...(s.bowl.joy !== undefined && !whole(s.bowl.joy, 0, 15) ? ['bowl joy is 0 to 15'] : []),
+      ...(s.bowl.energy !== undefined && !whole(s.bowl.energy, 0, 15) ? ['bowl energy is 0 to 15'] : []),
+      ...(s.bowl.xp !== undefined && !whole(s.bowl.xp, 0, 5) ? ['bowl xp is 0 to 5'] : []),
+    ]),
     ...availabilityProblems(s.months ? { months: s.months } : undefined, s.id)]
 }
 export const materialProblems = (s: Material): string[] => [...name(s),
@@ -120,7 +128,7 @@ export const goalProblems = (s: Goal): string[] => [...name(s), ...factProblems(
   ...(!['hunger', 'energy', 'joy'].includes(s.need.stat) ? ['need.stat is hunger, energy or joy'] : []),
   ...(!range(s.need.below, 0, 100) || !range(s.need.weight, 0, 10) ? ['invalid goal limits'] : []),
   ...Object.values(s.personality ?? {}).filter(n => !range(n, 0, 3)).map(() => 'personality multiplier is 0 to 3')]
-const SPEECH_TOKENS = ['name', 'buddy', 'food', 'gift', 'tool', 'weather']
+const SPEECH_TOKENS = ['name', 'buddy', 'food', 'gift', 'tool', 'weather', 'bowl']
 const SPEECH_GLYPHS = ['!', '?', '\u2665', 'z', '*']
 export const speechProblems = (s: Speech, refs: { behaviors: readonly { id: string }[]; interactions: readonly { id: string }[] }): string[] => {
   const pair = s.on === 'pair.start' || s.on === 'pair.end'
@@ -129,14 +137,15 @@ export const speechProblems = (s: Speech, refs: { behaviors: readonly { id: stri
   return [...base(s), ...(!SPEECH_TRIGGERS.includes(s.on) ? ['unknown speech trigger'] : []),
     ...(s.about?.some(id => !aboutIds ? false : !aboutIds.some(item => item.id === id)) ? ['unknown speech about id'] : []),
     ...(!s.lines.length || s.lines.length > 12 ? ['speech needs 1 to 12 lines'] : []),
-    ...s.lines.filter(line => !line.trim() || line.length > 60 || /\{|\}/.test(line.replace(/\{(name|buddy|food|gift|tool|weather)\}/g, ''))).map(() => 'speech line is 1 to 60 chars with known tokens'),
+    ...s.lines.filter(line => !line.trim() || line.length > 60 || /\{|\}/.test(line.replace(new RegExp(`\\{(?:${SPEECH_TOKENS.join('|')})\\}`, 'g'), ''))).map(() => 'speech line is 1 to 60 chars with known tokens'),
     ...tokens.filter(token => !SPEECH_TOKENS.includes(token)).map(token => `unknown token {${token}}`),
     ...(!range(s.when.weight, 0, 10) ? ['speech weight is 0 to 10'] : []),
     ...(s.when.hours && (s.when.hours.length !== 2 || s.when.hours.some(n => !whole(n, 0, 23)) || s.when.hours[0] === s.when.hours[1]) ? ['speech hours are two different hours from 0 to 23'] : []),
     ...(s.glyph && !SPEECH_GLYPHS.includes(s.glyph) ? ['speech glyph is not font-safe'] : []),
     ...(s.role && !pair ? ['speech role is only for pair triggers'] : []),
     ...(s.when.minFriend !== undefined && !whole(s.when.minFriend, 1, 6) ? ['minFriend is 1 to 6'] : []),
-    ...(s.when.minBond !== undefined && !whole(s.when.minBond, 0, 6) ? ['minBond is 0 to 6'] : [])]
+    ...(s.when.minBond !== undefined && !whole(s.when.minBond, 0, 6) ? ['minBond is 0 to 6'] : []),
+    ...(s.when.minBowl !== undefined && !whole(s.when.minBowl, 4, 24) ? ['minBowl is a cap from 4 to 24'] : [])]
 }
 export const interactionProblems = (s: Interaction, moves: readonly Move[]): string[] => [...name(s),
   ...(!['touch', 'face', 'chase', 'pile'].includes(s.spacing) ? ['unknown spacing'] : []),

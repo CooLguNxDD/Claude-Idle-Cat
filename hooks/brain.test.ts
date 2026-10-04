@@ -28,6 +28,19 @@ test('a hungry cat eats one portion, then an empty bowl only gets a meow', () =>
   expect(empty.bowl.food).toBe(0)
 })
 
+test('eating uses the placed bowl portion and its bonuses', () => {
+  const basic = tuned({ ...newHome(now), bowl: { food: 3 } }, { hunger: 20, joy: 40 })
+  const eaten = think(think(basic, now, seeded(1)), now + seconds('eat-bowl'), seeded(1))
+  expect(eaten.cats[0]!.hunger).toBe(50)
+  expect(eaten.cats[0]!.joy).toBe(40)
+  const golden = tuned({ ...newHome(now), decor: { ...newHome(now).decor, bowl: 'goldbowl' }, bowl: { food: 3 } }, { hunger: 20, joy: 40 })
+  const fed = think(think(golden, now, seeded(1)), now + seconds('eat-bowl'), seeded(1))
+  expect(fed.cats[0]!.hunger).toBe(60)
+  expect(fed.cats[0]!.joy).toBe(45)
+  expect(fed.cats[0]!.xp).toBe(3)
+  expect(fed.log).toMatch(/munches from the Golden bowl\. \+3xp/)
+})
+
 test('a tired cat goes to sleep and a second cat at home earns a capped bond', () => {
   const tired = think(tuned(newHome(now), { energy: 10, joy: 90 }), now, seeded(1))
   expect(tired.cats[0]!.intent?.id).toBe('nap-bed')

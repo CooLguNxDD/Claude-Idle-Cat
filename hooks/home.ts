@@ -6,9 +6,11 @@ import { seeded } from './rng'
 import { localDay } from './time'
 
 export type HomeMods = { coin: number; regen: number; autoFeed: boolean; eventRate: number; joyDecay: number; gift: number; expTime: number; bond: number; matOdds: number }
+export type BowlStats = { cap: number; portion: number; joy?: number; energy?: number; xp?: number }
 export type Furniture = {
   id: string; name: string; slot: Slot; price: number; perk: string
   mods: Partial<HomeMods>; bait: number; likes?: Personality
+  bowl?: BowlStats
   // Paw Miles-only items never appear in Nyan's stock.
   miles?: number
   // Seasonal items are stocked only in these months.

@@ -137,6 +137,8 @@ import furnitureMoonHammock from './furniture/moon-hammock'
 import furnitureNeonSign from './furniture/neon-sign'
 import furnitureShellFountain from './furniture/shell-fountain'
 import furnitureStarlitRug from './furniture/starlit-rug'
+import furnitureCelestialBowl from './furniture/celestial-bowl'
+import furnitureCeramicBowl from './furniture/ceramic-bowl'
 import shopGoldbowl from './shop/goldbowl'
 import shopRainbow from './shop/rainbow'
 import shopMoonlamp from './shop/moonlamp'
@@ -154,6 +156,8 @@ import shopShellFountain from './shop/shell-fountain'
 import shopStarMap from './shop/star-map'
 import shopStarlitRug from './shop/starlit-rug'
 import shopTrailSnacks from './shop/trail-snacks'
+import shopCelestialBowl from './shop/celestial-bowl'
+import shopCeramicBowl from './shop/ceramic-bowl'
 import materialFeather from './materials/feather'
 import materialNeonScrap from './materials/neon-scrap'
 import materialPineCone from './materials/pine-cone'
@@ -213,6 +217,7 @@ import speechWeatherClear from './speech/weather-clear'
 import speechWeatherRain from './speech/weather-rain'
 import speechWeatherSnow from './speech/weather-snow'
 import speechWelcome from './speech/welcome'
+import speechDoneEatFancy from './speech/done-eat-fancy'
 import type { Breed, Move, World, NamedCat, Reaction, Interaction, Expedition, Quest, GameEvent, SkillSpec, FurnitureSpec, ShopItem, Material, Behavior, Goal, Speech } from './types'
 
 // breeds definitions in pinned order; engines apply runtime eligibility.
@@ -385,6 +390,8 @@ export const FURNITURE: readonly FurnitureSpec[] = [
   furnitureNeonSign,
   furnitureShellFountain,
   furnitureStarlitRug,
+  furnitureCelestialBowl,
+  furnitureCeramicBowl,
 ]
 // shop definitions in pinned order; engines apply runtime eligibility.
 export const SHOP: readonly ShopItem[] = [
@@ -405,6 +412,8 @@ export const SHOP: readonly ShopItem[] = [
   shopStarMap,
   shopStarlitRug,
   shopTrailSnacks,
+  shopCelestialBowl,
+  shopCeramicBowl,
 ]
 // materials definitions in pinned order; engines apply runtime eligibility.
 export const MATERIALS: readonly Material[] = [
@@ -476,4 +485,5 @@ export const SPEECH: readonly Speech[] = [
   speechWeatherRain,
   speechWeatherSnow,
   speechWelcome,
+  speechDoneEatFancy,
 ]
