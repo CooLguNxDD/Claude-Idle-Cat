@@ -7,9 +7,10 @@ import { factsOf } from './brain/facts'
 import { befriend } from './friends'
 import { gainXp, withCat } from './game'
 import { plan } from './goap'
-import { addBond } from './pair'
-import { pickInteraction } from './pair'
+import { addBond, bondKey, pickInteraction } from './pair'
 import type { Rng } from './rng'
+import { skillTotals } from './skills'
+import { track } from './collection'
 
 const clamp = (n: number) => Math.max(0, Math.min(100, n))
 const dropIntent = (cat: Cat): Cat => {
@@ -41,7 +42,15 @@ const complete = (home: Home, catId: string, now: number, rng: Rng): Home => {
   })
   if (partner && fx.joy) next = withCat(next, partner.id, c => ({ ...c, joy: clamp(c.joy + fx.joy!) }))
   const bond = interaction?.bond ?? fx.bond ?? 0
-  if (behavior.partner && partner && bond > 0) next = addBond(next, catId, partner.id, bond, now)
+  // The brain alone pays an intent's bond; the on-screen pair run only animates it.
+  if (behavior.partner && partner && bond > 0) {
+    const key = bondKey(catId, partner.id), before = next.bonds[key]?.points ?? 0
+    next = addBond(next, catId, partner.id, bond, now)
+    const pair = [catId, partner.id]
+    if (next.cats.some(c => pair.includes(c.id) && skillTotals(c).harmony > 0))
+      next = { ...next, cats: next.cats.map(c => pair.includes(c.id) ? { ...c, joy: clamp(c.joy + 5) } : c) }
+    next = track(next, 'bond', (next.bonds[key]?.points ?? 0) - before, now)
+  }
   const line = `${cat.name} ${behavior.line}`
   const logged = { ...next, log: line }
   if (!fx.xp) return logged
@@ -72,7 +81,7 @@ const choose = (home: Home, cat: Cat, now: number, rng: Rng): Home => {
   return home
 }
 
-// A held intent (its cat still walking or playing it out on screen) waits, but never longer than this past due.
+/** A held intent (its cat still walking or playing it out on screen) waits, but never longer than this past due. */
 export const HOLD_MAX_MS = 120_000
 const isDue = (cat: Cat, behavior: Behavior, now: number, isHeld: (cat: Cat) => boolean) => {
   const age = now - cat.intent!.at, due = behavior.seconds * 1000

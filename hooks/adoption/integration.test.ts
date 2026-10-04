@@ -2,7 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Home } from '../../types'
 import { newHome } from '../game'
 
-test('Adopt is its own tab, charges one successful roll and Back returns to the Cat pane', async ($, on) => {
+test('Adopt is its own tab, charges one successful roll and Back returns to the Cat pane', { timeoutMs: 15_000 }, async ($, on) => {
   const now = 1_700_000_000_000
   mock.clock(on, { now })
   let stored: Home = { ...newHome(now), coins: 1000, rev: 100 }

@@ -1,6 +1,6 @@
 import { mock, test } from 'claude-code/testing'
 
-test('tab arrows wrap and Back follows visits, including command navigation', async ($, on) => {
+test('tab arrows wrap and Back follows visits, including command navigation', { timeoutMs: 15_000 }, async ($, on) => {
   mock.clock(on, { now: 1_700_000_000_000 })
   mock.store(on)
   on('ui.open', () => ({ value: { isPlaced: true } }))

@@ -43,6 +43,7 @@ test('validators reject excess bonuses, broken references, NaN and out-of-season
   expect(interactionProblems({ ...INTERACTIONS[0]!, roles: { lead: 'missing', partner: 'sit' } }, MOVES).length).toBeGreaterThan(0)
   expect(behaviorProblems({ ...BEHAVIORS[0]!, move: 'missing', seconds: 601 }, MOVES).length).toBeGreaterThan(0)
   expect(goalProblems({ ...GOALS[0]!, need: { ...GOALS[0]!.need, weight: 11 } }).length).toBeGreaterThan(0)
+  expect(goalProblems({ ...GOALS[0]!, need: { ...GOALS[0]!.need, below: 0 } })).toContain('invalid goal limits')
   expect(worldProblems({ ...WORLDS[0]!, cost: { coins: -1 } }, MATERIALS, WORLDS).length).toBeGreaterThan(0)
   expect(shopProblems({ ...SHOP[0]!, cost: { materials: { unknown: 1 } } }, MATERIALS, FURNITURE).length).toBeGreaterThan(0)
 })
