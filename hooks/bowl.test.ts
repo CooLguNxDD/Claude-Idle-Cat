@@ -4,6 +4,7 @@ import type { Home } from '../types'
 import { FURNITURE } from './content'
 import { bowlOf, fillBowl, normalizeBowl } from './bowl'
 import { newHome, tick } from './game'
+import { craft } from './shop'
 
 const rich = (home: Home): Home => ({ ...home, coins: 10_000 })
 
@@ -38,6 +39,17 @@ test('a smaller bowl keeps overflow and is not refilled past its cap', () => {
   expect(held.bowl.food).toBe(12)
   expect(held.coins).toBe(1000)
   expect(held.log).toMatch(/full/)
+})
+
+test('a crafted bowl is placed only when it holds more than the placed one', () => {
+  const base = newHome(0)
+  const basic = craft(rich(base), 'ceramic-bowl', 1)
+  expect(basic.decor.bowl).toBe('ceramic-bowl')
+  const golden = { ...rich(base), owned: [...base.owned, 'goldbowl'], decor: { ...base.decor, bowl: 'goldbowl' } }
+  const kept = craft(golden, 'ceramic-bowl', 1)
+  expect(kept.decor.bowl).toBe('goldbowl')
+  expect(kept.owned).toContain('ceramic-bowl')
+  expect(kept.log).toMatch(/place the new one from Home/)
 })
 
 test('the auto-feeder refills an empty bowl and leaves a stocked one alone', () => {

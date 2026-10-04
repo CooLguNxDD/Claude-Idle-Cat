@@ -1357,16 +1357,14 @@ export const register: Register = (on, options) => {
           </Text>
           {stock.map(item => (
             <Button key={`buy-${item.id}`} plain
-              label={`${home.owned.includes(item.id) ? '✓' : ' '} ${item.name} · ${item.price}c · ${item.slot} · ${item.bowl ? bowlPerk(item.bowl) : item.perk}`}
+              label={`${home.owned.includes(item.id) ? '✓' : ' '} ${item.name} · ${item.price}c · ${item.slot} · ${item.bowl ? `${bowlPerk(item.bowl)} · ${item.perk}` : item.perk}`}
               onPress={() => change($, (prev, t) => buyItem(prev, item.id, t, hourOf(t)))} />
           ))}
           <Text bold color={tone.accent}>Pip’s Curio shop · always open</Text>
           <Text>Materials: {Object.entries(home.materials).map(([id, n]) => `${id} ${n}`).join(' · ') || 'send a party to Garden Patrol'}</Text>
           {SHOP.filter(i => i.shop === 'curio').map(i => {
             const check = canCraft(home, i.id)
-            const granted = i.kind === 'furniture' ? furniture(i.grants) : undefined
-            const text = granted?.bowl ? bowlPerk(granted.bowl) : i.text
-            return <Button key={`craft-${i.id}`} plain label={`${i.name} · ${costText(i.cost)} · ${text}${check.ok ? '' : ` · ${check.reason}`}`} onPress={() => change($, (h, t) => craft(h, i.id, t))} />
+            return <Button key={`craft-${i.id}`} plain label={`${i.name} · ${costText(i.cost)} · ${i.text}${check.ok ? '' : ` · ${check.reason}`}`} onPress={() => change($, (h, t) => craft(h, i.id, t))} />
           })}
           {(home.gear['catnip-tea'] ?? 0) > 0 && <Button key="drink-tea" plain label={`Drink catnip tea (${home.gear['catnip-tea']})`} onPress={() => change($, h => drinkTea(h, activeCat(h).id))} />}
           <Text bold color={tone.accent}>Catnip market · it's {seasonOf(new Date(now).getMonth() + 1)}</Text>
