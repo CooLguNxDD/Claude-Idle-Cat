@@ -43,7 +43,8 @@ export const addBond = (home: Home, a: string, b: string, n: number, now: number
   const gained = Math.max(0, Math.min(DAILY_BOND_CAP - today, Math.floor(n * bonus)))
   return { ...home, bonds: { ...home.bonds, [key]: { points: old.points + gained, day, today: today + gained } } }
 }
-export type PairRun = { id: string; leadId: string; partnerId: string; lead: Motion; partner: Motion; left: number; elapsed: number }
+// isIntent: a brain play-buddy run; the brain pays its bond, so the frame loop must not.
+export type PairRun = { id: string; leadId: string; partnerId: string; lead: Motion; partner: Motion; left: number; elapsed: number; isIntent?: boolean }
 // Create temporary lead and partner motions; pair animation never enters the save.
 export const startPair = (i: Interaction, leadId: string, partnerId: string, motion: Motion, ctx: MotionCtx, rng: Rng): PairRun => ({
   id: i.id, leadId, partnerId, lead: forceMove(motion, i.roles.lead, ctx, rng, i.seconds),

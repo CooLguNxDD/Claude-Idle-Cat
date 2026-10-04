@@ -39,6 +39,8 @@ test('a tired cat goes to sleep and a second cat at home earns a capped bond', (
   const done = think(started, now + seconds('play-buddy'), seeded(3))
   const key = bondKey(actor.id, actor.intent!.with!)
   expect(done.bonds[key]!.points).toBeGreaterThan(0)
+  // The brain owns the reward, so the Paw Miles bond counter moves with it.
+  expect(done.miles.counts.bond).toBe(done.bonds[key]!.points)
   const capped = think({ ...started, bonds: { [key]: { points: DAILY_BOND_CAP, day: localDay(now), today: DAILY_BOND_CAP } } }, now + seconds('play-buddy'), seeded(3))
   expect(capped.bonds[key]!.points).toBe(DAILY_BOND_CAP)
 })

@@ -20,25 +20,28 @@ export const landmarksOf = (world: World, tier: number): Landmark[] => world.lan
 
 const isFree = (cost?: Cost) => !cost || (!(cost.coins || cost.miles) && !Object.keys(cost.materials ?? {}).length)
 
-/** Known ids only, plus every free world and the yard the save is standing in. */
+/** Known ids only, plus every free ungated world and the yard the save is standing in. */
 export const normalizeWorlds = (saved: unknown, currentId: string | undefined): string[] => {
   const known = new Set(WORLDS.map(w => w.id))
   const out: string[] = []
   const add = (id: string) => { if (known.has(id) && !out.includes(id)) out.push(id) }
   if (Array.isArray(saved)) for (const id of saved) if (typeof id === 'string') add(id)
-  for (const world of WORLDS) if (isFree(world.cost)) add(world.id)
+  for (const world of WORLDS) if (isFree(world.cost) && !world.unlock) add(world.id)
   if (currentId) add(currentId)
   return out
 }
 
-export const isWorldOwned = (home: Home, id: string) => home.worlds.includes(id) || WORLDS.some(w => w.id === id && isFree(w.cost))
+/** Bought, or free with its unlock gate met. A free world still waits on its gate. */
+export const isWorldOwned = (home: Home, id: string, worlds: readonly World[] = WORLDS) =>
+  home.worlds.includes(id) || worlds.some(w => w.id === id && isFree(w.cost) && isUnlocked(home, w.unlock))
 
 type BuyCheck = { ok: true; world: World } | { ok: false; reason: string }
 
-export const canBuyWorld = (home: Home, id: string): BuyCheck => {
-  const world = WORLDS.find(w => w.id === id)
+/** Whether the household can buy a world now, with the reason when it can't. */
+export const canBuyWorld = (home: Home, id: string, worlds: readonly World[] = WORLDS): BuyCheck => {
+  const world = worlds.find(w => w.id === id)
   if (!world) return { ok: false, reason: `No world called ${id}.` }
-  if (isWorldOwned(home, id)) return { ok: false, reason: `You already own the ${world.label}.` }
+  if (isWorldOwned(home, id, worlds)) return { ok: false, reason: `You already own the ${world.label}.` }
   if (!isUnlocked(home, world.unlock)) return { ok: false, reason: `Needs ${unlockHint(world.unlock)}.` }
   const cost = world.cost ?? {}
   if (!canPay(home, cost)) return { ok: false, reason: `Costs ${costText(cost)}.` }
@@ -55,10 +58,13 @@ export const buyWorld = (home: Home, id: string, now: number): Home => {
     effect: { kind: 'shop', at: now }, log: `The cats moved into the ${check.world.label} for ${costText(cost)}.` }, 'buy', 1, now)
 }
 
-/** Moves the household to an owned world. A locked yard says what it costs. */
-export const setWorld = (home: Home, id: string): Home => {
-  const world = WORLDS.find(w => w.id === id)
-  if (!world) return { ...home, log: `No world called ${id}. Worlds: ${WORLDS.map(w => w.id).join(', ')}.` }
-  if (!isWorldOwned(home, id)) return { ...home, log: `${world.label} costs ${costText(world.cost ?? {})}. /cat world buy ${id}` }
+/** Moves the household to an owned world. A locked yard says its gate or what it costs. */
+export const setWorld = (home: Home, id: string, worlds: readonly World[] = WORLDS): Home => {
+  const world = worlds.find(w => w.id === id)
+  if (!world) return { ...home, log: `No world called ${id}. Worlds: ${worlds.map(w => w.id).join(', ')}.` }
+  if (!isWorldOwned(home, id, worlds)) {
+    if (isFree(world.cost) || !isUnlocked(home, world.unlock)) return { ...home, log: `${world.label} needs ${unlockHint(world.unlock)}.` }
+    return { ...home, log: `${world.label} costs ${costText(world.cost ?? {})}. /cat world buy ${id}` }
+  }
   return { ...home, world: { id: world.id }, log: `The cats moved to the ${world.label}.` }
 }

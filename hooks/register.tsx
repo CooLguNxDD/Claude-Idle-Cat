@@ -708,7 +708,7 @@ export const register: Register = (on, options) => {
               const yard = latest
               const buddy = yard.cats.find(c => c.id === intent.with && !c.isAsleep && !isAway(yard, c.id))
               const picked = buddy && pickInteraction(latest, cat, buddy, motionRng)
-              pairRun = picked && buddy ? startPair(picked, cat.id, buddy.id, motion, ctx, motionRng) : null
+              pairRun = picked && buddy ? { ...startPair(picked, cat.id, buddy.id, motion, ctx, motionRng), isIntent: true } : null
               if (pairRun && picked && buddy) {
                 void say($, { on: 'pair.start', catId: cat.id, role: 'lead', buddyId: buddy.id, about: [picked.id], vars: { buddy: buddy.name } })
                 partnerReply = { frame: frame + 20, ev: { on: 'pair.start', catId: buddy.id, role: 'partner', buddyId: cat.id, about: [picked.id], vars: { buddy: cat.name } } }
@@ -734,7 +734,7 @@ export const register: Register = (on, options) => {
               pairRun = null; motion = { ...motion, left: 0 }
               const buddy = latest.cats.find(c => c.id === run.partnerId)
               void say($, { on: 'pair.end', catId: run.leadId, role: 'lead', buddyId: run.partnerId, about: [i.id], vars: { buddy: buddy?.name ?? '' } })
-              void queue(() => change($, (h, t) => {
+              if (!run.isIntent) void queue(() => change($, (h, t) => {
                 if (isAway(h, run.leadId) || isAway(h, run.partnerId)) return h
                 const key = bondKey(run.leadId, run.partnerId), before = h.bonds[key]?.points ?? 0
                 let bondedHome = addBond(h, run.leadId, run.partnerId, i.bond, t)

@@ -4,7 +4,8 @@ import { track } from './collection'
 export const BOWL_CAP = 10
 export const PORTION_COST = 5
 
-export const normalizeBowl = (bowl: unknown): { food: number } => {
+/** A saved bowl, repaired: missing or bad data gives 3 portions, food is a whole number within the cap. */
+export const normalizeBowl =(bowl: unknown): { food: number } => {
   if (!bowl || typeof bowl !== 'object' || !Number.isFinite((bowl as { food?: unknown }).food)) return { food: 3 }
   return { food: Math.max(0, Math.min(BOWL_CAP, Math.floor((bowl as { food: number }).food))) }
 }
