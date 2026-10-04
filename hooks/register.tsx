@@ -17,7 +17,7 @@ import { homeMods } from './home'
 import { read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Home, View, WeatherLocation, WeatherReading } from '../types'
+import type { Cat, Home, View, WeatherLocation, WeatherReading } from '../types'
 import { arcadeUrl, browserArgv, newToken, parseLine, snapshotOf, splitLines } from './arcade/bridge'
 import { GAMES, gameOf } from './arcade/games'
 import { ENERGY_COST, PAID_PLAYS, featured, finishGame, playsLeft, quitGame, startGame } from './arcade/rewards'
@@ -107,6 +107,12 @@ let motionRng: Rng | null = null
 let camera: Camera = { x: 0, manualUntil: 0 }
 // What the frame loop paints: the pane's view, element and last frame, whether it is mounted, and an in-flight guard.
 const paint = { view: 'cat' as View, kind: 'raster' as SceneKind, last: '', isMounted: false, isBusy: false, busyAt: 0 }
+// The brain waits on the active cat while its on-screen move is still walking or playing out.
+const isOnScreen = (cat: Cat) => {
+  const behavior = cat.intent ? BEHAVIORS.find(b => b.id === cat.intent!.id) : undefined
+  return paint.isMounted && !!behavior && !behavior.partner && cat.id === motionCatId && motion.move === behavior.move
+    && (motion.stage === 'go' || motion.left > 0)
+}
 // Set once an Image scene draws its text alt: this terminal shows no pictures, so the pane keeps to the Raster.
 let isImageBlocked = false
 // Claude Code's own theme row, read for the `auto` flavor.
@@ -581,7 +587,7 @@ export const register: Register = (on, options) => {
       return change($, (prev, t) => {
         const r = tickTally(prev, t)
         auto = r.deducted
-        return think(r.home, t, Math.random)
+        return think(r.home, t, Math.random, isOnScreen)
       }, () => auto)
     }))
     // Keeps the arcade server alive; it shuts itself down two minutes after the pings stop.

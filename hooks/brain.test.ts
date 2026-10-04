@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Home } from '../types'
-import { think } from './brain'
+import { HOLD_MAX_MS, think } from './brain'
 import { BEHAVIORS } from './content'
 import { adopt, migrate, newHome } from './game'
 import { bondKey, DAILY_BOND_CAP } from './pair'
@@ -41,6 +41,16 @@ test('a tired cat goes to sleep and a second cat at home earns a capped bond', (
   expect(done.bonds[key]!.points).toBeGreaterThan(0)
   const capped = think({ ...started, bonds: { [key]: { points: DAILY_BOND_CAP, day: localDay(now), today: DAILY_BOND_CAP } } }, now + seconds('play-buddy'), seeded(3))
   expect(capped.bonds[key]!.points).toBe(DAILY_BOND_CAP)
+})
+
+test('a held intent waits for the cat on screen, but only up to the cap', () => {
+  const planned = think(tuned({ ...newHome(now), bowl: { food: 3 } }, { hunger: 20 }), now, seeded(1))
+  const due = now + seconds('eat-bowl')
+  const held = think(planned, due, seeded(1), () => true)
+  expect(held.cats[0]!.intent?.id).toBe('eat-bowl')
+  expect(held.bowl.food).toBe(3)
+  expect(think(planned, due + HOLD_MAX_MS, seeded(1), () => true).bowl.food).toBe(2)
+  expect(think(planned, due, seeded(1), () => false).bowl.food).toBe(2)
 })
 
 test('away cats are skipped and migrate drops an unknown intent', () => {

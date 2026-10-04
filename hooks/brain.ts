@@ -72,8 +72,15 @@ const choose = (home: Home, cat: Cat, now: number, rng: Rng): Home => {
   return home
 }
 
+// A held intent (its cat still walking or playing it out on screen) waits, but never longer than this past due.
+export const HOLD_MAX_MS = 120_000
+const isDue = (cat: Cat, behavior: Behavior, now: number, isHeld: (cat: Cat) => boolean) => {
+  const age = now - cat.intent!.at, due = behavior.seconds * 1000
+  return age >= due && (age >= due + HOLD_MAX_MS || !isHeld(cat))
+}
+
 /** One pass for every cat at home: finish a due intent, then pick at most one new plan. */
-export const think = (home: Home, now: number, rng: Rng): Home => {
+export const think = (home: Home, now: number, rng: Rng, isHeld: (cat: Cat) => boolean = () => false): Home => {
   let next = home
   for (const cat of catsAtHome(home)) {
     const current = next.cats.find(c => c.id === cat.id) ?? cat
@@ -83,7 +90,7 @@ export const think = (home: Home, now: number, rng: Rng): Home => {
     }
     const behavior = current.intent ? BEHAVIORS.find(b => b.id === current.intent!.id) : undefined
     if (current.intent && !behavior) next = withCat(next, current.id, dropIntent)
-    else if (current.intent && behavior && now - current.intent.at >= behavior.seconds * 1000) next = complete(next, current.id, now, rng)
+    else if (current.intent && behavior && isDue(current, behavior, now, isHeld)) next = complete(next, current.id, now, rng)
     const after = next.cats.find(c => c.id === cat.id) ?? current
     if (!after.intent && !after.isAsleep) next = choose(next, after, now, rng)
   }
