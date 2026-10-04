@@ -120,5 +120,6 @@ export const thinkWithEvents = (home: Home, now: number, rng: Rng, isHeld: (cat:
   }
   return { home: next, events }
 }
+/** thinkWithEvents without the events, for callers that only need the next save. */
 export const think = (home: Home, now: number, rng: Rng, isHeld: (cat: Cat) => boolean = () => false): Home =>
   thinkWithEvents(home, now, rng, isHeld).home
