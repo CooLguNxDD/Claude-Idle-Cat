@@ -22,6 +22,7 @@ const KINDS = [
   { dir: 'materials', list: 'MATERIALS', type: 'Material', prefix: 'material' },
   { dir: 'behaviors', list: 'BEHAVIORS', type: 'Behavior', prefix: 'behavior' },
   { dir: 'goals', list: 'GOALS', type: 'Goal', prefix: 'goal' },
+  { dir: 'speech', list: 'SPEECH', type: 'Speech', prefix: 'speech' },
 ]
 const isCheck = process.argv.includes('--check')
 

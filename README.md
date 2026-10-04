@@ -50,12 +50,13 @@ Then type `/cat` to open the pane. Meow.
 | `/cat tea [cat-id]` | consume one catnip tea to restore a cat at home to full energy |
 | `←` / `→` / Enter (focused Expeditions keyboard row) | select a cat / send the selected party; `d` also sends |
 | `/config` → Claude reactions (`on` / `quiet` / `off`) | animate with toasts / animate quietly / disable reactions |
+| `/config` → Cat speech (`afk-cat.speech`: `on` / `quiet` / `off`) | context lines / no idle or tool chatter / hourly idle line only |
 | `/cat rename <name>` | rename the active cat |
 | `/cat shelter` | open the Adopt tab without spending coins (window shopping is free) |
 | `/cat adopt [name]` | roll and adopt a shelter cat, optionally with a chosen name |
 | `/cat switch [name]` | bring another cat front and centre; no name cycles to the next (or pick it from the cat list, `w` in the pane) |
 | `/cat reset` | start over with a new household (back to the cardboard box!) |
-| `/cat settings` · Settings tab (`v`) | saved sound toggle and preview, flavor, interface, canvas, reactions, theme, world, weather and arcade display |
+| `/cat settings` · Settings tab (`v`) | saved sound toggle and preview, flavor, interface, canvas, reactions, speech, theme, world, weather and arcade display |
 | `/cat theme <flavor>` | switch Claude Code itself to the Catppuccin theme (`latte` · `frappe` · `macchiato` · `mocha`); see Claude Code theme |
 | `/cat export [file]` | save a backup; default `~/.claude-kitten/backups/afk-cat-<date>.json` |
 | `/cat import <file>` | load a backup; your current save is backed up first (`…-before-import.json`) |
@@ -132,6 +133,10 @@ Pip's furniture recipes unlock at the following house tiers. Each item occupies 
 | `snowflake` | December–February Snow Trail |
 
 Claude errors trigger a hiss; passing test commands trigger celebration; a Bash call still running after twenty seconds triggers a cosmetic nap. The reactions setting controls animation and toasts. No reaction pays coins or changes cat needs.
+
+## Speech
+
+The pane quote is no longer one line for the whole day. Cats pick a line from `hooks/content/speech/` when they plan, finish a behaviour, meet another cat, notice weather or a festival, receive care, or hear Claude start, call a tool, pass a test, or finish a turn. A small glyph bobs over the active cat while that line is fresh. Speech lives in memory only; it never changes the save or a tool result. `afk-cat.speech` is `on`, `quiet` (no idle or tool chatter) or `off` (the hourly idle line only).
 
 [Content v2 walkthrough and previews](docs/content-v2-walkthrough.md).
 
@@ -414,7 +419,7 @@ node tools/build-web.mjs
 
 ### 🧶 Generator skills
 
-New content is a data file, and fifteen mirrored project skills in `.claude/skills/` and `.agents/skills/` write one for you in a Claude Code session in this repo. `behavior-gen` and `goal-gen` add GOAP behaviours and goals. Each writes the file, registers it with `node tools/build-content.mjs`, renders a preview with `node tools/preview.mjs`, then runs the checks.
+New content is a data file, and sixteen mirrored project skills in `.claude/skills/` and `.agents/skills/` write one for you in a Claude Code session in this repo. `behavior-gen` and `goal-gen` add GOAP behaviours and goals. Each writes the file, registers it with `node tools/build-content.mjs`, renders a preview with `node tools/preview.mjs`, then runs the checks.
 
 | Skill | Ask for | Writes |
 | --- | --- | --- |
@@ -423,6 +428,7 @@ New content is a data file, and fifteen mirrored project skills in `.claude/skil
 | `move-gen` | a move or animation for the roaming cat | `hooks/content/moves/<id>.ts` |
 | `world-gen` | a themed yard with layers and landmarks | `hooks/content/worlds/<id>.ts` |
 | `reaction-gen` | a Claude reaction | `hooks/content/reactions/<id>.ts` |
+| `speech-gen` | a context speech bank | `hooks/content/speech/<id>.ts` |
 | `interaction-gen` | pair play | `hooks/content/interactions/<id>.ts` |
 | `expedition-gen` | a timed expedition | `hooks/content/expeditions/<id>.ts` |
 | `quest-gen` | a quest chain | `hooks/content/quests/<id>.ts` |

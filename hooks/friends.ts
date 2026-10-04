@@ -74,20 +74,27 @@ const LINES: Record<Personality, readonly string[]> = {
 }
 const GREETINGS = ['Hey', 'Oh hi', 'Psst']
 
+// Nickname and catchphrase, the same rule dialogue uses. Seed keeps a line stable.
+export const decorate = (cat: Cat, text: string, seed: number): string => {
+  const p = cat.genes.personality
+  const level = friendLevel(cat.friendship)
+  const n = Math.abs(seed)
+  let line = text
+  if (level >= NICKNAME_LEVEL) line = `${GREETINGS[n % GREETINGS.length]}, ${NICKNAMES[p]}! ${line}`
+  if (level >= CATCHPHRASE_LEVEL) line = `${line} ${CATCHPHRASES[p]}`
+  return line
+}
+
 // What the cat says right now: changes by the hour, remembers yesterday's gift.
 export const dialogue = (cat: Cat, now: number, hour: number): string => {
   const p = cat.genes.personality
-  const level = friendLevel(cat.friendship)
   const seed = hour + cat.id.length + cat.name.length
   const gift = cat.lastGift && giftById(cat.lastGift.id)
   const days = cat.lastGift ? dayOf(now) - cat.lastGift.day : 99
-  let line: string
-  if (gift && days === 0) line = gift.loves === p ? `A ${gift.name}! My favorite!` : `Oh, a ${gift.name}. Thanks.`
-  else if (gift && days >= 1 && days <= 2 && gift.loves === p) line = `Still thinking about that ${gift.name}…`
-  else line = LINES[p][seed % LINES[p].length] ?? '…'
-  if (level >= NICKNAME_LEVEL) line = `${GREETINGS[seed % GREETINGS.length]}, ${NICKNAMES[p]}! ${line}`
-  if (level >= CATCHPHRASE_LEVEL) line = `${line} ${CATCHPHRASES[p]}`
-  return line
+  const line = gift && days === 0 ? (gift.loves === p ? `A ${gift.name}! My favorite!` : `Oh, a ${gift.name}. Thanks.`)
+    : gift && days >= 1 && days <= 2 && gift.loves === p ? `Still thinking about that ${gift.name}…`
+    : LINES[p][seed % LINES[p].length] ?? '…'
+  return decorate(cat, line, seed)
 }
 
 export const NEW_FRIEND = { friendship: 0, daily: { day: 0, points: 0, gifted: false }, lastGift: null }

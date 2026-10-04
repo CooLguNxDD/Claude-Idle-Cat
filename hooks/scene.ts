@@ -19,7 +19,7 @@ import { drawLandmarks } from './scene/landmarks'
 export { ROWS, sceneCols }
 export type { RgbaImage }
 export type SceneInput = { home: Home; now: number; tick: number; hour: number; flavor: Flavor; cols: number; scale?: number
-  motion?: Motion; partner?: { id: string; motion: Motion }; camX?: number }
+  motion?: Motion; partner?: { id: string; motion: Motion }; camX?: number; speech?: { glyph: string; at: number } }
 // Device pixels per scene pixel in the picture: every asset is a spec, so changing this re-renders all of it.
 export const PICTURE_SCALE = 4
 
@@ -27,7 +27,7 @@ export const PICTURE_SCALE = 4
 export const yardCols = (home: Home, cols: number) => worldCols(worldOf(home), home.tier, cols)
 
 // Sky, season and rain stay on the pane; the fence, furniture, landmarks and cats scroll with the camera.
-export const drawScene = ({ home, now, tick, hour, flavor, cols, scale, motion, partner, camX }: SceneInput): SceneCanvas => {
+export const drawScene = ({ home, now, tick, hour, flavor, cols, scale, motion, partner, camX, speech }: SceneInput): SceneCanvas => {
   const c = canvas(cols, scale)
   const world = worldOf(home)
   const wide = yardCols(home, cols)
@@ -44,7 +44,7 @@ export const drawScene = ({ home, now, tick, hour, flavor, cols, scale, motion, 
   drawCup(c, motion, flavor, cam)
   drawSeason(c, state, tick, flavor, weather)
   if (weather) drawWeatherLayer({ c, weather, tick, f: flavor }, 'front')
-  drawEffects(c, home, now, tick, flavor, { ...cat, ox: cat.ox - cam })
+  drawEffects(c, home, now, tick, flavor, { ...cat, ox: cat.ox - cam }, speech)
   if (wide > cols) drawMinimap(c, home, wide, cam, cat.ox, flavor)
   return c
 }

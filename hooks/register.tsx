@@ -23,13 +23,13 @@ import { GAMES, gameOf } from './arcade/games'
 import { ENERGY_COST, PAID_PLAYS, featured, finishGame, playsLeft, quitGame, startGame } from './arcade/rewards'
 import { catArt } from './art'
 import { backupDir, backupName, inDir, parseBackup, pickBase, toBackup } from './backup'
-import { buyCatnip, marketNow, seasonOf, sellCatnip, weekOf } from './calendar'
+import { buyCatnip, festivalOf, marketNow, seasonOf, sellCatnip, weekOf } from './calendar'
 import { ACHIEVEMENTS, MILES_SHOP, buyWithMiles, settle, tasksFor, track } from './collection'
 import { CRITTERS, critter, isAvailable, sell } from './critters'
 import { act, activeCat, adopt, adoptPrice, adoptVisitor, bar, buyItem, checkIn, coinRate, donateCritter, giveGift, idleRate,
   learnSkill, migrate, moodOf, newHome, nextCat, rename, respec, reward, rollToolPay, spendPay, stageName, switchTo,
   tick, tickTally, TOOL_CHANCE, activeMinutes, activePay, rampOf, toolPay, welcomeBack, xpToNext } from './game'
-import { CATCHPHRASE_LEVEL, DAILY_CAP, GIFTS, LEVELS, NICKNAME_LEVEL, PHOTO_LEVEL, dayOf, dialogue, friendLevel,
+import { CATCHPHRASE_LEVEL, DAILY_CAP, GIFTS, LEVELS, NICKNAME_LEVEL, PHOTO_LEVEL, dayOf, friendLevel,
   levelName, toNextLevel } from './friends'
 import type { Action } from './game'
 import { PERSONALITY_INFO, describeGenes } from './genes'
@@ -44,7 +44,9 @@ import { forceMove, motionCtxOf, startMotion, stepMotion } from './motion'
 import { followCam, panCam } from './camera'
 import type { Camera } from './camera'
 import { buyWorld, canBuyWorld, isWorldOwned, setWorld } from './world'
-import { think } from './brain'
+import { thinkWithEvents } from './brain'
+import { eventsOf, quoteOf, speak } from './speech'
+import type { Said, SpeechEvent } from './speech'
 import { BOWL_CAP, fillBowl } from './bowl'
 import { BEHAVIORS, WORLDS, EXPEDITIONS, SHOP, INTERACTIONS } from './content'
 import { DESIGN } from './scene/fine/draw'
@@ -62,7 +64,7 @@ import type { Flavor } from './theme'
 import type { SkinLevel } from './skin'
 import { visibleTabs } from './ui/tabs'
 import { goBack, initialRoute, navigate } from './ui/router'
-import { parseCurrent } from './weather/conditions'
+import { CONDITIONS, parseCurrent } from './weather/conditions'
 import { coordinates, forecastUrl, geocodingUrl, locationKey, locationUrl, parseLocations } from './weather/location'
 import { acceptWeather, emptyWeather, liveWeather, refreshDue, setLocation, weatherSummary } from './weather/state'
 
@@ -90,6 +92,14 @@ let pairRun: PairRun | null = null
 let intentKey = ''
 let reactionMemory: ReactionMemory = {}
 let reactionMode: ReactionMode = 'on'
+let speechMode: 'on' | 'quiet' | 'off' = 'on'
+let said: Said | null = null
+let recentLines: string[] = []
+const speechCooldown: Record<string, number> = {}
+let nextIdleAt = 0
+let lastWeather = ''
+let festivalDay = ''
+let partnerReply: { frame: number; ev: SpeechEvent } | null = null
 let reactionUntil = 0
 let partySelection: string[] = []
 let gearSelection: string[] = []
@@ -100,6 +110,7 @@ const SETTING_CHOICES: Record<string, readonly string[]> = {
   'afk-cat.skin': ['full', 'light', 'off'],
   'afk-cat.canvas': ['auto', 'image', 'text'],
   'afk-cat.reactions': ['on', 'quiet', 'off'],
+  'afk-cat.speech': ['on', 'quiet', 'off'],
 }
 const notifiedRuns = new Set<string>()
 let motionRng: Rng | null = null
@@ -153,6 +164,26 @@ const playClip = async ($: EngineInterface, clip: Clip) => {
   await $.audio.play({ asset: clipAsset(clip) })
 }
 
+// Speech stays in memory. It never writes the save and never changes a tool result.
+const say = async ($: EngineInterface, ev: SpeechEvent) => {
+  if (speechMode === 'off' || !latest || !ev.catId) return
+  if (speechMode === 'quiet' && (ev.on === 'idle' || ev.on === 'claude.tool')) return
+  const now = await $.clock.now()
+  if (ev.on === 'idle' ? now < nextIdleAt : (speechCooldown[ev.on] ?? 0) > now) return
+  motionRng ??= seeded(now)
+  const line = speak(latest, ev, now, hourOf(now), motionRng, recentLines)
+  if (!line) {
+    if (ev.on === 'idle') nextIdleAt = now + 45_000
+    return
+  }
+  if (said && now < said.until && line.priority < said.priority) return
+  said = line
+  recentLines = [...recentLines, line.text].slice(-8)
+  if (ev.on === 'idle') nextIdleAt = now + 45_000 + Math.floor(motionRng() * 45_000)
+  else speechCooldown[ev.on] = now + (ev.on === 'claude.tool' ? 20_000 : 6_000)
+  try { $.ui.invalidate('ui.render') } catch { /* cosmetic */ }
+}
+
 // Applies a change to the household, then saves it so it survives restarts.
 // `deducted` reports coins fn spent on its own, so they still count as earned; `onApplied` runs once the change lands.
 const change = async ($: EngineInterface, fn: (home: Home, now: number) => Home, deducted?: () => number,
@@ -179,6 +210,12 @@ const change = async ($: EngineInterface, fn: (home: Home, now: number) => Home,
     }
   }
   await $.store.set('home', home)
+  for (const ev of eventsOf(before, home, now)) void say($, ev)
+  const nextWeather = home.weather.current?.condition ?? ''
+  if (nextWeather && nextWeather !== (before.weather.current?.condition ?? '') && nextWeather !== lastWeather) {
+    lastWeather = nextWeather
+    void say($, { on: 'weather', catId: activeCat(home).id, about: [nextWeather], vars: { weather: CONDITIONS[nextWeather].label } })
+  }
   const cat = activeCat(home)
   $.ui.status(`🐱 ${cat.name} Lv${cat.level} ${moodOf(cat)} · ${fmtCoins(home.coins)}`)
   void pushArcade($, home, now)
@@ -291,12 +328,19 @@ const ACTIONS: { id: string; label: string; hotkey: string; run: 'play' | 'fill'
 const hourOf = (now: number) => new Date(now).getHours()
 
 type SceneKind = 'raster' | 'image'
+const speechMark = (home: Home, now: number) => said && now < said.until && said.glyph && said.catId === activeCat(home).id
+  ? { speech: { glyph: said.glyph, at: said.at } } : {}
+const paneQuote = (home: Home, now: number) => {
+  const quote = quoteOf(home, said, now, hourOf(now))
+  const speaker = home.cats.find(c => c.id === quote.catId) ?? activeCat(home)
+  return `${speaker.name}: "${quote.text}"`
+}
 const sceneCellsOf = (home: Home, view: View, now: number, flavor: Flavor) => view === 'adopt'
   ? shelterCells(home, now, frame, flavor, cols) : frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion,
-    camX: camera.x, ...(pairRun ? { partner: { id: pairRun.partnerId, motion: pairRun.partner } } : {}) })
+    camX: camera.x, ...(pairRun ? { partner: { id: pairRun.partnerId, motion: pairRun.partner } } : {}), ...speechMark(home, now) })
 const sceneImageOf = (home: Home, view: View, now: number, flavor: Flavor): RgbaImage => view === 'adopt'
   ? shelterImage(home, now, frame, flavor, cols, PICTURE_SCALE)
-  : frameImage({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion, camX: camera.x, ...(pairRun ? { partner: { id: pairRun.partnerId, motion: pairRun.partner } } : {}) })
+  : frameImage({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion, camX: camera.x, ...(pairRun ? { partner: { id: pairRun.partnerId, motion: pairRun.partner } } : {}), ...speechMark(home, now) })
 // A denied Image blit that names its alt means the terminal draws no pictures here.
 const isAltDeny = (deny: string) => /\balt\b|placeholder/i.test(deny)
 
@@ -511,6 +555,7 @@ const applySetting = (key: string, value: unknown) => {
     case 'afk-cat.sound': isSoundOn = value === true; break
     case 'afk-cat.canvas': canvasMode = value === 'image' || value === 'text' ? value : 'auto'; isImageBlocked = false; break
     case 'afk-cat.reactions': reactionMode = value === 'off' || value === 'quiet' ? value : 'on'; break
+    case 'afk-cat.speech': speechMode = value === 'off' || value === 'quiet' ? value : 'on'; break
   }
 }
 const setSetting = async ($: EngineInterface, key: string, value: string | boolean) => {
@@ -547,6 +592,9 @@ const departure = ($: EngineInterface, expId: string, ids: string[], gear: strin
 
 export const register: Register = (on, options) => {
   reactionMode = options.reactions === 'off' || options.reactions === 'quiet' ? options.reactions : 'on'
+  speechMode = options.speech === 'off' || options.speech === 'quiet' ? options.speech : 'on'
+  said = null; recentLines = []; nextIdleAt = 0; festivalDay = ''; partnerReply = null
+  for (const key of Object.keys(speechCooldown)) delete speechCooldown[key]
   pairRun = null; reactionMemory = {}; notifiedRuns.clear()
   flavorSetting = String(options.flavor ?? 'auto')
   isSoundOn = options.sound !== false
@@ -565,9 +613,12 @@ export const register: Register = (on, options) => {
     const saved = (await $.store.get('home')) ?? (await $.store.get('cat'))
     let bonus = 0
     let returns: string[] = []
+    let pendingBrain: SpeechEvent[] = []
     const home = await change($, (_, t) => {
       const loaded = resumeExpeditions(migrate(saved, t), t)
-      const day = checkIn(think(tick(loaded, t), t, Math.random), t)
+      const thought = thinkWithEvents(tick(loaded, t), t, Math.random, isOnScreen)
+      pendingBrain = thought.events
+      const day = checkIn(thought.home, t)
       bonus = day.bonus
       returns = readyRuns(day.home, t).filter(r => !day.home.expeditions.inbox.includes(r.id)).map(r => r.exp)
       return finishExpeditions(saved ? welcomeBack(loaded, day.home, t) : day.home, t)
@@ -580,15 +631,21 @@ export const register: Register = (on, options) => {
     owedMinutes = 0
     if (home.effect?.kind === 'welcome') $.ui.toast(home.log)
     if (bonus > 0) $.ui.toast(`Day ${home.streak} streak bonus: +${bonus}c`)
+    lastWeather = home.weather.current?.condition ?? ''
+    nextIdleAt = (await $.clock.now()) + 45_000 + Math.floor(Math.random() * 45_000)
+    for (const ev of pendingBrain) void say($, ev)
     void refreshWeather($)
     $.clock.every(60_000, () => { void refreshWeather($) })
     $.clock.every(TICK_MS, () => void readTheme($).then(() => {
       let auto = 0
+      let pendingTick: SpeechEvent[] = []
       return change($, (prev, t) => {
         const r = tickTally(prev, t)
         auto = r.deducted
-        return think(r.home, t, Math.random, isOnScreen)
-      }, () => auto)
+        const thought = thinkWithEvents(r.home, t, Math.random, isOnScreen)
+        pendingTick = thought.events
+        return thought.home
+      }, () => auto).then(() => { for (const ev of pendingTick) void say($, ev) })
     }))
     // Keeps the arcade server alive; it shuts itself down two minutes after the pings stop.
     $.clock.every(30_000, () => {
@@ -602,6 +659,14 @@ export const register: Register = (on, options) => {
     $.clock.every(FRAME_MS, async () => {
       if (!latest) return
       const now = await $.clock.now()
+      const dayKey = String(dayOf(now))
+      if (festivalDay !== dayKey) {
+        festivalDay = dayKey
+        const fest = festivalOf(new Date(now).getMonth() + 1)
+        const names = activeEvents(now).map(event => event.id)
+        if (fest || names.length) void say($, { on: 'festival', catId: activeCat(latest).id, about: [fest, ...names].filter((id): id is string => !!id) })
+      }
+      if (paint.isMounted && (!said || now >= said.until) && now >= nextIdleAt) void say($, { on: 'idle', catId: activeCat(latest).id })
       for (const id of notifiedRuns) if (!latest.expeditions.runs.some(r => r.id === id)) notifiedRuns.delete(id)
       const fresh = readyRuns(latest, now).filter(r => !latest!.expeditions.inbox.includes(r.id) && !notifiedRuns.has(r.id))
       if (fresh.length) {
@@ -622,6 +687,11 @@ export const register: Register = (on, options) => {
       paint.busyAt = now
       try {
         frame += 1
+        if (partnerReply && frame >= partnerReply.frame) {
+          const ev = partnerReply.ev
+          partnerReply = null
+          void say($, ev)
+        }
         const flavor = flavorAt(now)
         // The active cat roams only while someone can see it.
         if (paint.isMounted) {
@@ -639,6 +709,10 @@ export const register: Register = (on, options) => {
               const buddy = yard.cats.find(c => c.id === intent.with && !c.isAsleep && !isAway(yard, c.id))
               const picked = buddy && pickInteraction(latest, cat, buddy, motionRng)
               pairRun = picked && buddy ? { ...startPair(picked, cat.id, buddy.id, motion, ctx, motionRng), isIntent: true } : null
+              if (pairRun && picked && buddy) {
+                void say($, { on: 'pair.start', catId: cat.id, role: 'lead', buddyId: buddy.id, about: [picked.id], vars: { buddy: buddy.name } })
+                partnerReply = { frame: frame + 20, ev: { on: 'pair.start', catId: buddy.id, role: 'partner', buddyId: cat.id, about: [picked.id], vars: { buddy: cat.name } } }
+              }
             } else {
               pairRun = null
               motion = forceMove(motion, behavior.move, ctx, motionRng, behavior.seconds)
@@ -647,13 +721,19 @@ export const register: Register = (on, options) => {
           if (!pairRun && !intent && frame >= reactionUntil && frame % 240 === 0 && !isAway(latest, cat.id)) {
             const buddy = partnerOf(latest, cat.id, motionRng)
             const i = buddy && pickInteraction(latest, cat, buddy, motionRng)
-            if (i) pairRun = startPair(i, cat.id, buddy!.id, motion, ctx, motionRng)
+            if (i && buddy) {
+              pairRun = startPair(i, cat.id, buddy.id, motion, ctx, motionRng)
+              void say($, { on: 'pair.start', catId: cat.id, role: 'lead', buddyId: buddy.id, about: [i.id], vars: { buddy: buddy.name } })
+              partnerReply = { frame: frame + 20, ev: { on: 'pair.start', catId: buddy.id, role: 'partner', buddyId: cat.id, about: [i.id], vars: { buddy: cat.name } } }
+            }
           }
           if (pairRun) {
             pairRun = stepPair(pairRun, ctx); motion = pairRun.lead
             if (pairRun.left <= 0) {
-              const run = pairRun, i = INTERACTIONS.find(i => i.id === run.id)!
+              const run = pairRun, i = INTERACTIONS.find(item => item.id === run.id)!
               pairRun = null; motion = { ...motion, left: 0 }
+              const buddy = latest.cats.find(c => c.id === run.partnerId)
+              void say($, { on: 'pair.end', catId: run.leadId, role: 'lead', buddyId: run.partnerId, about: [i.id], vars: { buddy: buddy?.name ?? '' } })
               if (!run.isIntent) void queue(() => change($, (h, t) => {
                 if (isAway(h, run.leadId) || isAway(h, run.partnerId)) return h
                 const key = bondKey(run.leadId, run.partnerId), before = h.bonds[key]?.points ?? 0
@@ -800,7 +880,17 @@ export const register: Register = (on, options) => {
     try {
       const ran = await next(e)
       void queue(() => change($, (h, t) => track(reward(h, rollToolPay(h, Math.random) * rampOf(chatMinutes)), 'tools', 1, t)))
-      await emitReaction($, signalsOf({ tool: e.tool, command, isError: ran.isError === true || !!ran.deny, ms: 0 }), e.tool).catch(() => undefined)
+      const signals = signalsOf({ tool: e.tool, command, isError: ran.isError === true || !!ran.deny, ms: 0 })
+      await emitReaction($, signals, e.tool).catch(() => undefined)
+      // Speech is fire-and-forget: it never delays or changes the tool result.
+      try {
+        const catId = latest ? activeCat(latest).id : ''
+        if (catId) {
+          void say($, { on: 'claude.tool', catId, about: [e.tool], vars: { tool: e.tool } }).catch(() => undefined)
+          for (const signal of signals)
+            if (signal === 'test.pass' || signal === 'test.fail') void say($, { on: signal, catId }).catch(() => undefined)
+        }
+      } catch { /* cosmetic */ }
       return ran
     } catch (error) {
       await emitReaction($, ['tool.error'], e.tool).catch(() => undefined)
@@ -810,11 +900,16 @@ export const register: Register = (on, options) => {
 
   on('turn.start', async ($, e, next) => {
     earned.prompt = 0
-    return next(e)
+    const result = await next(e)
+    try { if (latest) void say($, { on: 'claude.prompt', catId: activeCat(latest).id }).catch(() => undefined) } catch { /* cosmetic */ }
+    return result
   })
 
   on('turn.complete', async ($, e, next) => {
     await emitReaction($, [turnSignal(e.reason)]).catch(() => undefined)
+    try {
+      if (latest) void say($, { on: turnSignal(e.reason) === 'turn.error' ? 'claude.error' : 'claude.done', catId: activeCat(latest).id }).catch(() => undefined)
+    } catch { /* cosmetic */ }
     await queue(async () => {
       const usd = await sessionUsd($)
       const spent = usd === undefined || paidUsd === undefined ? 0 : usd - paidUsd
@@ -1178,7 +1273,7 @@ export const register: Register = (on, options) => {
         <Box flexDirection="column">
           {tabs}
           {header}
-          <Text italic color={tone.title}>{cat.name}: "{dialogue(cat, now, hourOf(now))}"</Text>
+          <Text italic color={tone.title}>{paneQuote(home, now)}</Text>
           {home.cats.map(c => {
             const nextLevel = toNextLevel(c.friendship)
             const points = c.daily.day === day ? c.daily.points : 0
@@ -1336,7 +1431,7 @@ export const register: Register = (on, options) => {
         {tabs}
         {header}
         {scene}
-        <Text italic color={tone.title}>{cat.name}: "{dialogue(cat, now, hourOf(now))}"</Text>
+        <Text italic color={tone.title}>{paneQuote(home, now)}</Text>
         <Button key="cat-list" hotkey="w" plain
           label={`${isCatListOpen ? '▾' : '▸'} Cats ${home.cats.length}/${maxCats(home)} · ${cat.name} (w)`}
           onPress={() => update($, catListRef, open => !open)} />

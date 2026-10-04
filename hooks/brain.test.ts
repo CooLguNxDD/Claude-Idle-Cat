@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Home } from '../types'
-import { HOLD_MAX_MS, think } from './brain'
+import { HOLD_MAX_MS, think, thinkWithEvents } from './brain'
 import { BEHAVIORS } from './content'
 import { adopt, migrate, newHome } from './game'
 import { bondKey, DAILY_BOND_CAP } from './pair'
@@ -43,6 +43,16 @@ test('a tired cat goes to sleep and a second cat at home earns a capped bond', (
   expect(done.miles.counts.bond).toBe(done.bonds[key]!.points)
   const capped = think({ ...started, bonds: { [key]: { points: DAILY_BOND_CAP, day: localDay(now), today: DAILY_BOND_CAP } } }, now + seconds('play-buddy'), seeded(3))
   expect(capped.bonds[key]!.points).toBe(DAILY_BOND_CAP)
+})
+
+test('thinkWithEvents emits plan, done and an empty bowl', () => {
+  const hungry = tuned({ ...newHome(now), bowl: { food: 3 } }, { hunger: 20 })
+  const planned = thinkWithEvents(hungry, now, seeded(1))
+  expect(planned.events).toContainEqual({ on: 'plan', catId: hungry.cats[0]!.id, about: ['eat-bowl'] })
+  const eaten = thinkWithEvents(planned.home, now + seconds('eat-bowl'), seeded(1))
+  expect(eaten.events.some(e => e.on === 'done' && e.about?.[0] === 'eat-bowl')).toBe(true)
+  const empty = thinkWithEvents(tuned({ ...hungry, bowl: { food: 0 } }, { hunger: 20 }), now, seeded(1))
+  expect(empty.events.some(e => e.on === 'bowl.empty')).toBe(true)
 })
 
 test('a held intent waits for the cat on screen, but only up to the cap', () => {

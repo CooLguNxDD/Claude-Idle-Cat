@@ -169,7 +169,51 @@ import goalFed from './goals/fed'
 import goalRested from './goals/rested'
 import goalSocial from './goals/social'
 import goalTidy from './goals/tidy'
-import type { Breed, Move, World, NamedCat, Reaction, Interaction, Expedition, Quest, GameEvent, SkillSpec, FurnitureSpec, ShopItem, Material, Behavior, Goal } from './types'
+import speechBowlEmpty from './speech/bowl-empty'
+import speechCatch from './speech/catch'
+import speechClaudeDone from './speech/claude-done'
+import speechClaudeError from './speech/claude-error'
+import speechClaudePrompt from './speech/claude-prompt'
+import speechClaudeToolBash from './speech/claude-tool-bash'
+import speechClaudeToolEdit from './speech/claude-tool-edit'
+import speechClaudeToolRead from './speech/claude-tool-read'
+import speechDoneEat from './speech/done-eat'
+import speechDoneEatGreedy from './speech/done-eat-greedy'
+import speechDoneGroom from './speech/done-groom'
+import speechFestivalLights from './speech/festival-lights'
+import speechFestivalPumpkins from './speech/festival-pumpkins'
+import speechFill from './speech/fill'
+import speechGift from './speech/gift'
+import speechGiftLoved from './speech/gift-loved'
+import speechIdleCuddly from './speech/idle-cuddly'
+import speechIdleCurious from './speech/idle-curious'
+import speechIdleGreedy from './speech/idle-greedy'
+import speechIdleGrumpy from './speech/idle-grumpy'
+import speechIdleLazy from './speech/idle-lazy'
+import speechIdleNight from './speech/idle-night'
+import speechIdlePlayful from './speech/idle-playful'
+import speechIdleShy from './speech/idle-shy'
+import speechLevelup from './speech/levelup'
+import speechPairChase from './speech/pair-chase'
+import speechPairEnd from './speech/pair-end'
+import speechPairEndClose from './speech/pair-end-close'
+import speechPairNapPile from './speech/pair-nap-pile'
+import speechPairStartLead from './speech/pair-start-lead'
+import speechPairStartPartner from './speech/pair-start-partner'
+import speechPet from './speech/pet'
+import speechPlanEat from './speech/plan-eat'
+import speechPlanNap from './speech/plan-nap'
+import speechPlanPlay from './speech/plan-play'
+import speechPlay from './speech/play'
+import speechStray from './speech/stray'
+import speechTestFail from './speech/test-fail'
+import speechTestPass from './speech/test-pass'
+import speechWake from './speech/wake'
+import speechWeatherClear from './speech/weather-clear'
+import speechWeatherRain from './speech/weather-rain'
+import speechWeatherSnow from './speech/weather-snow'
+import speechWelcome from './speech/welcome'
+import type { Breed, Move, World, NamedCat, Reaction, Interaction, Expedition, Quest, GameEvent, SkillSpec, FurnitureSpec, ShopItem, Material, Behavior, Goal, Speech } from './types'
 
 // breeds definitions in pinned order; engines apply runtime eligibility.
 export const BREEDS: readonly Breed[] = [
@@ -385,4 +429,51 @@ export const GOALS: readonly Goal[] = [
   goalRested,
   goalSocial,
   goalTidy,
+]
+// speech definitions in pinned order; engines apply runtime eligibility.
+export const SPEECH: readonly Speech[] = [
+  speechBowlEmpty,
+  speechCatch,
+  speechClaudeDone,
+  speechClaudeError,
+  speechClaudePrompt,
+  speechClaudeToolBash,
+  speechClaudeToolEdit,
+  speechClaudeToolRead,
+  speechDoneEat,
+  speechDoneEatGreedy,
+  speechDoneGroom,
+  speechFestivalLights,
+  speechFestivalPumpkins,
+  speechFill,
+  speechGift,
+  speechGiftLoved,
+  speechIdleCuddly,
+  speechIdleCurious,
+  speechIdleGreedy,
+  speechIdleGrumpy,
+  speechIdleLazy,
+  speechIdleNight,
+  speechIdlePlayful,
+  speechIdleShy,
+  speechLevelup,
+  speechPairChase,
+  speechPairEnd,
+  speechPairEndClose,
+  speechPairNapPile,
+  speechPairStartLead,
+  speechPairStartPartner,
+  speechPet,
+  speechPlanEat,
+  speechPlanNap,
+  speechPlanPlay,
+  speechPlay,
+  speechStray,
+  speechTestFail,
+  speechTestPass,
+  speechWake,
+  speechWeatherClear,
+  speechWeatherRain,
+  speechWeatherSnow,
+  speechWelcome,
 ]

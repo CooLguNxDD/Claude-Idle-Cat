@@ -38,6 +38,8 @@ const RAMP_MINUTES = 60
 const RAMP_MAX = 2
 // Time away never pushes a stat below this: cats get grumpy, never sad.
 export const DECAY_FLOOR = 25
+// Speech tells the feeder's refill apart from the owner's by this log.
+export const AUTO_FEED_LOG = 'The auto-feeder adds a portion to the bowl.'
 
 export type Action = 'play' | 'pet' | 'nap'
 export type Mood = 'sleeping' | 'grumpy' | 'happy' | 'ok'
@@ -225,8 +227,7 @@ export const tickTally = (home: Home, now: number, rng: Rng = Math.random): { ho
   }
   if (deco.autoFeed && next.bowl.food < 1 && next.coins >= 5) {
     deducted += 5
-    next = { ...next, coins: next.coins - 5, bowl: { food: next.bowl.food + 1 }, effect: fx('fish', now),
-      log: 'The auto-feeder adds a portion to the bowl.' }
+    next = { ...next, coins: next.coins - 5, bowl: { food: next.bowl.food + 1 }, effect: fx('fish', now), log: AUTO_FEED_LOG }
   }
   const finder = here.length ? pick(rng, here) : null
   const events = finder ? Math.floor(min * EVENTS_PER_MIN * modsOf(finder).eventRate * deco.eventRate + rng()) : 0
