@@ -43,6 +43,43 @@ const locationPage = async (geolocation, fetch) => {
   return elements
 }
 
+test('the yard picture page takes a token and relays one validated frame', { timeout: 15_000 }, async () => {
+  const token = 'pane-test-token-1234567890'
+  const child = spawn(process.execPath, [fileURLToPath(new URL('./arcade.mjs', import.meta.url))],
+    { env: { ...process.env, ARCADE_TOKEN: token, ARCADE_PORT: '0', ARCADE_IDLE_MS: '30000' }, windowsHide: true })
+  const lines = createInterface({ input: child.stdout })[Symbol.asyncIterator]()
+  const rgba = Buffer.from([255, 0, 0, 255]).toString('base64')
+  try {
+    const ready = JSON.parse((await lines.next()).value)
+    const origin = `http://127.0.0.1:${ready.port}`
+    assert.equal((await fetch(`${origin}/pane`)).status, 403)
+    const page = await fetch(`${origin}/pane?t=${token}`)
+    assert.equal(page.status, 200)
+    assert.match(await page.text(), /Cat yard/)
+    for (const asset of ['pane.js', 'pane.css']) assert.equal((await fetch(`${origin}/${asset}`)).status, 200)
+    assert.equal((await fetch(`${origin}/pane/events`)).status, 403)
+    const post = (body, key = token) => fetch(`${origin}/api/pane`, { method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-arcade-token': key }, body: JSON.stringify(body) })
+    assert.equal((await post({ rgba, width: 1, height: 1 }, 'wrong')).status, 403)
+    assert.equal((await post({ rgba, width: 2, height: 1 })).status, 400)
+    assert.equal((await post({ rgba: 'not-base64', width: 1, height: 1 })).status, 400)
+    assert.equal((await fetch(`${origin}/api/state`, { method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-arcade-token': token }, body: 'x'.repeat(9000) })).status, 400)
+    const events = await fetch(`${origin}/pane/events?t=${token}`)
+    const reader = events.body.getReader()
+    const opened = new TextDecoder().decode((await reader.read()).value)
+    assert.match(opened, /"width":0/)
+    assert.equal((await post({ rgba, width: 1, height: 1 })).status, 200)
+    let rest = ''
+    while (!rest.includes(`"rgba":"${rgba}"`)) rest += new TextDecoder().decode((await reader.read()).value)
+    assert.match(rest, /event: frame/)
+    await reader.cancel()
+  } finally {
+    child.kill()
+    await lines.return()
+  }
+})
+
 test('browser location asks on click, rounds before sending, and handles denial', async () => {
   const sent = []
   let requests = 0

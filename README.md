@@ -77,6 +77,7 @@ Then type `/cat` to open the pane. Meow.
 | `e` `n` | Pet · Nap/Wake |
 | `j` / `l` / `0` | (Cat tab) pan the yard left / right · follow the cat again (it resumes on its own after 10 s) |
 | `p` | Play: opens the Arcade in your browser |
+| `/cat picture` · `i` | open the yard picture in the browser (the 4× scene, for terminals that cannot draw it) |
 | `o` | (Arcade tab) open or reopen the browser arcade |
 | `w` | open/close the cat list |
 | `‹` / `›` in the top bar | previous / next tab; wraps at either end, with tabs fitting on one line |
@@ -290,7 +291,7 @@ The **cat badge** draws the active cat as `ᓚᘏᗢ` in its own coat colors (a 
 
 ## 🖼️ Pane canvas
 
-In kitty and Ghostty the pane's scene draws as a real pixel picture at 4× the half-block detail, with banners in a tiny pixel font. Other terminals keep the half-block scene. Pick a mode in `/config` → **Pane canvas**:
+In kitty and Ghostty the pane's scene draws as a real pixel picture at 4× the half-block detail, with banners in a tiny pixel font. Other terminals keep the half-block scene. `i` or `/cat picture` opens that same picture in the browser, on the arcade's local server, and scales it to the window. Pick a mode in `/config` → **Pane canvas**:
 
 | Value | What it does |
 | --- | --- |
@@ -399,6 +400,7 @@ hooks/arcade/bridge.ts       what the mod and the browser exchange: snapshots, s
 server/arcade.mjs            local web server: serves the arcade, relays starts/results as stdout lines
 server/public/               arcade page, CSS, built bundle and four-flavor PNG art
 server/public/location.*    browser permission page for device location
+server/public/pane.*        browser yard picture for terminals that cannot draw images
 server/arcade.test.mjs       local-server and browser-location tests
 web/*.ts                     browser runtime: game loop, input, WebGL renderer (build: node tools/build-web.mjs)
 hooks/arcade/games/*.ts      the six mini-games (pure: init, step, score)

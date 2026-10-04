@@ -59,6 +59,9 @@ export const newToken = (rng: () => number) =>
 // Links may only name localhost; the server answers to it and to 127.0.0.1.
 export const arcadeUrl = (port: number, token: string) => `http://localhost:${port}/?t=${token}`
 
+// The yard picture, for terminals that cannot draw an Image.
+export const paneUrl = (port: number, token: string) => `http://localhost:${port}/pane?t=${token}`
+
 // How to open a URL in the default browser, per platform.
 export const browserArgv = (isWindows: boolean, url: string): string[][] =>
   isWindows ? [['rundll32', 'url.dll,FileProtocolHandler', url]] : [['open', url], ['xdg-open', url]]
