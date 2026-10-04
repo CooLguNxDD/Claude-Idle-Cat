@@ -296,7 +296,7 @@ export const adopt = (home: Home, now: number, rng: Rng = Math.random, name?: st
   const genes = { ...rollGenes(rng, now), ...(home.shinyCharm ? { isShiny: true } : {}) }
   const cat = newCat(`c${home.nextId}`, name?.slice(0, 20) || pick(rng, free.length ? free : NAMES), genes, now)
   return { ...home, coins: home.coins - price, cats: [...home.cats, cat], activeId: cat.id, nextId: home.nextId + 1,
-    shinyCharm: false, shelter: { pulls: home.shelter.pulls + 1, last: { catId: cat.id, at: now, cost: price } },
+    shinyCharm: false, shelter: { ...home.shelter, pulls: home.shelter.pulls + 1, last: { catId: cat.id, at: now, cost: price } },
     effect: fx('adopt', now), log: `Welcome home, ${cat.name}! ${RARITIES[rarityOf(genes)].label} ${genes.coat}.${genes.isShiny ? ' ✨ A shiny cat!' : ''}` }
 }
 

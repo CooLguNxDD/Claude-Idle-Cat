@@ -54,7 +54,9 @@ Then type `/cat` to open the pane. Meow.
 | `/config` → Cat speech (`afk-cat.speech`: `on` / `quiet` / `off`) | context lines / no idle or tool chatter / hourly idle line only |
 | `/cat rename <name>` | rename the active cat |
 | `/cat shelter` | open the Adopt tab without spending coins (window shopping is free) |
-| `/cat adopt [name]` | roll and adopt a shelter cat, optionally with a chosen name |
+| `/cat adopt [name]` | pay for a shelter parcel (name optional); open, rename, reroll or confirm on the next page |
+| `/cat reveal open\|rename <name>\|reroll\|confirm` | open the paid parcel, rename it, pay to reroll it, or welcome the cat |
+| `/cat reroll` | roll a new breed for the active cat; `/cat reroll confirm` keeps it, `/cat reroll rollback` refunds |
 | `/cat switch [name]` | bring another cat front and centre; no name cycles to the next (or pick it from the cat list, `w` in the pane) |
 | `/cat reset` | start over with a new household (back to the cardboard box!) |
 | `/cat settings` · Settings tab (`v`) | saved sound toggle and preview, flavor, interface, canvas, reactions, speech, theme, world, weather and arcade display |
@@ -157,12 +159,13 @@ Short version: stats drop, coins pile up, cats judge you silently.
 
 *Somewhere out there is a cat in a box. Maybe it's your next one.*
 
-- Roll & adopt opens a pixel parcel and reveals one cat, its rarity and genes. The fee stays at 100c per cat already in your household. It is charged only on success; full houses and insufficient coins consume no roll or shiny charm.
+- Roll & adopt pays the fee and opens a parcel page. Click Open to start the animation, then rename, reroll for 50c, or confirm. The fee stays at 100c per cat already in your household. It is charged only when a parcel is created; full houses and insufficient coins consume no roll or shiny charm. Confirm adds the cat. A paid parcel waits until you confirm.
+- The Adopt tab can reroll an arrival's breed for 50c. Personality stays. The review page confirms the new breed or rolls back and refunds the fee.
 - Rarity odds: **Common 60%**, **Uncommon 25%**, **Rare 10%**, **Epic 4%**, **Legendary 1%**. Available coats within a tier have equal odds; today's pool is visible in the tab. Rarity describes appearance and does not change stats or income.
 - New coats include russian blue, chocolate, cinnamon, silver, smoke, tortoiseshell, ragdoll, bengal, lynx and the starry Nebula 🌌. Markings and silhouettes roll independently. Duplicate coats are possible, and every successful pull adds a cat; cats are never replaced.
 - The expanded pack adds Calico Void, legendary Golden Glitch, Snowshoe, Tiger Tabby, Starpoint, Blue Cream, Copper Bengal and Moon Smoke year-round. The epic Ghost coat joins shelter pulls and stray visits throughout October, by your local clock. Ghost cats you adopt or import stay permanently; October visitors can finish their stay and move in after the month ends.
 - Shiny is a separate 1/64 roll in every rarity tier. The Paw Miles shiny charm guarantees the next successful shelter adoption is shiny.
-- The tab keeps your latest arrival card with Meet and Pull again buttons, shelter-pull count, house expansion link and free adoption of yard visitors. `q` returns to the tab you came from.
+- The tab keeps your latest arrival card with Meet, Pull again and Reroll breed buttons, shelter-pull count, house expansion link and free adoption of yard visitors. `q` returns to the tab you came from.
 
 ### 🏠 Home tab (`h`)
 
