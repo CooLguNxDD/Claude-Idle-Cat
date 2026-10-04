@@ -7,13 +7,17 @@ export const BASIC_BOWL: BowlStats = { cap: 8, portion: 30 }
 export const MAX_BOWL_CAP = 24
 export const PORTION_COST = 5
 
+/** The placed bowl's stats and name; a missing or unknown bowl counts as Basic. */
 export const bowlOf = (home: Home): BowlStats & { name: string } => {
   const item = furniture(home.decor.bowl)
   return { ...(item?.bowl ?? BASIC_BOWL), name: item?.name ?? 'Basic bowl' }
 }
+/** How many portions the placed bowl holds. */
 export const bowlCap = (home: Home) => bowlOf(home).cap
+/** Shop and Home text for a bowl's cap and portion. */
 export const bowlPerk = (stats: Pick<BowlStats, 'cap' | 'portion'>) => `cap ${stats.cap} · +${stats.portion} hunger`
 
+/** A saved bowl, repaired: missing or bad data gives 3 portions, food is a whole number within the largest cap. */
 export const normalizeBowl = (bowl: unknown): { food: number } => {
   if (!bowl || typeof bowl !== 'object' || !Number.isFinite((bowl as { food?: unknown }).food)) return { food: 3 }
   return { food: Math.max(0, Math.min(MAX_BOWL_CAP, Math.floor((bowl as { food: number }).food))) }

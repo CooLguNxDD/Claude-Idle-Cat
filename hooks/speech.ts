@@ -8,8 +8,10 @@ import { bondLevel } from './pair'
 import { seeded } from './rng'
 import type { Rng } from './rng'
 
+/** Something a cat can talk about: the trigger, who speaks, and ids or values that pick and fill a line. */
 export type SpeechEvent = { on: SpeechTrigger; catId: string; about?: readonly string[]; role?: 'lead' | 'partner'
   buddyId?: string; vars?: Record<string, string> }
+/** A line on screen: who said it, its glyph, when it fades and the priority a newer line must match. */
 export type Said = { catId: string; text: string; glyph?: Speech['glyph']; at: number; until: number; priority: number }
 
 const WORLD = new Set<SpeechTrigger>(['weather', 'festival', 'stray', 'catch', 'welcome'])
@@ -23,6 +25,7 @@ const inHours = (hours: readonly [number, number] | undefined, hour: number) => 
 const idHash = (id: string) => [...id].reduce((n, ch) => (n * 33 + ch.charCodeAt(0)) >>> 0, 7)
 
 const fill = (line: string, vars: Record<string, string>): string | null => {
+  // An empty value counts as missing on purpose: a line needing {buddy} is dropped when no buddy is around.
   const missing = [...line.matchAll(/\{(\w+)\}/g)].some(m => !vars[m[1] ?? ''])
   return missing ? null : line.replace(/\{(\w+)\}/g, (_, key: string) => vars[key] ?? '')
 }

@@ -7,9 +7,10 @@ import { factsOf } from './brain/facts'
 import { befriend } from './friends'
 import { gainXp, withCat } from './game'
 import { plan } from './goap'
-import { addBond } from './pair'
-import { pickInteraction } from './pair'
+import { addBond, bondKey, pickInteraction } from './pair'
 import type { Rng } from './rng'
+import { skillTotals } from './skills'
+import { track } from './collection'
 
 const clamp = (n: number) => Math.max(0, Math.min(100, n))
 const dropIntent = (cat: Cat): Cat => {
@@ -55,8 +56,17 @@ const complete = (home: Home, catId: string, now: number, rng: Rng): BrainStep =
   })
   if (partner && fx.joy) next = withCat(next, partner.id, c => ({ ...c, joy: clamp(c.joy + fx.joy!) }))
   const bond = interaction?.bond ?? fx.bond ?? 0
-  if (behavior.partner && partner && bond > 0) next = addBond(next, catId, partner.id, bond, now)
-  const phrase = eats ? behavior.line.replace('the bowl', `the ${bowl.name}`).replace(/\+\d+xp/, xp ? `+${xp}xp` : '') : behavior.line
+  // The brain alone pays an intent's bond; the on-screen pair run only animates it.
+  if (behavior.partner && partner && bond > 0) {
+    const key = bondKey(catId, partner.id), before = next.bonds[key]?.points ?? 0
+    next = addBond(next, catId, partner.id, bond, now)
+    const pair = [catId, partner.id]
+    if (next.cats.some(c => pair.includes(c.id) && skillTotals(c).harmony > 0))
+      next = { ...next, cats: next.cats.map(c => pair.includes(c.id) ? { ...c, joy: clamp(c.joy + 5) } : c) }
+    next = track(next, 'bond', (next.bonds[key]?.points ?? 0) - before, now)
+  }
+  // Name the bowl and restate the xp; with no xp the tag and its space go.
+  const phrase = eats ? behavior.line.replace('the bowl', `the ${bowl.name}`).replace(/\s*\+\d+xp/, xp ? ` +${xp}xp` : '') : behavior.line
   const line = `${cat.name} ${phrase}`
   const logged = { ...next, log: line }
   const done = !xp ? logged : gainXp(logged, catId, xp, now)
@@ -88,7 +98,7 @@ const choose = (home: Home, cat: Cat, now: number, rng: Rng): BrainStep => {
   return { home }
 }
 
-// A held intent (its cat still walking or playing it out on screen) waits, but never longer than this past due.
+/** A held intent (its cat still walking or playing it out on screen) waits, but never longer than this past due. */
 export const HOLD_MAX_MS = 120_000
 const isDue = (cat: Cat, behavior: Behavior, now: number, isHeld: (cat: Cat) => boolean) => {
   const age = now - cat.intent!.at, due = behavior.seconds * 1000
@@ -121,5 +131,6 @@ export const thinkWithEvents = (home: Home, now: number, rng: Rng, isHeld: (cat:
   }
   return { home: next, events }
 }
+/** thinkWithEvents without the events, for callers that only need the next save. */
 export const think = (home: Home, now: number, rng: Rng, isHeld: (cat: Cat) => boolean = () => false): Home =>
   thinkWithEvents(home, now, rng, isHeld).home

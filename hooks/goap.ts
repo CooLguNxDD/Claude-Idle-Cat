@@ -23,7 +23,10 @@ const better = (a: Node, b: Node) => {
 /** A* over fact sets. Depth is at most 4. Equal costs keep the earlier registry order. */
 export const plan = (facts: Facts, want: Facts, behaviors: readonly Behavior[]): Behavior[] | null => {
   if (matches(facts, want)) return []
-  const open: Node[] = [{ facts, path: [], g: 0, h: unsatisfied(facts, want) }]
+  // One behaviour may settle several wanted facts, so the cheapest single step is the most h may promise.
+  const step = behaviors.length ? Math.min(...behaviors.map(b => b.cost)) : 0
+  const hOf = (f: Facts) => unsatisfied(f, want) > 0 ? step : 0
+  const open: Node[] = [{ facts, path: [], g: 0, h: hOf(facts) }]
   const best = new Map<string, { g: number; path: number[] }>([[keyOf(facts), { g: 0, path: [] }]])
   let guard = 0
   while (open.length && guard++ < 4096) {
@@ -42,7 +45,7 @@ export const plan = (facts: Facts, want: Facts, behaviors: readonly Behavior[]):
       const prev = best.get(keyOf(nextFacts))
       if (prev && (prev.g < g || (prev.g === g && !pathWorse(prev.path, path)))) continue
       best.set(keyOf(nextFacts), { g, path })
-      open.push({ facts: nextFacts, path, g, h: unsatisfied(nextFacts, want) })
+      open.push({ facts: nextFacts, path, g, h: hOf(nextFacts) })
     }
   }
   return null

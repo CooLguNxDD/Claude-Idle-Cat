@@ -126,7 +126,7 @@ export const behaviorProblems = (s: Behavior, moves: readonly Move[]): string[] 
   ...effectProblems(s.effect)]
 export const goalProblems = (s: Goal): string[] => [...name(s), ...factProblems(s.want, `${s.id}.want`),
   ...(!['hunger', 'energy', 'joy'].includes(s.need.stat) ? ['need.stat is hunger, energy or joy'] : []),
-  ...(!range(s.need.below, 0, 100) || !range(s.need.weight, 0, 10) ? ['invalid goal limits'] : []),
+  ...(!range(s.need.below, 1, 100) || !range(s.need.weight, 0, 10) ? ['invalid goal limits'] : []),
   ...Object.values(s.personality ?? {}).filter(n => !range(n, 0, 3)).map(() => 'personality multiplier is 0 to 3')]
 const SPEECH_TOKENS = ['name', 'buddy', 'food', 'gift', 'tool', 'weather', 'bowl']
 const SPEECH_GLYPHS = ['!', '?', '\u2665', 'z', '*']

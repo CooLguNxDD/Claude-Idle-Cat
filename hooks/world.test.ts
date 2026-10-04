@@ -7,7 +7,7 @@ import type { World } from './content/types'
 import { migrate, newHome } from './game'
 import { frameCells, frameImage, yardCols } from './scene'
 import { FLAVORS } from './theme'
-import { buyWorld, isWorldOwned, landmarksOf, setWorld, worldCols, worldOf } from './world'
+import { buyWorld, canBuyWorld, isWorldOwned, landmarksOf, setWorld, worldCols, worldOf } from './world'
 
 const backyard = WORLDS.find(w => w.id === 'backyard')!
 
@@ -45,6 +45,13 @@ test('worlds are bought with coins and a locked yard cannot be entered', () => {
   const gated = buyWorld({ ...bought, coins: 1_000_000, materials: { stardust: 100 } }, 'space-station', 1)
   expect(gated.world.id).toBe('rooftops')
   expect(gated.log).toMatch(/tier 3/)
+  // A free world with a gate stays shut until the gate is met, and buying can't skip it.
+  const grove: World = { ...backyard, id: 'grove', label: 'Grove', unlock: { tier: 3 } }
+  const worlds = [...WORLDS, grove]
+  expect(isWorldOwned(home, 'grove', worlds)).toBe(false)
+  expect(setWorld(home, 'grove', worlds).log).toMatch(/needs house tier 3/)
+  expect(canBuyWorld(home, 'grove', worlds)).toEqual({ ok: false, reason: 'Needs house tier 3.' })
+  expect(setWorld({ ...home, tier: 3 }, 'grove', worlds).world.id).toBe('grove')
 })
 
 test('migrate keeps free yards and grandfathers the yard a save is already in', () => {
