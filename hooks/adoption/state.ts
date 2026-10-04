@@ -31,7 +31,8 @@ const offerOf = (data: BreedOffer | null | undefined, cats: Home['cats']): Breed
   const before = genesOf(data?.before), after = genesOf(data?.after)
   if (!data || !before || !after || !cats.some(c => c.id === data.catId)) return null
   if (!Number.isFinite(data.cost) || data.cost < 0 || !Number.isFinite(data.at)) return null
-  return { catId: data.catId, before, after, cost: data.cost, at: data.at }
+  const openedAt = data.openedAt === null || (Number.isFinite(data.openedAt) && data.openedAt >= data.at) ? data.openedAt : null
+  return { catId: data.catId, before, after, cost: data.cost, at: data.at, openedAt }
 }
 
 export const normalizeShelter = (data: Shelter | undefined, cats: Home['cats']): Shelter => {

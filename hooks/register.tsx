@@ -36,7 +36,7 @@ import { CATCHPHRASE_LEVEL, DAILY_CAP, GIFTS, LEVELS, NICKNAME_LEVEL, PHOTO_LEVE
 import type { Action } from './game'
 import { PERSONALITY_INFO, describeGenes } from './genes'
 import { COATS, RARITIES, availableBreeds, breedOf, rarityBadge, rarityOf } from './adoption/registry'
-import { applyCatCommand, REROLL_COST } from './adoption/commands'
+import { applyCatCommand, BREED_COST } from './adoption/commands'
 import { revealedCat } from './adoption/state'
 import { LOAN_SHARE, SHOP_CLOSE, SHOP_OPEN, baitOf, dailyStock, fmtCoins, furniture, isShopOpen, maxCats, payLoan, place,
   takeLoan, tierAt, tierOf } from './home'
@@ -86,6 +86,7 @@ const FORMS = ['ninja', 'royal', 'cloud', 'chonk']
 
 // Latest home and scene width for the animation loop, which repaints without a render pass.
 let latest: Home | null = null
+let rerollPickId: string | null = null
 let cols = 34
 let frame = 0
 // Where the active cat is in the yard and what it is doing; kept in memory, never in the save.
@@ -345,12 +346,12 @@ const paneQuote = (home: Home, now: number) => {
   return `${speaker.name}: "${quote.text}"`
 }
 const shelterFocus = (view: View) => view === 'reveal' ? 'pending' as const : view === 'reroll' ? 'offer' as const : 'last' as const
-const isShelterView = (view: View) => view === 'adopt' || view === 'reveal' || view === 'reroll'
-const sceneCellsOf = (home: Home, view: View, now: number, flavor: Flavor) => isShelterView(view)
+const showsParcel = (home: Home, view: View) => view === 'adopt' || view === 'reveal' || (view === 'reroll' && !!home.shelter.offer)
+const sceneCellsOf = (home: Home, view: View, now: number, flavor: Flavor) => showsParcel(home, view)
   ? shelterCells(home, now, frame, flavor, cols, shelterFocus(view))
   : view === 'expedition' ? trailCells(home, now, frame, flavor, cols, watchRun) : frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion,
     camX: camera.x, ...(pairRun ? { partner: { id: pairRun.partnerId, motion: pairRun.partner } } : {}), ...speechMark(home, now) })
-const sceneImageOf = (home: Home, view: View, now: number, flavor: Flavor): RgbaImage => isShelterView(view)
+const sceneImageOf = (home: Home, view: View, now: number, flavor: Flavor): RgbaImage => showsParcel(home, view)
   ? shelterImage(home, now, frame, flavor, cols, PICTURE_SCALE, shelterFocus(view))
   : view === 'expedition' ? trailImage(home, now, frame, flavor, cols, watchRun, PICTURE_SCALE)
   : frameImage({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion, camX: camera.x, ...(pairRun ? { partner: { id: pairRun.partnerId, motion: pairRun.partner } } : {}), ...speechMark(home, now) })
@@ -495,7 +496,7 @@ const HELP = [
   '/cat shelter — open the adoption gacha',
   '/cat adopt [name] — pay for a shelter parcel, then open, rename, reroll or confirm',
   '/cat reveal open|rename <name>|reroll|confirm — the paid parcel',
-  '/cat reroll — roll a new breed for the active cat (confirm or rollback)',
+  '/cat reroll [name] — open the breed page, or pay to reroll that cat',
   '/cat switch [name] — change the active cat (no name: the next one)',
   '/cat rename <name> — rename the active cat',
   '/cat reset — start over (wipes everything)',
@@ -899,13 +900,17 @@ export const register: Register = (on, options) => {
       const action = rest[0]
       const current = await change($, prev => prev)
       const catId = current.shelter.offer?.catId ?? activeCat(current).id
-      const home = action === 'confirm' ? await change($, prev => applyCatCommand(prev, { type: 'breed.confirm', catId }, 0))
+      const named = arg && !['open', 'confirm', 'rollback', 'again'].includes(action ?? '')
+        ? current.cats.find(c => c.id === arg || c.name.toLowerCase() === arg.toLowerCase()) : undefined
+      const home = action === 'open' ? await change($, (prev, t) => applyCatCommand(prev, { type: 'breed.open' }, t))
+        : action === 'confirm' ? await change($, prev => applyCatCommand(prev, { type: 'breed.confirm', catId }, 0))
         : action === 'rollback' ? await change($, prev => applyCatCommand(prev, { type: 'breed.rollback', catId }, 0))
-        : current.shelter.offer ? current
-        : await change($, (prev, t) => applyCatCommand(prev, { type: 'breed.reroll', catId: activeCat(prev).id }, t, Math.random))
-      await routeTo($, !action && home.shelter.offer ? 'reroll' : 'adopt')
+        : action === 'again' ? await change($, (prev, t) => applyCatCommand(prev, { type: 'breed.again' }, t, Math.random))
+        : named ? await change($, (prev, t) => applyCatCommand(prev, { type: 'breed.reroll', catId: named.id }, t, Math.random))
+        : current
+      await routeTo($, action === 'confirm' || action === 'rollback' ? 'adopt' : 'reroll')
       await $.ui.open({ id: PANE, title: 'AFK Cat' })
-      return { text: home.log }
+      return { text: named || action ? home.log : 'Pick a cat to reroll.' }
     }
     if (sub && !['show', 'open', 'rename', 'adopt', 'switch', 'reset'].includes(sub)) return { text: HELP }
     let home: Home
@@ -1030,8 +1035,8 @@ export const register: Register = (on, options) => {
     paint.last = sceneImage?.rgba ?? sceneCells
     paint.isMounted = paint.last !== ''
     // What the picture shows, for screen readers and terminals that draw the alt instead.
-    const isShelter = view === 'adopt' || view === 'reveal' || view === 'reroll'
-    const tabView = isShelter && view !== 'adopt' ? 'adopt' : view
+    const isParcel = showsParcel(home, view)
+    const tabView = view === 'reveal' || view === 'reroll' ? 'adopt' : view
     const trailAlt = () => {
       const run = watchedRun(home)
       if (!run) return 'A quiet camp: no parties are out'
@@ -1039,7 +1044,7 @@ export const register: Register = (on, options) => {
       return `${trail.exp?.label ?? run.exp}: ${captionOf(beat, partyOf(home, run).lead)}`
     }
     const sceneAlt = view === 'expedition' ? trailAlt()
-      : !isShelter ? catsAtHome(home).length ? `${cat.name} (${mood}) in the yard` : 'All cats are away on expeditions'
+      : !isParcel ? catsAtHome(home).length ? `${cat.name} (${mood}) in the yard` : 'All cats are away on expeditions'
       : view === 'reveal' && home.shelter.pending ? `${home.shelter.pending.name} in a shelter parcel`
       : view === 'reroll' && home.shelter.offer ? 'A breed reroll at the shelter'
       : reveal ? `${reveal.name} at the adoption shelter` : 'A mystery parcel at the adoption shelter'
@@ -1083,8 +1088,8 @@ export const register: Register = (on, options) => {
           {'Input' in ui ? <ui.Input key="reveal-name" label="Name" placeholder={pending.name} submitLabel="rename"
             onSubmit={async value => { await change($, prev => applyCatCommand(prev, { type: 'shelter.rename', name: value }, 0)) }} />
             : <Text color={tone.muted}>Rename: /cat reveal rename {'<name>'}</Text>}
-          <Box>
-            <Button key="reveal-reroll" plain label={`Reroll · ${fmtCoins(REROLL_COST)}`}
+          <Box gap={2}>
+            <Button key="reveal-reroll" plain label={`Reroll · ${fmtCoins(BREED_COST)}`}
               onPress={() => change($, (prev, t) => applyCatCommand(prev, { type: 'shelter.reroll' }, t, Math.random))} />
             <Button key="reveal-confirm" plain label="Confirm"
               onPress={async () => {
@@ -1100,24 +1105,58 @@ export const register: Register = (on, options) => {
     if (view === 'reroll') {
       const offer = home.shelter.offer
       const offered = offer ? home.cats.find(c => c.id === offer.catId) : null
-      return <Box flexDirection="column">
+      return <Box flexDirection="column" gap={1}>
         {tabs}
         {scene}
         <Text bold color={tone.title}>Breed reroll</Text>
-        {!offer && <Text color={tone.muted}>No breed roll is waiting.</Text>}
-        {offer && offered && <Box flexDirection="column">
+        {!offer && (() => {
+          const picked = home.cats.find(c => c.id === rerollPickId) ?? activeCat(home)
+          const away = isAway(home, picked.id)
+          const price = BREED_COST
+          return <Box flexDirection="column">
+            <Text color={tone.muted}>Pick a cat. A breed reroll costs {fmtCoins(BREED_COST)}.</Text>
+            <Button key="reroll-list" hotkey="w" plain
+              label={`${isCatListOpen ? '▾' : '▸'} Cats ${home.cats.length}/${maxCats(home)} · ${picked.name} (w)`}
+              onPress={() => update($, catListRef, open => !open)} />
+            <Text color={tone.muted}>{picked.name} · {describeGenes(picked.genes)} · {PERSONALITY_INFO[picked.genes.personality]}</Text>
+            {isCatListOpen && home.cats.map(c => (
+              <Box key={`reroll-cat-${c.id}`} flexDirection="column">
+                <Button key={`reroll-cat-${c.id}-pick`} plain
+                  label={`   ${c.id === picked.id ? '●' : '○'} ${c.name}${isAway(home, c.id) ? ' · away' : ''}`}
+                  onPress={async () => {
+                    rerollPickId = c.id
+                    await change($, prev => switchTo(prev, c.id))
+                    await update($, catListRef, () => false)
+                  }} />
+                <Text color={tone.muted}>{`      ${describeGenes(c.genes)} · ${PERSONALITY_INFO[c.genes.personality]}`}</Text>
+              </Box>
+            ))}
+            <Text> </Text>
+            <Button key="reroll-pay" plain label={away ? `${picked.name} is away` : `Reroll ${picked.name} · ${fmtCoins(price)}`}
+              onPress={() => change($, (prev, t) => applyCatCommand(prev, { type: 'breed.reroll', catId: picked.id }, t, Math.random))} />
+          </Box>
+        })()}
+        {offer && offer.openedAt === null && <Box gap={2}>
+          <Button key="breed-rollback" plain label="Rollback"
+            onPress={() => change($, prev => applyCatCommand(prev, { type: 'breed.rollback', catId: offer.catId }, 0))} />
+          <Button key="breed-open" plain label="Open"
+            onPress={() => change($, (prev, t) => applyCatCommand(prev, { type: 'breed.open' }, t))} />
+        </Box>}
+        {offer && offered && offer.openedAt !== null && <Box flexDirection="column">
           <Text color={tone.muted}>Now · {describeGenes(offer.before)}</Text>
           <Text bold color={css(flavor[RARITIES[rarityOf(offer.after)].color])}>Offered · {rarityBadge(offer.after)} · {describeGenes(offer.after)}</Text>
-          <Text color={tone.muted}>{offered.name} keeps the same personality. Rollback returns {fmtCoins(offer.cost)}.</Text>
-          <Box>
-            <Button key="breed-confirm" plain label="Confirm"
-              onPress={async () => {
-                await change($, prev => applyCatCommand(prev, { type: 'breed.confirm', catId: offer.catId }, 0))
-                await routeTo($, 'adopt')
-              }} />
+          <Text color={tone.muted}>{offered.name} keeps the same personality. Rollback does not return the fee.</Text>
+          <Box gap={2}>
             <Button key="breed-rollback" plain label="Rollback"
               onPress={async () => {
                 await change($, prev => applyCatCommand(prev, { type: 'breed.rollback', catId: offer.catId }, 0))
+                await routeTo($, 'adopt')
+              }} />
+            <Button key="breed-again" plain label={`Roll again · ${fmtCoins(BREED_COST)}`}
+              onPress={() => change($, (prev, t) => applyCatCommand(prev, { type: 'breed.again' }, t, Math.random))} />
+            <Button key="breed-confirm" plain label="Confirm"
+              onPress={async () => {
+                await change($, prev => applyCatCommand(prev, { type: 'breed.confirm', catId: offer.catId }, 0))
                 await routeTo($, 'adopt')
               }} />
           </Box>
@@ -1144,21 +1183,16 @@ export const register: Register = (on, options) => {
           <Text bold color={css(flavor[RARITIES[rarityOf(reveal.genes)].color])}>{rarityBadge(reveal.genes)} · {reveal.name}</Text>
           <Text color={tone.muted}>{describeGenes(reveal.genes)}</Text>
           <Text color={tone.muted}>Last arrival · {home.shelter.last!.cost === 0 ? 'yard visitor' : `${home.shelter.last!.cost}c`}</Text>
-          <Box>
-            <Button key="shelter-meet" plain label={`Meet ${reveal.name}`} onPress={async () => {
-              await change($, prev => switchTo(prev, reveal.id))
-              await routeTo($, 'cat')
-            }} />
-            {!pending && room > 0 && home.coins >= price && <Button key="shelter-again" plain label={` Pull again · ${fmtCoins(price)}`}
-              onPress={roll} />}
-            <Button key="breed-reroll" plain label={`Reroll breed · ${fmtCoins(REROLL_COST)}`}
-              onPress={async () => {
-                const next = await change($, (prev, t) => applyCatCommand(prev, { type: 'breed.reroll', catId: reveal.id }, t, Math.random))
-                if (next.shelter.offer) await routeTo($, 'reroll')
-              }} />
-          </Box>
+          <Button key="shelter-meet" plain label={`Meet ${reveal.name}`} onPress={async () => {
+            await change($, prev => switchTo(prev, reveal.id))
+            await routeTo($, 'cat')
+          }} />
+          <Text> </Text>
+          <Button key="breed-reroll" plain label={home.shelter.offer ? 'Review breed reroll' : 'Reroll breed'}
+            onPress={() => routeTo($, 'reroll')} />
         </Box>}
-        {home.shelter.offer && <Button key="breed-review" plain label="Review breed reroll" onPress={() => routeTo($, 'reroll')} />}
+        {!reveal && <Button key="breed-reroll" plain label={home.shelter.offer ? 'Review breed reroll' : 'Reroll breed'}
+          onPress={() => routeTo($, 'reroll')} />}
         <Button key="adopt" plain label={pending ? 'Parcel waiting'
           : room <= 0 ? 'House full · expand in Home'
           : home.coins < price ? `Need ${fmtCoins(price)} to roll & adopt` : `Roll & adopt · ${fmtCoins(price)}`}

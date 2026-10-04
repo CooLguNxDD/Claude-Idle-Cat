@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 import { migrate, newHome } from '../game'
 import { seeded } from '../rng'
-import { applyCatCommand, REROLL_COST } from './commands'
+import { applyCatCommand, BREED_COST } from './commands'
 
 test('a pull waits for open and confirm; failures spend nothing', () => {
   const home = { ...newHome(1), coins: 1000, shinyCharm: true }
@@ -34,22 +34,34 @@ test('a pull waits for open and confirm; failures spend nothing', () => {
   expect(migrate({ ...confirmed, shelter: { ...confirmed.shelter, pending: { id: 'nope' } } }, 6).shelter.pending).toBeNull()
 })
 
-test('a breed reroll keeps personality until confirm and rollback refunds', () => {
+test('a breed reroll keeps personality until confirm and rollback spends the fee', () => {
   const home = { ...newHome(1), coins: 40 }
   const poor = applyCatCommand(home, { type: 'breed.reroll', catId: 'c1' }, 2, seeded(1))
   expect(poor.coins).toBe(40)
   expect(poor.shelter.offer).toBeNull()
-  const rich = { ...home, coins: 80 }
+  const rich = { ...home, coins: 500 }
   const rolled = applyCatCommand(rich, { type: 'breed.reroll', catId: 'c1' }, 2, seeded(3))
-  expect(rolled.coins).toBe(80 - REROLL_COST)
-  expect(rolled.cats[0]!.genes).toEqual(rich.cats[0]!.genes)
-  expect(rolled.shelter.offer?.before.personality).toBe(rolled.shelter.offer?.after.personality)
-  const undone = applyCatCommand(rolled, { type: 'breed.rollback', catId: 'c1' }, 3)
-  expect(undone.coins).toBe(80)
+  expect(rolled.coins).toBe(500 - BREED_COST)
+  expect(rolled.shelter.offer?.openedAt).toBeNull()
+  expect(applyCatCommand(rolled, { type: 'breed.confirm', catId: 'c1' }, 3).cats[0]!.genes).toEqual(rich.cats[0]!.genes)
+  const opened = applyCatCommand(rolled, { type: 'breed.open' }, 3)
+  expect(opened.shelter.offer?.openedAt).toBe(3)
+  expect(opened.cats[0]!.genes).toEqual(rich.cats[0]!.genes)
+  expect(opened.shelter.offer?.before.personality).toBe(opened.shelter.offer?.after.personality)
+  const undone = applyCatCommand(opened, { type: 'breed.rollback', catId: 'c1' }, 4)
+  expect(undone.coins).toBe(opened.coins)
+  expect(undone.cats[0]!.genes).toEqual(rich.cats[0]!.genes)
   expect(undone.shelter.offer).toBeNull()
   const again = applyCatCommand(rich, { type: 'breed.reroll', catId: 'c1' }, 2, seeded(3))
-  const kept = applyCatCommand(again, { type: 'breed.confirm', catId: 'c1' }, 4)
+  const kept = applyCatCommand(applyCatCommand(again, { type: 'breed.open' }, 4), { type: 'breed.confirm', catId: 'c1' }, 5)
   expect(kept.cats[0]!.genes).toEqual(again.shelter.offer?.after)
-  expect(kept.coins).toBe(80 - REROLL_COST)
-  expect(kept.shelter.offer).toBeNull()
+  expect(kept.coins).toBe(500 - BREED_COST)
+  const dearer = applyCatCommand(kept, { type: 'breed.reroll', catId: 'c1' }, 6, seeded(4))
+  expect(dearer.coins).toBe(kept.coins - BREED_COST)
+  const seen = applyCatCommand(dearer, { type: 'breed.open' }, 7)
+  const rerolled = applyCatCommand(seen, { type: 'breed.again' }, 8, seeded(9))
+  expect(rerolled.coins).toBe(seen.coins - BREED_COST)
+  expect(rerolled.shelter.offer?.openedAt).toBeNull()
+  expect(rerolled.shelter.offer?.before).toEqual(seen.shelter.offer?.before)
+  expect(rerolled.cats[0]!.genes).toEqual(rich.cats[0]!.genes)
 })

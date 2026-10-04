@@ -76,7 +76,7 @@ test('October shelter odds include Ghost and the collection book labels its seas
   await ui.unmount()
 })
 
-test('the arrival card offers Pull again while there is room and coins', async ($, on) => {
+test('Roll & adopt can be used again while there is room and coins', async ($, on) => {
   const now = 1_700_000_000_000
   mock.clock(on, { now })
   let stored: Home = { ...newHome(now), tier: 2, coins: 1000, rev: 100 }
@@ -101,13 +101,15 @@ test('the arrival card offers Pull again while there is room and coins', async (
   }
   await ui.press({ key: 'adopt' })
   await confirm()
-  await ui.press({ key: 'shelter-again' })
+  await ui.press({ key: 'adopt' })
   await confirm()
   expect(stored.shelter.pulls).toBe(2)
   expect(stored.cats.length).toBe(3)
-  await ui.press({ key: 'shelter-again' })
+  await ui.press({ key: 'adopt' })
   await confirm()
   expect(stored.cats.length).toBe(4)
-  expect(await ui.find({ key: 'shelter-again' })).toBeUndefined()
+  await ui.press({ key: 'adopt' })
+  expect(stored.cats.length).toBe(4)
+  expect(stored.shelter.pending).toBeNull()
   await ui.unmount()
 })

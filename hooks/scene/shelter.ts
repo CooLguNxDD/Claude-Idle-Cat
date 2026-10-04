@@ -17,8 +17,8 @@ const drawShelter = (home: Home, now: number, tick: number, f: Flavor, cols: num
   const offer = focus === 'offer' ? home.shelter.offer : null
   const cat = pending || offer ? null : revealedCat(home)
   const genes: Genes | undefined = pending?.genes ?? offer?.after ?? cat?.genes
-  const openedAt = pending ? pending.openedAt : offer || cat ? home.shelter.last?.at ?? now : null
-  const age = offer ? Infinity : openedAt === null ? 0 : Math.max(0, (now - openedAt) / 1000)
+  const openedAt = pending ? pending.openedAt : offer ? offer.openedAt : cat ? home.shelter.last?.at ?? now : null
+  const age = openedAt === null ? 0 : Math.max(0, (now - openedAt) / 1000)
   const accent = genes ? f[RARITIES[rarityOf(genes)].color] : f.mauve
   const cx = Math.floor(cols / 2)
   for (let y = 0; y < HEIGHT; y++) for (let x = 0; x < cols; x++)

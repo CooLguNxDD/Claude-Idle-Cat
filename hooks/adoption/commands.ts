@@ -6,7 +6,7 @@ import { maxCats } from '../home'
 import { pick } from '../rng'
 import type { Rng } from '../rng'
 
-export const REROLL_COST = 50
+export const BREED_COST = 200
 const NAMES = ['Tofu', 'Miso', 'Sushi', 'Nori', 'Biscuit', 'Pudding', 'Luna', 'Pixel', 'Bean', 'Taro', 'Boba',
   'Ziggy', 'Kiwi', 'Waffles', 'Socks', 'Pepper', 'Mango', 'Dumpling']
 
@@ -52,11 +52,11 @@ const rerollPending = (home: Home, now: number, rng: Rng): Home => {
   const pending = home.shelter.pending
   if (!pending) return fail(home, 'There is no parcel to reroll.')
   if (pending.openedAt === null) return fail(home, 'Open the parcel first.')
-  if (home.coins < REROLL_COST) return fail(home, `A reroll costs ${REROLL_COST}c.`)
+  if (home.coins < BREED_COST) return fail(home, `A reroll costs ${BREED_COST}c.`)
   const genes = rollGenes(rng, now)
-  return { ...home, coins: home.coins - REROLL_COST,
-    shelter: { ...home.shelter, pending: { ...pending, genes } },
-    log: `The parcel shakes again. ${genes.coat}${genes.isShiny ? ' ✨' : ''}.` }
+  return { ...home, coins: home.coins - BREED_COST,
+    shelter: { ...home.shelter, pending: { ...pending, genes, openedAt: null } },
+    log: `The parcel is closed again. Open it to see ${genes.coat}${genes.isShiny ? ' ✨' : ''}.` }
 }
 
 const confirmPull = (home: Home, now: number): Home => {
@@ -76,24 +76,46 @@ const rerollBreed = (home: Home, catId: string, now: number, rng: Rng): Home => 
   const cat = home.cats.find(c => c.id === catId)
   if (!cat) return fail(home, 'That cat is not here.')
   if (isAway(home, cat.id)) return fail(home, `${cat.name} is away on an expedition.`)
-  if (home.coins < REROLL_COST) return fail(home, `A breed reroll costs ${REROLL_COST}c.`)
+  const price = BREED_COST
+  if (home.coins < price) return fail(home, `Rerolling ${cat.name} costs ${price}c.`)
   const after = cosmetic(cat.genes, rng, now)
-  return { ...home, coins: home.coins - REROLL_COST,
-    shelter: { ...home.shelter, offer: { catId: cat.id, before: cat.genes, after, cost: REROLL_COST, at: now } },
-    log: `${cat.name} might become a ${after.coat}. Confirm or roll back.` }
+  return { ...home, coins: home.coins - price,
+    shelter: { ...home.shelter, offer: { catId: cat.id, before: cat.genes, after, cost: price, at: now, openedAt: null } },
+    log: `${cat.name}'s parcel is waiting. Open it to see the new breed.` }
+}
+
+const againBreed = (home: Home, now: number, rng: Rng): Home => {
+  const offer = home.shelter.offer
+  if (!offer || offer.openedAt === null) return fail(home, 'Open the parcel before rolling again.')
+  const cat = home.cats.find(c => c.id === offer.catId)
+  if (!cat) return fail(home, 'That cat is not here.')
+  const price = BREED_COST
+  if (home.coins < price) return fail(home, `Rolling again costs ${price}c.`)
+  const after = cosmetic(cat.genes, rng, now)
+  return { ...home, coins: home.coins - price,
+    shelter: { ...home.shelter, offer: { ...offer, after, cost: price, at: now, openedAt: null } },
+    log: `${cat.name}'s parcel is closed again. Open it to see the new breed.` }
+}
+
+const openBreed = (home: Home, now: number): Home => {
+  const offer = home.shelter.offer
+  if (!offer) return fail(home, 'There is no breed parcel to open.')
+  if (offer.openedAt !== null) return home
+  return { ...home, shelter: { ...home.shelter, offer: { ...offer, openedAt: now } }, log: 'The parcel rustles…' }
 }
 
 const rollbackBreed = (home: Home, catId: string): Home => {
   const offer = home.shelter.offer
   if (!offer || offer.catId !== catId) return fail(home, 'There is no breed roll to undo.')
   const cat = home.cats.find(c => c.id === catId)
-  return { ...home, coins: home.coins + offer.cost, shelter: { ...home.shelter, offer: null },
-    log: `${cat?.name ?? 'The cat'} keeps the old breed. ${offer.cost}c returned.` }
+  return { ...home, shelter: { ...home.shelter, offer: null },
+    log: `${cat?.name ?? 'The cat'} keeps the old breed.` }
 }
 
 const confirmBreed = (home: Home, catId: string): Home => {
   const offer = home.shelter.offer
   if (!offer || offer.catId !== catId) return fail(home, 'There is no breed roll to confirm.')
+  if (offer.openedAt === null) return fail(home, 'Open the parcel first.')
   const cat = home.cats.find(c => c.id === catId)
   if (!cat) return { ...home, shelter: { ...home.shelter, offer: null }, log: 'That cat is gone. The roll is discarded.' }
   return { ...home, cats: home.cats.map(c => c.id === catId ? { ...c, genes: offer.after } : c),
@@ -108,6 +130,8 @@ export const applyCatCommand = (home: Home, command: CatCommand, now: number, rn
     case 'shelter.reroll': return rerollPending(home, now, rng)
     case 'shelter.confirm': return confirmPull(home, now)
     case 'breed.reroll': return rerollBreed(home, command.catId, now, rng)
+    case 'breed.again': return againBreed(home, now, rng)
+    case 'breed.open': return openBreed(home, now)
     case 'breed.rollback': return rollbackBreed(home, command.catId)
     case 'breed.confirm': return confirmBreed(home, command.catId)
   }
