@@ -1,7 +1,7 @@
 {
   "name": "afk-cat",
   "displayName": "Claude Idle Cat",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "A Tamagotchi-style AFK cat that lives in a Claude Code pane, earns coins while you idle and while Claude works",
   "author": { "name": "Andrew Liang" },
   "homepage": "https://github.com/CooLguNxDD/Claude-Idle-Cat",
