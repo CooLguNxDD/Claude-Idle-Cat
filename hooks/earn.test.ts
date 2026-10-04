@@ -168,3 +168,47 @@ test('a reply whose reward never lands is paid by the next reply', async ($, on)
   const owed = activePay(stored, TEN_MIN) + coinRate(stored) * 10 + spendPay(stored, 1)
   expect(near(await finish(), owed * rampOf(0))).toBe(true)
 })
+
+test('the pane keeps the last reply payout after a brain tick replaces the log', { timeoutMs: 30_000 }, async ($, on) => {
+  const now = 1_700_000_000_000
+  const clock = mock.clock(on, { now })
+  const cats = newHome(now).cats.map(c => ({ ...c, level: 10 }))
+  let stored: Home = { ...newHome(now), cats, coins: 0, rev: 100 }
+  // A newer save the tick should adopt; the live home object is frozen.
+  let newer: Home | null = null
+  on('store.get', () => ({ value: newer ?? stored }))
+  on('store.set', ($, e) => { stored = e.value as Home; newer = null; return { value: undefined } })
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200_000 }, rateLimits: [], cost: { usd: 1 } } }))
+  on('command.register', () => ({ value: { command: 'cat' } }))
+  on('config.list', () => ({ value: [] }))
+  on('ui.toast', () => ({ value: undefined }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.invalidate', () => ({ value: undefined }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('turn.complete', () => ({ text: '' }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+  const reply = async (turnId: string) => {
+    await $.turn.start({ text: 'hi', turnId })
+    await $.turn.complete({ answer: 'ok', durationMs: TEN_MIN, isAborted: false, turnId, reason: 'answer' })
+    await clock.advance(10)
+  }
+  await reply('t1')
+  const pay = activePay(stored, TEN_MIN)
+  // Hungry cat, empty bowl, no intent: the next tick's think overwrites the payout log.
+  newer = {
+    ...stored,
+    rev: stored.rev + 1,
+    bowl: { food: 0 },
+    cats: stored.cats.map(c => ({ ...c, hunger: 0, isAsleep: false, intent: undefined })),
+  }
+  await clock.advance(10_000)
+  expect(stored.log).toBe('Mochi meows at the empty bowl.')
+  const ui = await $.ui.mount({
+    plugin: 'afk-cat', surface: 'terminal', component: 'Pane', requestId: 'afk-cat',
+    props: { title: 'AFK Cat', isFocused: true, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} },
+  })
+  expect(await ui.find({ type: 'Text', text: new RegExp(`last reply \\+${fmtCoins(pay)} \\(10m ×1\\.0\\)`) })).toBeDefined()
+  await ui.unmount()
+})

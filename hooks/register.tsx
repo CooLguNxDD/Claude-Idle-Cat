@@ -142,6 +142,8 @@ let sprintUntil = 0
 let paidUsd: number | undefined
 // Coins gained this prompt and this chat; the prompt resets on turn.start, both on session.start.
 const earned = { prompt: 0, chat: 0 }
+// Last reply's payout. The pane keeps it after behaviour lines replace home.log.
+let lastPay: { pay: number; ramp: number; minutes: number } | null = null
 // Active minutes this chat has run; Claude's pay ramps up with it.
 let chatMinutes = 0
 // Active minutes from replies whose reward never landed; the next reply pays them.
@@ -627,6 +629,7 @@ export const register: Register = (on, options) => {
     // Time away and the streak bonus are not this chat's earnings.
     earned.prompt = 0
     earned.chat = 0
+    lastPay = null
     chatMinutes = 0
     owedMinutes = 0
     if (home.effect?.kind === 'welcome') $.ui.toast(home.log)
@@ -924,9 +927,10 @@ export const register: Register = (on, options) => {
         chatMinutes += minutes + owed
         owedMinutes -= owed
       }
+      let pay = 0
       try {
         await change($, (prev, t) => {
-          const pay = (activePay(prev, e.durationMs) + coinRate(prev) * owed + spendPay(prev, spent)) * ramp
+          pay = (activePay(prev, e.durationMs) + coinRate(prev) * owed + spendPay(prev, spent)) * ramp
           const paid = { ...reward(prev, pay, 2, t), effect: { kind: 'coins' as const, at: t } }
           return track(pay > 0 ? { ...paid, log: `Claude worked ${Math.round(minutes + owed)}m: +${fmtCoins(pay)}` } : paid, 'turns', 1, t)
         }, undefined, settled)
@@ -935,6 +939,7 @@ export const register: Register = (on, options) => {
         if (!isApplied) owedMinutes += minutes
         return
       }
+      lastPay = { pay, ramp, minutes: Math.round(minutes + owed) }
       $.ui.toast(`💰 +${fmtCoins(earned.prompt)} this prompt · +${fmtCoins(earned.chat)} this chat · ×${ramp.toFixed(1)} session`)
     })
     return next(e)
@@ -1465,6 +1470,9 @@ export const register: Register = (on, options) => {
         <Text color={tone.coin}>
           Coins {fmtCoins(home.coins)} (+{idleRate(home).toFixed(1)}/min idle · ×{rampOf(chatMinutes).toFixed(1)} session · +{toolPay(home).toFixed(1)}/tool, {TOOL_CHANCE * 100}% of calls)
           {freePoints(cat) > 0 ? ` · ${freePoints(cat)} skill point${freePoints(cat) > 1 ? 's' : ''} to spend (s)` : ''}
+        </Text>
+        <Text color={tone.coin}>
+          {`💰 This prompt +${fmtCoins(earned.prompt)} · this chat +${fmtCoins(earned.chat)}${lastPay ? ` · last reply +${fmtCoins(lastPay.pay)} (${lastPay.minutes}m ×${lastPay.ramp.toFixed(1)})` : ''}`}
         </Text>
         <Text italic color={tone.log}>{home.log}</Text>
         {yardCols(home, cols) > cols && (
