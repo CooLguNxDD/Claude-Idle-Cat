@@ -8,7 +8,9 @@ export const TABS: { view: View; label: string; hotkey: string }[] = [
   { view: 'friends', label: 'Friends', hotkey: 'r' },
   { view: 'book', label: 'Book', hotkey: 'b' },
   { view: 'miles', label: 'Miles', hotkey: 'm' },
+  { view: 'expedition', label: 'Expeditions', hotkey: 'x' },
   { view: 'arcade', label: 'Arcade', hotkey: 'g' },
+  { view: 'settings', label: 'Settings', hotkey: 'v' },
   { view: 'weather', label: 'Weather', hotkey: 't' },
 ]
 

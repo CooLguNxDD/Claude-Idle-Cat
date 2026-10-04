@@ -3,6 +3,7 @@ import type { Arcade, Cat, GameId, Home } from '../../types'
 import { track } from '../collection'
 import { addToPocket } from '../critters'
 import { befriend, dayOf } from '../friends'
+import { catsAtHome } from '../away'
 import { activeCat, coinRate, reward } from '../game'
 import { seeded } from '../rng'
 import type { Rng } from '../rng'
@@ -38,6 +39,7 @@ const withCat = (home: Home, id: string, fn: (cat: Cat) => Cat): Home =>
 const clamp = (n: number) => Math.max(0, Math.min(100, n))
 
 export const startGame = (home: Home, id: GameId, now: number): Home => {
+  if (!catsAtHome(home).length) return { ...home, log: 'All cats are away on expeditions.' }
   const cat = activeCat(home)
   const game = gameOf(id)
   if (!game) return home

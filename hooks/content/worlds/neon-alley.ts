@@ -9,6 +9,8 @@ export default defineWorld({
   ],
   slots: { bed: 0, rug: 5, plant: 26, toy: 36, bowl: 60, hanging: 46 },
   landmarks: [
+    { kind: 'window', x: 72, tier: 1 },
+    { kind: 'shelf', x: 106, tier: 1 },
     { kind: 'tower', x: 92, tier: 1 },
     { kind: 'tunnel', x: 124, tier: 1 },
     { kind: 'pipe', x: 190, tier: 2 },

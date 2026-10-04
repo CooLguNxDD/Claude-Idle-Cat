@@ -4,7 +4,7 @@ import { ROWS, canvas, sceneCols, view } from './scene/canvas'
 import type { RgbaImage, SceneCanvas } from './scene/canvas'
 import { drawCats } from './scene/cats'
 import { drawDecor } from './scene/decor'
-import { drawEffects } from './scene/effects'
+import { drawEffects, drawCup } from './scene/effects'
 import { drawYard } from './scene/yard'
 import { drawSeason } from './scene/season'
 import { drawWeatherLayer } from './scene/weather'
@@ -19,7 +19,7 @@ import { drawLandmarks } from './scene/landmarks'
 export { ROWS, sceneCols }
 export type { RgbaImage }
 export type SceneInput = { home: Home; now: number; tick: number; hour: number; flavor: Flavor; cols: number; scale?: number
-  motion?: Motion; camX?: number }
+  motion?: Motion; partner?: { id: string; motion: Motion }; camX?: number }
 // Device pixels per scene pixel in the picture: every asset is a spec, so changing this re-renders all of it.
 export const PICTURE_SCALE = 4
 
@@ -27,7 +27,7 @@ export const PICTURE_SCALE = 4
 export const yardCols = (home: Home, cols: number) => worldCols(worldOf(home), home.tier, cols)
 
 // Sky, season and rain stay on the pane; the fence, furniture, landmarks and cats scroll with the camera.
-export const drawScene = ({ home, now, tick, hour, flavor, cols, scale, motion, camX }: SceneInput): SceneCanvas => {
+export const drawScene = ({ home, now, tick, hour, flavor, cols, scale, motion, partner, camX }: SceneInput): SceneCanvas => {
   const c = canvas(cols, scale)
   const world = worldOf(home)
   const wide = yardCols(home, cols)
@@ -40,7 +40,8 @@ export const drawScene = ({ home, now, tick, hour, flavor, cols, scale, motion, 
   drawLandmarks(yard, landmarksOf(world, home.tier), flavor, tick, world.scene)
   if (weather) drawWeatherLayer({ c: yard, weather, tick, f: flavor }, 'ground')
   drawDecor(yard, home, now, tick, flavor, state)
-  const cat = drawCats(yard, home, now, tick, flavor, motion)
+  const cat = drawCats(yard, home, now, tick, flavor, motion, partner)
+  drawCup(c, motion, flavor, cam)
   drawSeason(c, state, tick, flavor, weather)
   if (weather) drawWeatherLayer({ c, weather, tick, f: flavor }, 'front')
   drawEffects(c, home, now, tick, flavor, { ...cat, ox: cat.ox - cam })

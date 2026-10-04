@@ -3,7 +3,7 @@ import { expect, test } from 'claude-code/testing'
 import { MOVES } from './content'
 import { moveProblems, POSE_KINDS } from './content/types'
 import { newHome } from './game'
-import { FPS, motionCtxOf, moveOf, pickMove, poseOf, startMotion, stepMotion } from './motion'
+import { forceMove, FPS, motionCtxOf, moveOf, pickMove, poseOf, startMotion, stepMotion } from './motion'
 import type { Motion, MotionCtx } from './motion'
 import { seeded } from './rng'
 import { frameCells, frameImage } from './scene'
@@ -12,7 +12,7 @@ import { FLAVORS } from './theme'
 
 const ctx = (over: Partial<MotionCtx> = {}): MotionCtx => ({ mood: 'happy', personality: 'playful', hour: 12, hunger: 90,
   energy: 90, minX: 0, maxX: 160, spots: { bowl: 140, bed: 0 }, landmarks: [], ...over })
-const YARD = [{ kind: 'tower' as const, x: 300, w: 48 }, { kind: 'tunnel' as const, x: 400, w: 88 }, { kind: 'pipe' as const, x: 560, w: 64 }]
+const YARD = [{ kind: 'tower' as const, x: 300, w: 48 }, { kind: 'tunnel' as const, x: 400, w: 88 }, { kind: 'pipe' as const, x: 560, w: 64 }, { kind: 'window' as const, x: 100, w: 56 }, { kind: 'shelf' as const, x: 200, w: 56 }]
 const run = (m: Motion, c: MotionCtx, frames: number, seed = 7) => {
   const rng = seeded(seed)
   const seen: Motion[] = []
@@ -26,7 +26,7 @@ test('every move file is valid and the planner can pick it', () => {
   const rng = seeded(3)
   for (const mood of ['happy', 'ok', 'grumpy', 'sleeping'] as const) for (const personality of ['lazy', 'playful', 'shy'] as const)
     for (const hour of [3, 7, 15, 22]) for (let i = 0; i < 200; i++) picked.add(pickMove(undefined, ctx({ mood, personality, hour, maxX: 800, landmarks: YARD }), rng).id)
-  expect([...picked].sort()).toEqual(MOVES.map(m => m.id).sort())
+  expect([...picked].sort()).toEqual(MOVES.filter(m => !m.isScripted).map(m => m.id).sort())
 })
 
 test('the validator names bad moves', () => {
@@ -100,7 +100,7 @@ test('the planner context reads the world: its width, bowl, bed and unlocked lan
   expect(c.maxX).toBe((80 - 16) * 4)
   expect(c.spots.bowl).toBe((60 - 14) * 4)
   expect(c.landmarks).toEqual([])
-  expect(motionCtxOf({ ...home, tier: 2 }, 48, 9).landmarks.map(l => l.kind)).toEqual(['tower', 'tunnel', 'pipe'])
+  expect(motionCtxOf({ ...home, tier: 2 }, 48, 9).landmarks.map(l => l.kind)).toEqual(['window', 'tower', 'shelf', 'tunnel', 'pipe'])
   expect(c.mood).toBe('happy')
 })
 
@@ -123,4 +123,17 @@ test('a seek move walks to the tower and perches on top, and a tunnel dash hides
 test('seek moves are skipped in a yard without their landmark', () => {
   const rng = seeded(9)
   for (let i = 0; i < 500; i++) expect(pickMove(undefined, ctx(), rng).seek).toBeUndefined()
+})
+
+test('forceMove runs scripts deterministically and turn flips facing in place', () => {
+  const c = ctx(), m = startMotion(40)
+  const forced = forceMove(m, 'hiss', c, seeded(7), 3)
+  expect(forced.move).toBe('hiss'); expect(forced.left).toBe(24)
+  expect(forceMove(m, 'missing', c, seeded(7))).toBe(m)
+  const spin = forceMove(m, 'chase-tail', c, seeded(7), 3)
+  const path = run(spin, c, 8)
+  expect(path[3]!.facing).toBe(-spin.facing); expect(path[7]!.facing).toBe(spin.facing)
+  expect(path.every(p => p.x === 40)).toBe(true)
+  const rng = seeded(8)
+  for (let n = 0; n < 300; n++) expect(moveOf(pickMove(undefined, c, rng).id).isScripted).not.toBe(true)
 })

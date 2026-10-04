@@ -40,11 +40,22 @@ Then type `/cat` to open the pane. Meow.
 | `/cat` (or `/cat show`) | open the pane (knock, knock) |
 | `/cat hide` | close the pane (the cats keep earning, they're professionals) |
 | `/cat help` | list the commands |
+| `/cat expedition` / `x` | Expeditions tab: slots, party picker, gear, trails, rewards |
+| `/cat send <exp> <cat…> [+gear…]` | send 1–3 cats by id or single-word name; gear is consumed per run |
+| `/cat claim [run-id]` | collect one ready party or every ready party; rewards pay once |
+| `/cat quests` | open daily quest chains alongside Paw Miles |
+| `/cat curio` | open Home with Pip’s always-open Curio shop |
+| `/cat craft <id>` | buy a Curio recipe with coins and materials |
+| `/cat exchange <cat-id> <friend-id>` | December gift swap with another household cat or visiting cat |
+| `/cat tea [cat-id]` | consume one catnip tea to restore a cat at home to full energy |
+| `←` / `→` / Enter (focused Expeditions keyboard row) | select a cat / send the selected party; `d` also sends |
+| `/config` → Claude reactions (`on` / `quiet` / `off`) | animate with toasts / animate quietly / disable reactions |
 | `/cat rename <name>` | rename the active cat |
 | `/cat shelter` | open the Adopt tab without spending coins (window shopping is free) |
 | `/cat adopt [name]` | roll and adopt a shelter cat, optionally with a chosen name |
 | `/cat switch [name]` | bring another cat front and centre; no name cycles to the next (or pick it from the cat list, `w` in the pane) |
 | `/cat reset` | start over with a new household (back to the cardboard box!) |
+| `/cat settings` · Settings tab (`v`) | saved sound toggle and preview, flavor, interface, canvas, reactions, theme, world, weather and arcade display |
 | `/cat theme <flavor>` | switch Claude Code itself to the Catppuccin theme (`latte` · `frappe` · `macchiato` · `mocha`); see Claude Code theme |
 | `/cat export [file]` | save a backup; default `~/.claude-kitten/backups/afk-cat-<date>.json` |
 | `/cat import <file>` | load a backup; your current save is backed up first (`…-before-import.json`) |
@@ -63,7 +74,7 @@ Then type `/cat` to open the pane. Meow.
 | `w` | open/close the cat list |
 | `‹` / `›` in the top bar | previous / next tab; wraps at either end, with tabs fitting on one line |
 | `q` / `↶` in the top bar | go back to the previously visited tab |
-| `c` `a` `s` `h` `r` `b` `m` `g` `t` | shortcuts for visible tabs: Cat · Adopt · Skills · Home · Friends · Book · Miles · Arcade · Weather |
+| `c` `a` `s` `h` `r` `b` `m` `x` `g` `v` `t` | shortcuts for visible tabs: Cat · Adopt · Skills · Home · Friends · Book · Miles · Expeditions · Arcade · Settings · Weather |
 | Arcade Display menu / Fullscreen | fit the 320×180 art canvas to the window, choose a 1×–6× size (up to 1080p), or fill the screen |
 
 ### 💾 Saves
@@ -71,6 +82,55 @@ Then type `/cat` to open the pane. Meow.
 - The household is one JSON save in the mod's store, written on every change.
 - Each save carries a revision number. With Claude Code open in two places, a session first loads a newer save the other one wrote, so progress isn't overwritten. (No cat gets left behind.)
 - `/cat export` and `/cat import` move the cats between machines or plugin installs. Cats travel well.
+
+## 🧭 Expeditions, friends and late-game curios
+
+Garden Patrol starts at 15 minutes. Choose awake cats, send them out, and claim their seeded coin, material and critter finds after they return. They leave the yard and running band until claimed; a household with every cat away shows an away sign and paw prints. Timers keep running while the plugin is closed. One slot grows to two at House, three at Manor and four at Castle; an Expedition permit adds one slot within that four-slot cap. Matriarch can bring a fourth party member.
+
+Pip’s Curio shop is always open. Garden feathers craft the Harbor map, which opens Riverbank for shells. Deep Woods opens at House; Neon Rooftops needs Neon Alley; Moon Crater needs Castle and a Star map. Pumpkin Patch opens in October, and Snow Trail in December through February. Gather materials to craft late furniture, maps, gear and charms. Gear is chosen per party and consumed at departure. At levels 15, 20 and 25, each existing skill branch extends with expedition and bond perks. Astral advances the expedition clock by 1.2× while the plugin is closed; Oracle reveals rewards already stored in the party’s run.
+
+Cats also boop noses, chase, groom and nap together. Bonds use the friendship ladder with at most ten points gained per pair each local day. Two seeded quest chains sit beside Paw Miles tasks; claim a completed chain before local midnight. December gift swaps work between household pairs and with visiting cats. Harvest weekends in October and November boost expedition materials by 1.5× at departure. Expedition rewards, including event boosts, are frozen when sent.
+
+| Branch | Level 15 | Level 20 | Level 25 |
+| --- | --- | --- | --- |
+| Hunter | Scout: −15% expedition duration | Trailblazer: +1 material roll | Legend: +5% rare odds |
+| Cuddler | Kinship: +50% bond gain | Harmony: pair play gives both cats joy | Matriarch: +1 party member |
+| Dreamer | Astral: offline expedition time ×1.2 | Stargazer: favors stardust finds | Oracle: shows a departed party's frozen loot |
+
+Pip's furniture recipes unlock at the following house tiers. Each item occupies one existing slot; mods have validator caps.
+
+| Craft id | Slot / tier | Cost | Perk |
+| --- | --- | --- | --- |
+| `map-table` | toy / Villa | 1200c + 10 pine-cone | −10% expedition duration |
+| `shell-fountain` | bowl / Villa | 1500c + 12 shell | auto-feed, +60% gifts |
+| `neon-sign` | hanging / Mansion | 3000c + 15 neon-scrap | double AFK events |
+| `moon-hammock` | bed / Castle | 6000c + 20 stardust | +150% regen, +25% bonds |
+| `starlit-rug` | rug / Palace | 12000c + 30 stardust | joy fades 50% slower |
+
+| Curio id | Kind / minimum tier | Cost | Perk |
+| --- | --- | --- | --- |
+| `harbor-map` | map / Cottage | 80c + 3 feather | unlock Riverbank |
+| `star-map` | map / Castle | 500c + 5 neon-scrap | unlock Moon Crater |
+| `trail-snacks` | gear / Cottage | 40c + 2 pine-cone | −20% duration for one party |
+| `lucky-collar` | gear / House | 80c + 2 shell | +5% rare odds for one party |
+| `big-satchel` | gear / House | 60c + 3 feather | +1 material roll per cat for one party |
+| `expedition-permit` | charm / Villa | 1000c + 10 pine-cone | permanent +1 slot, capped at four |
+| `bond-bell` | charm / Villa | 800c + 8 shell | permanent +25% bonds |
+| `catnip-tea` | consumable / Cottage | 20c + 1 feather | refill one cat's energy at home |
+
+| Material | Expedition source |
+| --- | --- |
+| `feather` | Garden Patrol, Riverbank, Deep Woods, Neon Rooftops |
+| `pine-cone` | Garden Patrol, Deep Woods, Pumpkin Patch, Snow Trail |
+| `shell` | Riverbank |
+| `neon-scrap` | Neon Rooftops, Moon Crater |
+| `stardust` | Moon Crater |
+| `pumpkin` | October Pumpkin Patch |
+| `snowflake` | December–February Snow Trail |
+
+Claude errors trigger a hiss; passing test commands trigger celebration; a Bash call still running after twenty seconds triggers a cosmetic nap. The reactions setting controls animation and toasts. No reaction pays coins or changes cat needs.
+
+[Content v2 walkthrough and previews](docs/content-v2-walkthrough.md).
 
 ## 🐾 How the game works
 
@@ -216,7 +276,7 @@ The picture's art is a spec, not a bitmap: shapes are laid out on a design grid 
 
 ## 🔊 Sound
 
-Short chiptune clips play on level-up, evolution, adoption, achievements, birthdays, gifts and critter finds. Turn them off in `/config` → **Sound effects**.
+Short chiptune clips play on level-up, evolution, adoption, achievements, birthdays, gifts and critter finds. Turn them off in the **Settings** tab (`v`, or `/cat settings`) → **Sound effects**, or in `/config` → **Sound effects**. Preview plays the level-up clip when sound is enabled. All five plugin config fields save through Claude Code and apply immediately; the menu also saves world, weather units and arcade glow/CRT with your household.
 - **macOS:** clips play through Claude Code's audio player.
 - **Windows:** Claude Code has no player there, so the mod plays the same WAV files through PowerShell's `SoundPlayer`.
 - **Linux:** silent. (The cat is sneaking.)
@@ -342,6 +402,7 @@ claude plugin validate .
 claude plugin test .
 node --test server/arcade.test.mjs
 node tools/build-content.mjs --check
+node --test tools/content.test.mjs
 node --test tools/release-snapshot.test.mjs
 node tools/build-art.mjs
 node tools/build-web.mjs
@@ -349,7 +410,7 @@ node tools/build-web.mjs
 
 ### 🧶 Generator skills
 
-New content is a data file, and four project skills in `.claude/skills/` write one for you in a Claude Code session in this repo. Each writes the file, registers it with `node tools/build-content.mjs`, renders a preview with `node tools/preview.mjs`, then runs the checks.
+New content is a data file, and thirteen mirrored project skills in `.claude/skills/` and `.agents/skills/` write one for you in a Claude Code session in this repo. Each writes the file, registers it with `node tools/build-content.mjs`, renders a preview with `node tools/preview.mjs`, then runs the checks.
 
 | Skill | Ask for | Writes |
 | --- | --- | --- |
@@ -357,6 +418,15 @@ New content is a data file, and four project skills in `.claude/skills/` write o
 | `cat-gen` | a named character who visits the yard | `hooks/content/cats/<id>.ts` |
 | `move-gen` | a move or animation for the roaming cat | `hooks/content/moves/<id>.ts` |
 | `world-gen` | a themed yard with layers and landmarks | `hooks/content/worlds/<id>.ts` |
+| `reaction-gen` | a Claude reaction | `hooks/content/reactions/<id>.ts` |
+| `interaction-gen` | pair play | `hooks/content/interactions/<id>.ts` |
+| `expedition-gen` | a timed expedition | `hooks/content/expeditions/<id>.ts` |
+| `quest-gen` | a quest chain | `hooks/content/quests/<id>.ts` |
+| `event-gen` | an exchange or boost event | `hooks/content/events/<id>.ts` |
+| `skill-gen` | a skill in an existing branch | `hooks/content/skills/<id>.ts` |
+| `furniture-gen` | tier-gated decor | `hooks/content/furniture/<id>.ts` |
+| `shop-gen` | a shop recipe, map, charm, gear or tea | `hooks/content/shop/<id>.ts` |
+| `material-gen` | an expedition material | `hooks/content/materials/<id>.ts` |
 
 To type-check, load the plugin once with `--plugin-dir`. That writes `.claude-plugin/types/` (git-ignored). Then run `npx -p typescript@5 tsc -p .`.
 
@@ -369,3 +439,7 @@ The mod API is early access and can change between Claude Code releases. This ve
 ---
 
 *From a cardboard box to a cat tower. Not bad for a broke stray.* 😸
+
+Expedition world requirements apply to the currently selected yard: switch to Neon Alley to send a Neon Rooftops party. Switching worlds afterward keeps that party and its frozen rewards. Return notifications persist across session reloads; rewards stay available until you claim. A long test command can trigger a nap at 20 seconds and a celebration when its tests pass.
+
+`/cat send garden-patrol "Sir Miso"` and `/cat exchange "Sir Miso" "Captain Bean"` accept quoted names as well as cat ids. Gift exchange reports when the daily bond cap prevents extra bond points.

@@ -22,8 +22,8 @@ test('the yard grows with the house and unlocks landmarks by tier', () => {
   expect([0, 1, 2].map(tier => worldCols(backyard, tier, 48))).toEqual([80, 160, 240])
   expect(worldCols(backyard, 0, 300)).toBe(300)
   expect(landmarksOf(backyard, 0)).toEqual([])
-  expect(landmarksOf(backyard, 1).map(l => l.kind)).toEqual(['tower', 'tunnel'])
-  expect(landmarksOf(backyard, 2).map(l => l.kind)).toEqual(['tower', 'tunnel', 'pipe'])
+  expect(landmarksOf(backyard, 1).map(l => l.kind)).toEqual(['window', 'tower', 'shelf', 'tunnel'])
+  expect(landmarksOf(backyard, 2).map(l => l.kind)).toEqual(['window', 'tower', 'shelf', 'tunnel', 'pipe'])
 })
 
 test('old saves land in the backyard and an unknown world falls back to it', () => {

@@ -1,3 +1,19 @@
+import { catRef, wordsOf } from './commands'
+import { catsAtHome, isAway } from './away'
+import { claim, canSend, finishExpeditions, lootOf, readyRuns, resumeExpeditions, send, slotsOf } from './expeditions'
+import { claimQuest, questsFor, questState } from './quests'
+import { activeEvents, exchange } from './events'
+import { canCraft, costText, craft, drinkTea } from './shop'
+import { addBond, bondKey, partnerOf, pickInteraction, startPair, stepPair } from './pair'
+import type { PairRun } from './pair'
+import { pickReaction, rememberReaction } from './reactions'
+import type { ReactionMemory, ReactionMode } from './reactions'
+import { signalsOf, turnSignal } from './reactions/signals'
+import type { Signal } from './content/types'
+import { isContentAvailable } from './content/availability'
+import { unlockHint } from './content/types'
+import { skillTotals } from './skills'
+import { homeMods } from './home'
 import { read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
@@ -24,11 +40,11 @@ import { LOAN_SHARE, SHOP_CLOSE, SHOP_OPEN, baitOf, dailyStock, fmtCoins, furnit
 import { PICTURE_SCALE, ROWS, frameCells, frameImage, sceneCols, yardCols } from './scene'
 import type { RgbaImage } from './scene'
 import { CLASSIC_X } from './scene/cats'
-import { motionCtxOf, startMotion, stepMotion } from './motion'
+import { forceMove, motionCtxOf, startMotion, stepMotion } from './motion'
 import { followCam, panCam } from './camera'
 import type { Camera } from './camera'
 import { setWorld } from './world'
-import { WORLDS } from './content'
+import { WORLDS, EXPEDITIONS, SHOP, INTERACTIONS } from './content'
 import { DESIGN } from './scene/fine/draw'
 import { seeded } from './rng'
 import type { Rng } from './rng'
@@ -67,6 +83,22 @@ let cols = 34
 let frame = 0
 // Where the active cat is in the yard and what it is doing; kept in memory, never in the save.
 let motion = startMotion(CLASSIC_X)
+let motionCatId = ''
+let pairRun: PairRun | null = null
+let reactionMemory: ReactionMemory = {}
+let reactionMode: ReactionMode = 'on'
+let reactionUntil = 0
+let partySelection: string[] = []
+let gearSelection: string[] = []
+let expeditionChoice = 0
+let partyCursor = 0
+const SETTING_CHOICES: Record<string, readonly string[]> = {
+  'afk-cat.flavor': ['auto', 'daycycle', 'latte', 'frappe', 'macchiato', 'mocha'],
+  'afk-cat.skin': ['full', 'light', 'off'],
+  'afk-cat.canvas': ['auto', 'image', 'text'],
+  'afk-cat.reactions': ['on', 'quiet', 'off'],
+}
+const notifiedRuns = new Set<string>()
 let motionRng: Rng | null = null
 // The pane's window onto the yard; it follows the cat until a pan holds it for a while.
 let camera: Camera = { x: 0, manualUntil: 0 }
@@ -76,6 +108,7 @@ const paint = { view: 'cat' as View, kind: 'raster' as SceneKind, last: '', isMo
 let isImageBlocked = false
 // Claude Code's own theme row, read for the `auto` flavor.
 let claudeTheme = 'dark'
+let flavorSetting = 'auto'
 let isSoundOn = true
 let skin: SkinLevel = 'full'
 // How the pane's scene draws: auto tries a picture and falls back to half-block cells.
@@ -250,10 +283,10 @@ const hourOf = (now: number) => new Date(now).getHours()
 type SceneKind = 'raster' | 'image'
 const sceneCellsOf = (home: Home, view: View, now: number, flavor: Flavor) => view === 'adopt'
   ? shelterCells(home, now, frame, flavor, cols) : frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion,
-    camX: camera.x })
+    camX: camera.x, ...(pairRun ? { partner: { id: pairRun.partnerId, motion: pairRun.partner } } : {}) })
 const sceneImageOf = (home: Home, view: View, now: number, flavor: Flavor): RgbaImage => view === 'adopt'
   ? shelterImage(home, now, frame, flavor, cols, PICTURE_SCALE)
-  : frameImage({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion, camX: camera.x })
+  : frameImage({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion, camX: camera.x, ...(pairRun ? { partner: { id: pairRun.partnerId, motion: pairRun.partner } } : {}) })
 // A denied Image blit that names its alt means the terminal draws no pictures here.
 const isAltDeny = (deny: string) => /\balt\b|placeholder/i.test(deny)
 
@@ -373,6 +406,15 @@ const weatherCommand = async ($: EngineInterface, arg: string): Promise<{ text: 
 }
 
 const HELP = [
+  '/cat expedition — Expeditions tab (x)',
+  '/cat send <exp> <cat…> [+gear…] — send a party',
+  '/cat claim [run] — collect ready rewards',
+  '/cat quests — today’s chains in Miles',
+  '/cat curio — Pip’s always-open Curio shop',
+  '/cat craft <id> — craft using coins and materials',
+  '/cat exchange <cat-id> <friend-id> — December gift swap',
+  '/cat tea [cat-id] — use one catnip tea',
+  '/cat settings — sound, appearance, reactions, weather and arcade display',
   '/cat (or /cat show) — open the pane',
   '/cat hide — close the pane (the cats keep earning)',
   '/cat shelter — open the adoption gacha',
@@ -385,7 +427,7 @@ const HELP = [
   '/cat weather <city> — real weather; system for device location, off to clear, refresh to update',
   '/cat theme <latte|frappe|macchiato|mocha> — switch Claude Code to that Catppuccin theme',
   '/cat world [id] — list the worlds, or move the yard to another one',
-  'In the pane: ‹ › tabs · q back · c a s h r b m g t visible tab shortcuts · f e n feed/pet/nap · p arcade · w cat list',
+  'In the pane: ‹ › tabs · q back · c a s h r b m x g v t visible tab shortcuts · f e n feed/pet/nap · p arcade · w cat list',
   'On the Cat tab: j and l pan the yard · 0 follows the cat again',
 ].join('\n')
 
@@ -450,16 +492,55 @@ const backupCommand = async ($: EngineInterface, sub: 'export' | 'import', arg: 
   return { text: `Imported ${home.cats.length} cats and ${Math.floor(home.coins)}c. Your previous save is at ${safety}` }
 }
 
+const applySetting = (key: string, value: unknown) => {
+  switch (key) {
+    case 'afk-cat.flavor': flavorSetting = String(value); break
+    case 'afk-cat.skin': skin = skinLevel(value); break
+    case 'afk-cat.sound': isSoundOn = value === true; break
+    case 'afk-cat.canvas': canvasMode = value === 'image' || value === 'text' ? value : 'auto'; isImageBlocked = false; break
+    case 'afk-cat.reactions': reactionMode = value === 'off' || value === 'quiet' ? value : 'on'; break
+  }
+}
+const setSetting = async ($: EngineInterface, key: string, value: string | boolean) => {
+  const result = await $.config.set({ key, value })
+  if (result.deny) { $.ui.toast(`Couldn't save setting: ${result.deny}`); return }
+  applySetting(key, result.value)
+  $.ui.invalidate('ui.render')
+}
+
 const readTheme = async ($: EngineInterface) => {
   const row = (await $.config.list()).find(r => r.key === 'theme')
   claudeTheme = typeof row?.value === 'string' ? row.value : 'dark'
 }
 
+
+const emitReaction = async ($: EngineInterface, signals: readonly Signal[], tool = '') => {
+  if (!latest || !catsAtHome(latest).length) return
+  const now = await $.clock.now(), cat = activeCat(latest)
+  motionRng ??= seeded(now)
+  if (motionCatId !== cat.id) { motion = startMotion(CLASSIC_X); motionCatId = cat.id }
+  const r = pickReaction(cat, signals, tool, now, reactionMemory, motionRng, reactionMode)
+  if (!r) return
+  reactionMemory = rememberReaction(reactionMemory, cat.id, r.id, now)
+  pairRun = null
+  motion = forceMove(motion, r.move, motionCtxOf(latest, cols, hourOf(now)), motionRng)
+  reactionUntil = frame + motion.left
+  await queue(() => change($, (h, t) => track({ ...h, ...(reactionMode === 'on' && r.line ? { log: r.line } : {}), ...(r.effect ? { effect: { kind: r.effect, at: t } } : {}) }, 'react', 1, t)))
+  if (reactionMode === 'on' && r.line) $.ui.toast(r.line)
+}
+const departure = ($: EngineInterface, expId: string, ids: string[], gear: string[]) => {
+  const seed = Math.floor(Math.random() * 4294967296)
+  return change($, (h, t) => send(h, expId, ids, gear, t, seed))
+}
+
 export const register: Register = (on, options) => {
+  reactionMode = options.reactions === 'off' || options.reactions === 'quiet' ? options.reactions : 'on'
+  pairRun = null; reactionMemory = {}; notifiedRuns.clear()
+  flavorSetting = String(options.flavor ?? 'auto')
   isSoundOn = options.sound !== false
   skin = skinLevel(options.skin)
   canvasMode = options.canvas === 'image' || options.canvas === 'text' ? options.canvas : 'auto'
-  const flavorAt = (now: number) => resolveFlavor(String(options.flavor ?? 'auto'), claudeTheme, hourOf(now))
+  const flavorAt = (now: number) => resolveFlavor(flavorSetting, claudeTheme, hourOf(now))
   flavorNow = flavorAt
 
   on('session.start', async ($, e, next) => {
@@ -471,12 +552,15 @@ export const register: Register = (on, options) => {
     paidUsd = await sessionUsd($)
     const saved = (await $.store.get('home')) ?? (await $.store.get('cat'))
     let bonus = 0
+    let returns: string[] = []
     const home = await change($, (_, t) => {
-      const loaded = migrate(saved, t)
+      const loaded = resumeExpeditions(migrate(saved, t), t)
       const day = checkIn(tick(loaded, t), t)
       bonus = day.bonus
-      return saved ? welcomeBack(loaded, day.home, t) : day.home
+      returns = readyRuns(day.home, t).filter(r => !day.home.expeditions.inbox.includes(r.id)).map(r => r.exp)
+      return finishExpeditions(saved ? welcomeBack(loaded, day.home, t) : day.home, t)
     })
+    for (const exp of returns) $.ui.toast(`Expedition ready: ${EXPEDITIONS.find(e => e.id === exp)?.label ?? exp}. Claim in Expeditions.`)
     // Time away and the streak bonus are not this chat's earnings.
     earned.prompt = 0
     earned.chat = 0
@@ -506,6 +590,20 @@ export const register: Register = (on, options) => {
     $.clock.every(FRAME_MS, async () => {
       if (!latest) return
       const now = await $.clock.now()
+      for (const id of notifiedRuns) if (!latest.expeditions.runs.some(r => r.id === id)) notifiedRuns.delete(id)
+      const fresh = readyRuns(latest, now).filter(r => !latest!.expeditions.inbox.includes(r.id) && !notifiedRuns.has(r.id))
+      if (fresh.length) {
+        for (const r of fresh) notifiedRuns.add(r.id)
+        void queue(async () => {
+          let notices: string[] = []
+          await change($, (h, t) => {
+            notices = readyRuns(h, t).filter(r => !h.expeditions.inbox.includes(r.id)).map(r => r.exp)
+            return finishExpeditions(h, t)
+          })
+          for (const exp of notices) $.ui.toast(`Expedition ready: ${EXPEDITIONS.find(e => e.id === exp)?.label ?? exp}. Claim in Expeditions.`)
+          $.ui.invalidate('ui.render')
+        }).finally(() => { for (const r of fresh) notifiedRuns.delete(r.id) })
+      }
       // A frame still waiting on its blit holds the next one back, but never past STALL_MS.
       if (paint.isBusy && now - paint.busyAt < STALL_MS) return
       paint.isBusy = true
@@ -516,7 +614,29 @@ export const register: Register = (on, options) => {
         // The active cat roams only while someone can see it.
         if (paint.isMounted) {
           motionRng ??= seeded(now)
-          motion = stepMotion(motion, motionCtxOf(latest, cols, hourOf(now)), motionRng)
+          const cat = activeCat(latest), ctx = motionCtxOf(latest, cols, hourOf(now))
+          if (motionCatId !== cat.id) { motion = startMotion(CLASSIC_X); motionCatId = cat.id; pairRun = null }
+          if (pairRun && (pairRun.leadId !== cat.id || isAway(latest, pairRun.partnerId) || isAway(latest, pairRun.leadId))) pairRun = null
+          if (!pairRun && frame >= reactionUntil && frame % 240 === 0 && !isAway(latest, cat.id)) {
+            const buddy = partnerOf(latest, cat.id, motionRng)
+            const i = buddy && pickInteraction(latest, cat, buddy, motionRng)
+            if (i) pairRun = startPair(i, cat.id, buddy!.id, motion, ctx, motionRng)
+          }
+          if (pairRun) {
+            pairRun = stepPair(pairRun, ctx); motion = pairRun.lead
+            if (pairRun.left <= 0) {
+              const run = pairRun, i = INTERACTIONS.find(i => i.id === run.id)!
+              pairRun = null; motion = { ...motion, left: 0 }
+              void queue(() => change($, (h, t) => {
+                if (isAway(h, run.leadId) || isAway(h, run.partnerId)) return h
+                const key = bondKey(run.leadId, run.partnerId), before = h.bonds[key]?.points ?? 0
+                let bondedHome = addBond(h, run.leadId, run.partnerId, i.bond, t)
+                if (h.cats.some(c => [run.leadId, run.partnerId].includes(c.id) && skillTotals(c).harmony > 0)) bondedHome = { ...bondedHome, cats: bondedHome.cats.map(c => [run.leadId, run.partnerId].includes(c.id) ? { ...c, joy: Math.min(100, c.joy + 5) } : c) }
+                const gained = (bondedHome.bonds[key]?.points ?? 0) - before
+                return track({ ...bondedHome, log: i.line }, 'bond', gained, t)
+              }))
+            }
+          } else if (!isAway(latest, cat.id)) motion = stepMotion(motion, ctx, motionRng)
           camera = followCam(camera, Math.round(motion.x / DESIGN), 14, yardCols(latest, cols), cols, frame)
         }
         // Skips the scene while the pane is closed and when a frame would repaint the same cells.
@@ -541,7 +661,7 @@ export const register: Register = (on, options) => {
         if (band.mode !== 'raster') return
         const isSprint = frame < sprintUntil
         runX = nextX(runX, band.cols, isSprint)
-        const run = { cat: activeCat(latest), flavor, tick: frame, x: runX, cols: band.cols, isSprint }
+        const run = { cat: activeCat(latest), flavor, tick: frame, x: runX, cols: band.cols, isSprint, isAway: !catsAtHome(latest).length }
         if ((await $.ui.blit({ requestId: band.id, key: RUNNER, cells: runFrame(run) })).deny) band.mode = 'off'
       } finally {
         paint.isBusy = false
@@ -550,9 +670,43 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+
+  on('ui.message', { element: 'expedition-keys' }, async ($, e) => {
+    if (!latest || (await read($, routeRef))?.view !== 'expedition') return {}
+    const key = (e.data as { key?: string } | null)?.key, here = catsAtHome(latest)
+    if (key === 'left' || key === 'right') {
+      partyCursor = (partyCursor + (key === 'left' ? -1 : 1) + here.length) % Math.max(1, here.length)
+      partySelection = here[partyCursor] ? [here[partyCursor]!.id] : []
+      $.ui.invalidate('ui.render')
+    } else if (key === 'return' && here.length) {
+      const selected = partySelection.filter(id => here.some(c => c.id === id))
+      const ids = selected.length ? selected : here.slice(0, 1).map(c => c.id)
+      await departure($, EXPEDITIONS[expeditionChoice % EXPEDITIONS.length]!.id, ids, gearSelection.filter(id => (latest!.gear[id] ?? 0) > 0))
+    }
+    return {}
+  })
+
   on('command.run', { command: 'cat' }, async ($, e) => {
-    const [sub = '', ...rest] = e.args.trim().split(/\s+/)
+    const [sub = '', ...rest] = wordsOf(e.args)
     const arg = rest.join(' ')
+
+    if (['expedition', 'quests', 'curio', 'settings'].includes(sub)) {
+      await routeTo($, sub === 'expedition' ? 'expedition' : sub === 'quests' ? 'miles' : sub === 'settings' ? 'settings' : 'home')
+      await change($, h => h)
+      await $.ui.open({ id: PANE, title: 'AFK Cat' })
+      return { text: sub === 'curio' ? 'Pip’s Curio shop is always open.' : `Opened ${sub}.` }
+    }
+    if (sub === 'send') {
+      const id = rest[0] ?? '', names = rest.slice(1).filter(s => !s.startsWith('+'))
+      const gear = rest.slice(1).filter(s => s.startsWith('+')).map(s => s.slice(1))
+      await change($, h => h)
+      const ids = names.map(n => catRef(latest!, n))
+      return { text: (await departure($, id, ids, gear)).log }
+    }
+    if (sub === 'claim') return { text: (await change($, (h, t) => arg ? claim(h, arg, t) : readyRuns(h, t).reduce((next, r) => claim(next, r.id, t), h))).log }
+    if (sub === 'craft') return { text: (await change($, (h, t) => craft(h, arg, t))).log }
+    if (sub === 'tea') return { text: (await change($, h => drinkTea(h, arg || activeCat(h).id))).log }
+    if (sub === 'exchange') return { text: (await change($, (h, t) => exchange(h, catRef(h, rest[0] ?? activeCat(h).id), catRef(h, rest[1] ?? ''), t, Math.random))).log }
     if (sub === 'hide' || sub === 'close') {
       await $.ui.close({ id: PANE })
       return { text: 'The cats will keep earning while the pane is closed. /cat brings it back.' }
@@ -589,33 +743,32 @@ export const register: Register = (on, options) => {
     return { text: 'Your cats are in the pane.' }
   })
 
-  on('config.set', { key: 'theme' }, async ($, e, next) => {
-    const set = await next(e)
-    await readTheme($)
+  on('config.set', async ($, e, next) => {
+    const result = await next(e)
+    if (result.deny) return result
+    if (e.key === 'theme') await readTheme($)
+    else if (e.key.startsWith('afk-cat.')) applySetting(e.key, result.value)
     $.ui.invalidate('ui.render')
-    return set
+    return result
   })
-
-  on('config.set', { key: 'skin' }, async ($, e, next) => {
-    const set = await next(e)
-    skin = skinLevel(e.value)
-    $.ui.invalidate('ui.render')
-    return set
-  })
-
-  on('config.set', { key: 'canvas' }, async ($, e, next) => {
-    const set = await next(e)
-    canvasMode = e.value === 'image' || e.value === 'text' ? e.value : 'auto'
-    isImageBlocked = false
-    $.ui.invalidate('ui.render')
-    return set
-  })
-
   on('tool.call', async ($, e, next) => {
     sprintUntil = frame + 16
-    const ran = await next(e)
-    void queue(() => change($, (prev, t) => track(reward(prev, rollToolPay(prev, Math.random) * rampOf(chatMinutes)), 'tools', 1, t)))
-    return ran
+    const command = e.tool === 'Bash' && 'command' in e ? String(e.command ?? '') : ''
+    // Cosmetic timers and reactions must never change the real tool's result.
+    let cancel = () => {}
+    try {
+      const timer = $.clock.after(20000, () => { void emitReaction($, ['tool.long'], e.tool).catch(() => undefined) })
+      cancel = () => timer.cancel()
+    } catch {}
+    try {
+      const ran = await next(e)
+      void queue(() => change($, (h, t) => track(reward(h, rollToolPay(h, Math.random) * rampOf(chatMinutes)), 'tools', 1, t)))
+      await emitReaction($, signalsOf({ tool: e.tool, command, isError: ran.isError === true || !!ran.deny, ms: 0 }), e.tool).catch(() => undefined)
+      return ran
+    } catch (error) {
+      await emitReaction($, ['tool.error'], e.tool).catch(() => undefined)
+      throw error
+    } finally { try { cancel() } catch {} }
   })
 
   on('turn.start', async ($, e, next) => {
@@ -624,6 +777,7 @@ export const register: Register = (on, options) => {
   })
 
   on('turn.complete', async ($, e, next) => {
+    await emitReaction($, [turnSignal(e.reason)]).catch(() => undefined)
     await queue(async () => {
       const usd = await sessionUsd($)
       const spent = usd === undefined || paidUsd === undefined ? 0 : usd - paidUsd
@@ -680,13 +834,13 @@ export const register: Register = (on, options) => {
     paint.last = sceneImage?.rgba ?? sceneCells
     paint.isMounted = paint.last !== ''
     // What the picture shows, for screen readers and terminals that draw the alt instead.
-    const sceneAlt = view !== 'adopt' ? `${cat.name} (${mood}) in the yard`
+    const sceneAlt = view !== 'adopt' ? catsAtHome(home).length ? `${cat.name} (${mood}) in the yard` : 'All cats are away on expeditions'
       : reveal ? `${reveal.name} at the adoption shelter` : 'A mystery parcel at the adoption shelter'
     const scene = sceneImage && 'Image' in ui
       ? <ui.Image key={SCENE} columns={cols} rows={ROWS} source={sceneImage} alt={sceneAlt} />
       : 'Raster' in ui ? <ui.Raster key={SCENE} columns={cols} rows={ROWS} cells={sceneCells} />
       : view === 'adopt' && !reveal ? <Text color={tone.accent}>{'   /─────\\\n   │  ?  │\n   └─────┘'}</Text>
-        : <Box flexDirection="column">{catArt(mood, home.frame, formOf(cat)).map(line => <Text>{line}</Text>)}</Box>
+        : <Box flexDirection="column">{view !== 'adopt' && !catsAtHome(home).length ? <Text>🐾 All cats are away on expeditions</Text> : catArt(mood, home.frame, formOf(cat)).map(line => <Text>{line}</Text>)}</Box>
 
     const isCatListOpen = (await read($, catListRef)) ?? false
     const tabs = (
@@ -746,6 +900,40 @@ export const register: Register = (on, options) => {
           <Button key={`shelter-adopt-${v.id}`} plain label={`Welcome ${v.name}`} onPress={() => change($, (prev, t) => adoptVisitor(prev, v.id, t))} />
         </Box>)}
         <Text italic color={tone.log}>{home.log}</Text>
+      </Box>
+    }
+
+    if (view === 'settings') {
+      const rows = (await $.config.list()).filter(r => r.key.startsWith('afk-cat.'))
+      return <Box flexDirection="column">
+        {tabs}
+        <Text bold color={tone.title}>Cat settings</Text>
+        <Text color={tone.muted}>Changes save immediately. Sound controls the cat's chiptune effects.</Text>
+        {rows.map(row => <Box key={`setting-${row.key}`} flexDirection="column">
+          <Text bold color={tone.accent}>{row.label} · {typeof row.value === 'boolean' ? row.value ? 'on' : 'off' : String(row.value)}{row.isLocked ? ' · locked' : ''}</Text>
+          {row.description && <Text color={tone.muted}>{row.description}</Text>}
+          {row.isLocked ? <Text dimColor>Managed by your host settings.</Text> : row.kind === 'boolean'
+            ? <Button key={`setting-${row.key}-toggle`} plain label={row.value ? 'Turn off' : 'Turn on'} onPress={() => setSetting($, row.key, !row.value)} />
+            : (row.options ?? SETTING_CHOICES[row.key] ?? []).map(value => <Button key={`setting-${row.key}-${value}`} plain
+              label={`${row.value === value ? '●' : '○'} ${value}`} onPress={() => setSetting($, row.key, value)} />)}
+        </Box>)}
+        {!rows.length && <Text color={tone.muted}>Plugin settings are available in the host's /config menu.</Text>}
+        <Button key="settings-sound-preview" plain label={isSoundOn ? 'Preview level-up sound' : 'Sound preview muted'}
+          onPress={async () => { if (isSoundOn) { try { await playClip($, 'levelup') } catch { $.ui.toast('Sound playback is unavailable on this host.') } } }} />
+        <Text bold color={tone.title}>Claude Code theme · {claudeTheme}</Text>
+        {FLAVOR_NAMES.map(name => <Button key={`settings-theme-${name}`} plain label={name}
+          onPress={async () => { const result = await themeCommand($, name); $.ui.toast(result.text) }} />)}
+        <Text bold color={tone.title}>Yard world · {home.world.id}</Text>
+        {WORLDS.map(world => <Button key={`settings-world-${world.id}`} plain label={`${home.world.id === world.id ? '●' : '○'} ${world.label}`}
+          onPress={() => change($, h => setWorld(h, world.id))} />)}
+        <Text bold color={tone.title}>Weather · {weatherSummary(home.weather, now)}</Text>
+        <Button key="settings-weather" plain label="Choose weather location" onPress={() => routeTo($, 'weather')} />
+        <Button key="settings-weather-units" plain label={home.weather.units === 'c' ? 'Use °F' : 'Use °C'}
+          onPress={() => change($, h => ({ ...h, weather: { ...h.weather, units: h.weather.units === 'c' ? 'f' : 'c' } }))} />
+        <Button key="settings-weather-off" plain label="Turn live weather off" onPress={async () => { await weatherCommand($, 'off') }} />
+        <Text bold color={tone.title}>Arcade display</Text>
+        {(['glow', 'crt'] as const).map(key => <Button key={`settings-${key}`} plain label={`${key === 'crt' ? 'CRT' : 'Glow'}: ${home.prefs[key] ? 'on' : 'off'}`}
+          onPress={() => change($, h => ({ ...h, prefs: { ...h.prefs, [key]: !h.prefs[key] } }))} />)}
       </Box>
     }
 
@@ -864,6 +1052,44 @@ export const register: Register = (on, options) => {
       )
     }
 
+
+    if (view === 'expedition') {
+      const catById = new Map(home.cats.map(c => [c.id, c]))
+      const here = catsAtHome(home), selection = partySelection.filter(id => here.some(c => c.id === id))
+      const ids = selection.length ? selection : here.slice(0, 1).map(c => c.id)
+      const selected = EXPEDITIONS[expeditionChoice % EXPEDITIONS.length]!
+      const gear = gearSelection.filter(id => (home.gear[id] ?? 0) > 0)
+      const cycleParty = (step: number) => { partyCursor = (partyCursor + step + here.length) % Math.max(1, here.length); partySelection = here[partyCursor] ? [here[partyCursor]!.id] : []; $.ui.invalidate('ui.render') }
+      return <Box flexDirection="column">
+        {tabs}{scene}
+        <Text bold color={tone.title}>Expeditions · {home.expeditions.runs.length}/{slotsOf(home)} slots used</Text>
+        {home.expeditions.runs.map(r => {
+          const ready = r.endsAt <= now, minutes = Math.max(0, Math.ceil((r.endsAt - now) / 60000))
+          return <Box flexDirection="column">
+            <Text>{EXPEDITIONS.find(e => e.id === r.exp)?.label ?? r.exp} · {r.cats.map(id => catById.get(id)?.name ?? id).join(', ')} · {bar(100 * Math.min(1, (now - r.startAt) / (r.endsAt - r.startAt)), 10)} · {ready ? 'Ready to claim' : `${minutes}m left`}</Text>
+            {ready && <Button key={`claim-${r.id}`} plain label="Claim rewards" onPress={() => change($, (h, t) => claim(h, r.id, t))} />}
+            {r.cats.some(id => { const cat = catById.get(id); return cat && skillTotals(cat).oracle > 0 }) && <Text>Oracle: {lootOf(r).coins}c · {Object.entries(lootOf(r).materials).map(([id, n]) => `${n} ${id}`).join(', ')}</Text>}
+          </Box>
+        })}
+        {'Client' in ui && <ui.Client key="expedition-keys" module="./ui/expedition-keys.tsx" props={{ names: ids.map(id => catById.get(id)?.name ?? id), trail: selected.label }} height={2} />}
+        <Text bold>Party · click the keyboard row for ← → and Enter; choose more below</Text>
+        <Box><Button key="party-prev" plain label="←" onPress={() => cycleParty(-1)} /><Button key="party-next" plain label="→" onPress={() => cycleParty(1)} /></Box>
+        {here.map(c => <Button key={`party-${c.id}`} plain label={`${ids.includes(c.id) ? '✓' : '·'} ${c.name} · L${c.level} · energy ${Math.floor(c.energy)}`} onPress={() => { partySelection = ids.includes(c.id) ? ids.filter(id => id !== c.id) : [...ids, c.id]; $.ui.invalidate('ui.render') }} />)}
+        <Text>Gear · one of each per party, consumed when sent</Text>
+        {SHOP.filter(i => i.kind === 'gear' && (home.gear[i.id] ?? 0) > 0).map(i => <Button key={`gear-${i.id}`} plain label={`${gear.includes(i.id) ? '✓' : '·'} ${i.name} (${home.gear[i.id]}) · ${i.text}`} onPress={() => { gearSelection = gear.includes(i.id) ? gear.filter(id => id !== i.id) : [...gear, i.id]; $.ui.invalidate('ui.render') }} />)}
+        <Text bold>Trails</Text>
+        {EXPEDITIONS.map((e, i) => {
+          const check = canSend(home, e.id, ids, now)
+          return <Box flexDirection="column">
+            <Button key={`expedition-${e.id}`} plain label={`${selected.id === e.id ? '▸' : '·'} ${e.label} · ${e.minutes}m · ${e.cost.coins}c + ${e.cost.energy} energy/cat · L${e.minLevel} · party ${e.party.join('–')}`} onPress={() => { expeditionChoice = i; $.ui.invalidate('ui.render') }} />
+            <Text color={check.ok ? tone.muted : tone.warn}>{check.ok ? e.blurb : check.reason} · Finds: {Object.keys(e.loot.materials).join(', ')} · {e.loot.rolls.join('–')} rolls/cat · {e.loot.coins.join('–')} × coin rate · critters{e.loot.rare ? ` · rare ${e.loot.rare.item}` : ''}</Text>
+          </Box>
+        })}
+        <Button key="expedition-send" plain hotkey="d" label={`Send to ${selected.label}`} onPress={() => departure($, selected.id, ids, gear)} />
+        <Text italic color={tone.log}>{home.log}</Text>
+      </Box>
+    }
+
     if (view === 'miles') {
       const tasks = tasksFor(now)
       const counts = home.miles.day === dayOf(now) ? home.miles.counts : {}
@@ -877,6 +1103,14 @@ export const register: Register = (on, options) => {
               {done.includes(t.id) ? '✓' : '·'} {t.text} ({Math.min(counts[t.counter] ?? 0, t.goal)}/{t.goal}) · {t.miles} miles
             </Text>
           ))}
+          <Text bold color={tone.accent}>Quest chains · two a day</Text>
+          {questsFor(now).map(q => {
+            const state = questState(home, now), p = state.progress[q.id] ?? { step: 0, count: 0 }, step = q.steps[p.step]
+            return <Box flexDirection="column">
+              <Text>{q.label} · {state.claimed.includes(q.id) ? 'claimed ✓' : step ? `${step.text} (${p.count}/${step.goal}) · step ${p.step + 1}/${q.steps.length}` : 'Ready to claim!'}</Text>
+              {!step && !state.claimed.includes(q.id) && <Button key={`quest-${q.id}`} plain label={`Claim ${q.label}`} onPress={() => change($, (h, t) => claimQuest(h, q.id, t))} />}
+            </Box>
+          })}
           <Text bold color={tone.accent}>
             Achievements {Object.keys(home.achievements).length}/{ACHIEVEMENTS.length}
           </Text>
@@ -922,6 +1156,12 @@ export const register: Register = (on, options) => {
               </Box>
             )
           })}
+          <Text bold color={tone.accent}>Bonds</Text>
+          {Object.entries(home.bonds).map(([key, b]) => <Text>{key.split('|').map(id => home.cats.find(c => c.id === id)?.name ?? id).join(' + ')} · {levelName(b.points)} · {b.points} points · today {b.day === day ? b.today : 0}/10</Text>)}
+          {activeEvents(now).some(e => e.kind === 'exchange') && <Box flexDirection="column">
+            <Text bold>December gift exchange</Text>
+            {[...catsAtHome(home).filter(c => c.id !== cat.id), ...home.visitors].map(c => <Button key={`exchange-${c.id}`} plain label={`Exchange with ${c.name}`} onPress={() => change($, (h, t) => exchange(h, activeCat(h).id, c.id, t, Math.random))} />)}
+          </Box>}
           <Text bold color={tone.accent}>Give {cat.name} a gift (once a day; favorites count more)</Text>
           <Box flexDirection="column">
             {GIFTS.map(g => (
@@ -979,6 +1219,13 @@ export const register: Register = (on, options) => {
               label={`${home.owned.includes(item.id) ? '✓' : ' '} ${item.name} · ${item.price}c · ${item.slot} · ${item.perk}`}
               onPress={() => change($, (prev, t) => buyItem(prev, item.id, t, hourOf(t)))} />
           ))}
+          <Text bold color={tone.accent}>Pip’s Curio shop · always open</Text>
+          <Text>Materials: {Object.entries(home.materials).map(([id, n]) => `${id} ${n}`).join(' · ') || 'send a party to Garden Patrol'}</Text>
+          {SHOP.filter(i => i.shop === 'curio').map(i => {
+            const check = canCraft(home, i.id)
+            return <Button key={`craft-${i.id}`} plain label={`${i.name} · ${costText(i.cost)} · ${i.text}${check.ok ? '' : ` · ${check.reason}`}`} onPress={() => change($, (h, t) => craft(h, i.id, t))} />
+          })}
+          {(home.gear['catnip-tea'] ?? 0) > 0 && <Button key="drink-tea" plain label={`Drink catnip tea (${home.gear['catnip-tea']})`} onPress={() => change($, h => drinkTea(h, activeCat(h).id))} />}
           <Text bold color={tone.accent}>Catnip market · it's {seasonOf(new Date(now).getMonth() + 1)}</Text>
           {(() => {
             const market = marketNow(now, hour, isOpen)
@@ -1129,11 +1376,11 @@ export const register: Register = (on, options) => {
     const width = Math.min(e.props.bodyColumns, RUN_MAX_COLS)
     if ('Raster' in ui && latest && width >= 30 && e.props.maxRows >= RUN_ROWS) {
       band = { id: e.requestId, cols: width, mode: 'raster' }
-      const run = { cat: activeCat(latest), flavor: flavorAt(now), tick: frame, x: runX, cols: width, isSprint: frame < sprintUntil }
+      const run = { cat: activeCat(latest), flavor: flavorAt(now), tick: frame, x: runX, cols: width, isSprint: frame < sprintUntil, isAway: !catsAtHome(latest).length }
       return <ui.Raster key={RUNNER} columns={width} rows={RUN_ROWS} cells={runFrame(run)} />
     }
     band.mode = 'text'
-    return <ui.Text color={uiTokens(flavorAt(now)).accent}>{walkFrame(frame, e.props.bodyColumns)}</ui.Text>
+    return <ui.Text color={uiTokens(flavorAt(now)).accent}>{latest && !catsAtHome(latest).length ? '🐾  🐾  🐾 away on a trip' : walkFrame(frame, e.props.bodyColumns)}</ui.Text>
   })
 
   on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {

@@ -42,7 +42,7 @@ const toBase64 = (bytes: Uint8Array) => {
   return out
 }
 
-export type RunInput = { cat: Pick<Cat, 'genes'>; flavor: Flavor; tick: number; x: number; cols: number; isSprint: boolean }
+export type RunInput = { cat: Pick<Cat, 'genes'>; flavor: Flavor; tick: number; x: number; cols: number; isSprint: boolean; isAway?: boolean }
 
 // Where the cat is next frame: it runs right and wraps once it reaches the fish.
 export const nextX = (x: number, cols: number, isSprint: boolean): number => {
@@ -52,13 +52,20 @@ export const nextX = (x: number, cols: number, isSprint: boolean): number => {
 }
 
 // The grid as pixels (NONE = see-through), so tests can read a frame without decoding cells.
-export const runPixels = ({ cat, flavor: f, tick, x, cols, isSprint }: RunInput): Uint32Array => {
+export const runPixels = ({ cat, flavor: f, tick, x, cols, isSprint, isAway }: RunInput): Uint32Array => {
   const px = new Uint32Array(cols * H).fill(NONE)
   const put = (a: number, b: number, c: number) => {
     if (a >= 0 && a < cols && b >= 0 && b < H) px[b * cols + a] = c
   }
   for (let i = 0; i < cols; i++) if ((i + 1) % 4 < 2) put(i, GROUND, f.surface2)
 
+  if (isAway) {
+    for (let step = 0; step < cols; step += 12) {
+      const x = (step + tick) % cols, y = step % 24 ? 5 : 3
+      for (const [dx, dy] of [[0, 0], [2, 0], [1, 2], [2, 2], [1, 3]]) put(x + dx!, y + dy!, f.mauve)
+    }
+    return px
+  }
   const ox = x + 3
   const frame = FRAMES[tick % FRAMES.length] as (typeof FRAMES)[number]
   const oy = frame.isAir ? 2 : 3

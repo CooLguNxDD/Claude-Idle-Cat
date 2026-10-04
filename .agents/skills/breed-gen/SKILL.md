@@ -1,6 +1,6 @@
 ---
 name: breed-gen
-description: Add a new cat breed (a coat with its colours, pattern and rarity) to Codex Idle Cat as one data file. Use when asked for a new breed, coat, fur colour or cat pattern, including "cat bleed".
+description: Add a new cat breed (a coat with its colours, pattern and rarity) to Claude Idle Cat as one data file. Use when asked for a new breed, coat, fur colour or cat pattern, including "cat bleed".
 ---
 
 # breed-gen: add a breed (coat)
@@ -49,7 +49,7 @@ node tools/build-web.mjs                            # the arcade draws coats too
 
 Open the PNG. The coat must read against both the light latte row and the dark mocha row, and markings (socks, blaze, mask, spots) must still show. Adjust shades and re-render until it does.
 
-Then the checks from `AGENTS.md`. `breeds.test.ts` validates every breed and keeps the 18 original coats first. Seasonal RNG tests must use a fixed timestamp inside the availability window; also prove exclusion outside it and retention in backups. Adding a breed to a rarity tier changes which coat a given seed rolls in that tier; if a test pinned a specific seeded coat, update that expectation and say so.
+Then the checks from `CLAUDE.md`. `breeds.test.ts` validates every breed and keeps the 18 original coats first. Seasonal RNG tests must use a fixed timestamp inside the availability window; also prove exclusion outside it and retention in backups. Adding a breed to a rarity tier changes which coat a given seed rolls in that tier; if a test pinned a specific seeded coat, update that expectation and say so.
 
 Update the README coat count ("one of N coats") if it names one.
 

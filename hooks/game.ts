@@ -1,3 +1,5 @@
+import { normalizeProgression } from './progression-save'
+import { catsAtHome, isAway } from './away'
 import type { Cat, EffectKind, Genes, Home, Slot } from '../types'
 import { RARITIES, rarityOf } from './adoption/registry'
 import { emptyShelter, normalizeShelter } from './adoption/state'
@@ -68,6 +70,8 @@ export const newHome = (now: number, cat: Cat = newCat('c1', 'Mochi', GINGER, no
   celebrated: [], catnip: { week: 0, qty: 0, paid: 0 }, arcade: { day: 0, plays: {}, best: {}, golds: 0, open: null },
   rev: 0, prefs: { glow: true, crt: false }, weather: emptyWeather(), shelter: emptyShelter(),
   world: { id: 'backyard' },
+  expeditions: { runs: [], done: {}, inbox: [] }, materials: {}, gear: {}, bonds: {},
+  quests: { day: 0, progress: {}, claimed: [] }, exchanges: { day: 0, pairs: [], visitors: [] },
 })
 
 type OldUpgrades = Partial<{ feeder: number; toy: number; bed: number }>
@@ -101,7 +105,7 @@ export const migrate = (saved: unknown, now: number): Home => {
     const home = saved as Home
     // A round left open by a closed session is dropped (its energy stays spent).
     return { ...base, ...home, cats: home.cats.map(normalizeCat), arcade: { ...base.arcade, ...home.arcade, open: null },
-      weather: normalizeWeather(home.weather, now), shelter: normalizeShelter(home.shelter, home.cats) }
+      weather: normalizeWeather(home.weather, now), shelter: normalizeShelter(home.shelter, home.cats), ...normalizeProgression(home, home.cats) }
   }
   if (version === 2) {
     const { upgrades, maxCats: _old, ...v2 } = saved as V2Home & { maxCats?: number }
@@ -122,7 +126,11 @@ export const migrate = (saved: unknown, now: number): Home => {
   }
 }
 
-export const activeCat = (home: Home): Cat => home.cats.find(c => c.id === home.activeId) ?? (home.cats[0] as Cat)
+// Falls back to the first cat at home; all-away households retain a read-only display cat.
+export const activeCat = (home: Home): Cat => {
+  const here = catsAtHome(home)
+  return here.find(c => c.id === home.activeId) ?? here[0] ?? home.cats[0]!
+}
 const withCat = (home: Home, id: string, fn: (cat: Cat) => Cat): Home =>
   ({ ...home, cats: home.cats.map(c => (c.id === id ? fn(c) : c)) })
 
@@ -134,7 +142,7 @@ export const adoptPrice = (home: Home) => 100 * home.cats.length
 export const catRate = (home: Home, cat: Cat) =>
   cat.level * modsOf(cat).coin * homeMods(home).coin * (cat.hunger < 35 ? 0.75 : 1) *
   (cat.isAsleep ? modsOf(cat).sleepCoin : 1)
-export const coinRate = (home: Home) => home.cats.reduce((sum, cat) => sum + catRate(home, cat), 0)
+export const coinRate = (home: Home) => catsAtHome(home).reduce((sum, cat) => sum + catRate(home, cat), 0)
 export const idleRate = (home: Home) => coinRate(home) * IDLE_SHARE
 export const toolPay = (home: Home) => coinRate(home) * TOOL_MINUTES
 // A tool call pays toolPay with probability TOOL_CHANCE, else nothing.
@@ -188,22 +196,24 @@ export const tick = (home: Home, now: number, rng: Rng = Math.random): Home => t
 export const tickTally = (home: Home, now: number, rng: Rng = Math.random): { home: Home; deducted: number } => {
   const cap = MAX_AFK_MS + Math.max(...home.cats.map(c => modsOf(c).offlineHours)) * 60 * MINUTE
   const min = Math.min(Math.max(0, now - home.lastTick), cap) / MINUTE
-  const income = idleRate(home) * min
+  const here = catsAtHome(home), hereIds = new Set(here.map(c => c.id))
+  const income = here.reduce((sum, cat) => sum + catRate(home, cat), 0) * IDLE_SHARE * min
   let next: Home = repayFromIncome({
     ...home,
-    cats: home.cats.map(cat => tickCat(home, cat, min)),
+    cats: home.cats.map(cat => hereIds.has(cat.id) ? tickCat(home, cat, min) : cat),
     coins: home.coins + income,
     lastTick: now,
     frame: home.frame + 1,
   }, income)
   let deducted = home.loan - next.loan
   const deco = homeMods(home)
+  const ticked = new Map(next.cats.map(c => [c.id, c]))
   for (const cat of home.cats) {
-    const woke = cat.isAsleep && !next.cats.find(c => c.id === cat.id)?.isAsleep
+    const woke = cat.isAsleep && !ticked.get(cat.id)?.isAsleep
     if (woke) next.log = `${cat.name} wakes up fully rested.`
   }
   if (deco.autoFeed) {
-    for (const cat of next.cats) {
+    for (const cat of next.cats.filter(c => hereIds.has(c.id))) {
       if (cat.hunger < 40 && next.coins >= 5) {
         deducted += 5
         next = withCat({ ...next, coins: next.coins - 5, effect: fx('fish', now),
@@ -211,18 +221,18 @@ export const tickTally = (home: Home, now: number, rng: Rng = Math.random): { ho
       }
     }
   }
-  const finder = pick(rng, home.cats)
-  const events = Math.floor(min * EVENTS_PER_MIN * modsOf(finder).eventRate * deco.eventRate + rng())
-  if (events > 0) {
+  const finder = here.length ? pick(rng, here) : null
+  const events = finder ? Math.floor(min * EVENTS_PER_MIN * modsOf(finder).eventRate * deco.eventRate + rng()) : 0
+  if (events > 0 && finder) {
     const gift = Math.round(5 * finder.level * events * modsOf(finder).gift * deco.gift)
     next = { ...next, coins: next.coins + gift, effect: fx('coins', now),
       log: `${finder.name} ${pick(rng, AFK_EVENTS)}! +${gift}c` }
   }
   const date = new Date(now)
-  const found = findCritters(home, min, date.getMonth() + 1, date.getHours(), rng, home.cats.map(c => modsOf(c).eventRate))
+  const found = findCritters(home, min, date.getMonth() + 1, date.getHours(), rng, here.map(c => modsOf(c).eventRate))
   if (found.length > 0) {
     const names = found.map(id => critter(id)?.name ?? id)
-    const who = pick(rng, home.cats).name
+    const who = pick(rng, here).name
     next = track({ ...addToPocket(next, found), effect: fx('catch', now),
       log: found.length === 1 ? `${who} brought home a ${names[0]}!` : `The cats brought home ${found.length} critters!` },
     'catch', found.length, now)
@@ -243,6 +253,7 @@ export const checkIn = (home: Home, now: number): { home: Home; bonus: number } 
 
 // Feed, play, pet or nap the active cat; each one counts toward today's Paw Miles.
 export const act = (home: Home, action: Action, now: number): Home => {
+  if (!catsAtHome(home).length) return { ...home, log: 'All cats are away on expeditions.' }
   const done = care(home, action, now)
   // Only a successful action sets a new effect.
   return action !== 'nap' && done.effect !== home.effect ? track(done, action as Counter, 1, now) : done
@@ -302,12 +313,16 @@ export const adoptVisitor = (home: Home, visitorId: string, now: number): Home =
 export const switchTo = (home: Home, nameOrId: string): Home => {
   const key = nameOrId.toLowerCase()
   const cat = home.cats.find(c => c.id === nameOrId || c.name.toLowerCase() === key)
+  if (cat && isAway(home, cat.id)) return { ...home, log: `${cat.name} is away on an expedition.` }
   return cat ? { ...home, activeId: cat.id, log: `${cat.name} is front and centre.` }
     : { ...home, log: `No cat named ${nameOrId}.` }
 }
 
 // Cycles the active cat through the household in adoption order.
 export const nextCat = (home: Home): Home => {
+  const here = catsAtHome(home)
+  if (!here.length) return { ...home, log: 'All cats are away on expeditions.' }
+  if (here.length !== home.cats.length) return switchTo(home, here[(here.findIndex(c => c.id === activeCat(home).id) + 1) % here.length]!.id)
   if (home.cats.length < 2) return { ...home, log: `${activeCat(home).name} is the only cat here. Adopt (a) a friend!` }
   const at = home.cats.findIndex(c => c.id === home.activeId)
   return switchTo(home, home.cats[(at + 1) % home.cats.length]!.id)
@@ -321,6 +336,7 @@ export const rename = (home: Home, name: string): Home => {
 
 // Spends one of the active cat's skill points.
 export const learnSkill = (home: Home, id: string): Home => {
+  if (!catsAtHome(home).length) return { ...home, log: 'All cats are away on expeditions.' }
   const cat = activeCat(home)
   const check = canLearn(cat, id)
   if (!check.ok) return { ...home, log: `Can't learn that: ${check.reason}.` }
@@ -341,6 +357,7 @@ export const respec = (home: Home, now: number): Home => {
 
 // One gift a day per cat, bought on the spot; favorites count much more.
 export const giveGift = (home: Home, giftId: string, now: number): Home => {
+  if (!catsAtHome(home).length) return { ...home, log: 'All cats are away on expeditions.' }
   const gift = giftById(giftId)
   const cat = activeCat(home)
   if (!gift) return { ...home, log: 'No such gift.' }
@@ -379,9 +396,10 @@ export const welcomeBack = (before: Home, after: Home, now: number): Home => {
 }
 
 // Claude's work tips the household; xp goes to the active cat.
-export const reward = (home: Home, coins: number, xp = 0, now = home.lastTick): Home => {
+export const reward = (home: Home, coins: number, xp = 0, now = home.lastTick, catId?: string): Home => {
   const paid = { ...home, coins: home.coins + coins }
-  return xp > 0 ? gainXp(paid, home.activeId, xp, now) : paid
+  const target = catId ?? (catsAtHome(home).length ? activeCat(home).id : undefined)
+  return xp > 0 && target ? gainXp(paid, target, xp, now) : paid
 }
 
 export const moodOf = (cat: Cat): Mood => {

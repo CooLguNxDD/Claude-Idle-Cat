@@ -1,6 +1,6 @@
 ---
 name: cat-gen
-description: Create a named cat character (fixed genes, bio, catchphrase) for Codex Idle Cat that visits the yard as a rare stray and can be adopted. Use when asked to generate, design or add a specific cat, character or NPC.
+description: Create a named cat character (fixed genes, bio, catchphrase) for Claude Idle Cat that visits the yard as a rare stray and can be adopted. Use when asked to generate, design or add a specific cat, character or NPC.
 ---
 
 # cat-gen: add a named cat
@@ -42,7 +42,7 @@ node tools/build-content.mjs
 node tools/preview.mjs cat <id> --out <scratch>   # the cat's 4x portrait in every flavor
 ```
 
-Open the PNG and check the look matches the description. Then the checks from `AGENTS.md` (`Codex plugin validate .`, both `tsc` runs, `Codex plugin test .`, `node --test server/arcade.test.mjs`, `node tools/build-content.mjs --check`) and `node tools/build-web.mjs`. `hooks/content/cats.test.ts` validates every named cat against the coat and world registries. Sample each eligible world at a fixed in-season date, prove exclusion elsewhere and outside its window, and prevent duplicate household/visitor names.
+Open the PNG and check the look matches the description. Then the checks from `CLAUDE.md` (`claude plugin validate .`, both `tsc` runs, `claude plugin test .`, `node --test server/arcade.test.mjs`, `node tools/build-content.mjs --check`) and `node tools/build-web.mjs`. `hooks/content/cats.test.ts` validates every named cat against the coat and world registries. Sample each eligible world at a fixed in-season date, prove exclusion elsewhere and outside its window, and prevent duplicate household/visitor names.
 
 ## 4. Commit
 

@@ -1,6 +1,6 @@
 import type { Coat, Genes, Marking, Rarity, Silhouette } from '../../types'
 import type { ColorName } from '../theme'
-import { BREEDS } from '../content'
+import { BREEDS } from '../content/breed-registry'
 import type { Breed } from '../content/types'
 import { isContentAvailable } from '../content/availability'
 import { pick, weighted } from '../rng'

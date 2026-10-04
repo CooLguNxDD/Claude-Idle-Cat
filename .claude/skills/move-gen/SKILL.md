@@ -12,7 +12,7 @@ A move is one file in `hooks/content/moves/<id>.ts`. The planner in `hooks/motio
 From the request, decide:
 
 - **id**: lowercase kebab-case, unique among `hooks/content/moves/*.ts`.
-- **pose**: one of `sit`, `walk`, `run`, `loaf`, `sleep`, `groom`, `stretch`, `crouch` (see `POSE_KINDS` in `hooks/content/types.ts`). Pick the closest; a pose the renderers lack is a code change, so ask before adding one.
+- **pose**: one of `sit`, `walk`, `run`, `loaf`, `sleep`, `groom`, `stretch`, `crouch`, `knead`, `spin`, `arch` (see `POSE_KINDS` in `hooks/content/types.ts`). Pick the closest; a pose the renderers lack is a code change, so ask before adding one.
 - **feel**: travel speed, bounce, how long it lasts, when it happens.
 
 ## 2. Write the file
@@ -30,6 +30,8 @@ export default defineMove({
 })
 ```
 
+Stop and ask if the request needs a new engine concept: pose, signal, spacing, counter, effect key, event kind or landmark. Existing authorization for an engine change still applies.
+
 Rules, which `moveProblems` checks:
 
 - `cycle` is 1 to 32 frames at 8 fps; `lift` needs exactly `cycle` values between -12 and 4.
@@ -38,7 +40,8 @@ Rules, which `moveProblems` checks:
 - `when.moods` uses `happy`, `ok`, `grumpy`, `sleeping`. No moods means any waking mood; only a move that lists `sleeping` runs during a nap.
 - `when.personality` multiplies `weight` for `lazy`, `playful`, `greedy`, `shy`, `cuddly`, `curious`.
 - `when.hours` is `[from, to]` in local hours and may wrap past midnight (`[18, 6]`).
-- `next` names existing move ids only. `seek` is `tower`, `tunnel` or `pipe` (perch heights live in `LANDMARK_PERCH`).
+- `isScripted: true` excludes the move from random planning; reactions and interactions use `forceMove`. `turn` flips facing every 1–cycle frames. `prop: 'cup'` requires `seek: 'shelf'`.
+- `next` names existing move ids only. `seek` is `tower`, `tunnel`, `pipe`, `window` or `shelf` (perch heights live in `LANDMARK_PERCH`).
 - Hunger below 50 sends any `walk`-pose move to the bowl, and energy below 40 sends it to the bed. Keep that in mind when naming a walk.
 
 ## 3. Register, look, test
@@ -59,10 +62,11 @@ npx -y -p typescript tsc -p web
 claude plugin test .              # motion.test.ts checks every move is valid and reachable
 node --test server/arcade.test.mjs
 node tools/build-content.mjs --check
+node --test tools/content.test.mjs # checks generator mirrors and registry ordering
 node tools/build-web.mjs          # moves ride in the arcade bundle through the content barrel; commit server/public/arcade.js
 ```
 
-`motion.test.ts` asserts the planner can reach every move across moods, personalities and hours. If your move is unreachable, widen `when` rather than editing the test.
+`motion.test.ts` asserts the planner can reach every non-scripted move across moods, personalities and hours. If your move is unreachable, widen `when` rather than editing the test.
 
 ## 4. Commit
 

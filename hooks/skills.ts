@@ -1,3 +1,4 @@
+import { SKILL_FILES } from './content'
 import type { Cat } from '../types'
 
 export type Branch = 'hunter' | 'cuddler' | 'dreamer'
@@ -7,8 +8,10 @@ export const FORM_LEVEL = 10
 export type SkillEffect = Partial<{
   coin: number; eventRate: number; gift: number; petJoy: number; playJoy: number; xp: number
   joyDecay: number; regen: number; energyDecay: number; offlineHours: number; sleepCoin: number
+  expTime: number; matRolls: number; rareOdds: number; bond: number; party: number
+  expOffline: number; stardust: number; harmony: number; oracle: number
 }>
-export type Skill = { id: string; branch: Branch; name: string; maxRank: number; needs?: string; perk: string; per: SkillEffect }
+export type Skill = { id: string; branch: Branch; name: string; maxRank: number; needs?: string; perk: string; per: SkillEffect; minLevel?: number }
 
 export const BRANCHES: Record<Branch, { title: string; form: Form; blurb: string }> = {
   hunter: { title: 'Hunter', form: 'ninja', blurb: 'coins, AFK finds and gifts' },
@@ -17,20 +20,7 @@ export const BRANCHES: Record<Branch, { title: string; form: Form; blurb: string
 }
 
 // Each rank multiplies by `1 + per` (or adds, for offlineHours).
-export const SKILLS: readonly Skill[] = [
-  { id: 'claws', branch: 'hunter', name: 'Sharp Claws', maxRank: 3, perk: '+20% coins', per: { coin: 0.2 } },
-  { id: 'nose', branch: 'hunter', name: 'Keen Nose', maxRank: 1, needs: 'claws', perk: '+50% AFK events', per: { eventRate: 0.5 } },
-  { id: 'prowl', branch: 'hunter', name: 'Night Prowl', maxRank: 1, needs: 'nose', perk: '+50% gift size', per: { gift: 0.5 } },
-  { id: 'apex', branch: 'hunter', name: 'Apex Pounce', maxRank: 1, needs: 'prowl', perk: '+50% coins', per: { coin: 0.5 } },
-  { id: 'paws', branch: 'cuddler', name: 'Soft Paws', maxRank: 3, perk: '+50% joy from Pet', per: { petJoy: 0.5 } },
-  { id: 'purr', branch: 'cuddler', name: 'Purr Engine', maxRank: 1, needs: 'paws', perk: '+50% xp', per: { xp: 0.5 } },
-  { id: 'charm', branch: 'cuddler', name: 'Charm', maxRank: 1, needs: 'purr', perk: 'joy fades 30% slower', per: { joyDecay: -0.3 } },
-  { id: 'beloved', branch: 'cuddler', name: 'Beloved', maxRank: 1, needs: 'charm', perk: 'double xp, +50% Play joy', per: { xp: 1, playJoy: 0.5 } },
-  { id: 'catnap', branch: 'dreamer', name: 'Catnap', maxRank: 3, perk: '+50% sleep regen', per: { regen: 0.5 } },
-  { id: 'deep', branch: 'dreamer', name: 'Deep Sleep', maxRank: 1, needs: 'catnap', perk: 'energy fades 30% slower', per: { energyDecay: -0.3 } },
-  { id: 'walk', branch: 'dreamer', name: 'Dream Walk', maxRank: 1, needs: 'deep', perk: '+4h counted while away', per: { offlineHours: 4 } },
-  { id: 'lucid', branch: 'dreamer', name: 'Lucid Dream', maxRank: 1, needs: 'walk', perk: '+100% coins while asleep', per: { sleepCoin: 1 } },
-]
+export const SKILLS = SKILL_FILES
 const BY_ID = new Map(SKILLS.map(s => [s.id, s]))
 
 export const rankOf = (cat: Cat, id: string) => cat.skills[id] ?? 0
@@ -43,6 +33,7 @@ export type LearnCheck = { ok: true } | { ok: false; reason: string }
 export const canLearn = (cat: Cat, id: string): LearnCheck => {
   const skill = BY_ID.get(id)
   if (!skill) return { ok: false, reason: 'no such skill' }
+  if (cat.level < (skill.minLevel ?? 1)) return { ok: false, reason: `needs level ${skill.minLevel}` }
   if (rankOf(cat, id) >= skill.maxRank) return { ok: false, reason: 'maxed' }
   if (skill.needs && rankOf(cat, skill.needs) === 0) {
     return { ok: false, reason: `needs ${BY_ID.get(skill.needs)?.name ?? skill.needs}` }
@@ -69,12 +60,13 @@ export const formOf = (cat: Cat): Form | null => {
 export type SkillTotals = Required<SkillEffect>
 export const skillTotals = (cat: Cat): SkillTotals => {
   const t: SkillTotals = { coin: 1, eventRate: 1, gift: 1, petJoy: 1, playJoy: 1, xp: 1, joyDecay: 1, regen: 1,
-    energyDecay: 1, offlineHours: 0, sleepCoin: 1 }
+    energyDecay: 1, offlineHours: 0, sleepCoin: 1, expTime: 1, matRolls: 0, rareOdds: 0, bond: 1, party: 0,
+    expOffline: 1, stardust: 0, harmony: 0, oracle: 0 }
   for (const skill of SKILLS) {
     const rank = rankOf(cat, skill.id)
     if (rank === 0) continue
     for (const [key, per] of Object.entries(skill.per) as [keyof SkillTotals, number][]) {
-      if (key === 'offlineHours') t.offlineHours += per * rank
+      if (['offlineHours', 'matRolls', 'rareOdds', 'party', 'stardust', 'harmony', 'oracle'].includes(key)) t[key] += per * rank
       else t[key] *= 1 + per * rank
     }
   }

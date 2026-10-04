@@ -46,7 +46,7 @@ On this machine `~/.claude/settings.json` sets `env.CLAUDE_CODE_PLUGIN_DIRS` to 
 - A breed's optional `available: { months: [10] }` and a named cat's `appears.available` use the local calendar through `hooks/content/availability.ts`; month numbers run from 1 to 12. Missing metadata means year-round. `rollCoat(rng, now)` and `rollGenes(rng, now)` require a timestamp; apply eligibility only to new arrivals, never existing cats or imports. Every rarity must retain a year-round coat. Full palette uses `YEAR_ROUND_COATS` and keeps its legacy achievement id.
 - The registries contain 28 breeds (27 year-round), six worlds and six named cats. Ghost and Boo are October-only arrivals; existing ghost visitors retain their normal stay and adoption eligibility.
 - The `breed-gen`, `cat-gen`, `move-gen` and `world-gen` skills in `.claude/skills/` write these files; keep them in step when a spec changes.
-- After adding or removing a content file run `node tools/build-content.mjs`; it rewrites `index.ts`, keeps existing entries in place and appends new ones, so seeded rolls stay stable.
+- The builder also generates `breed-registry.ts` from the same pinned breed order; browser sprite imports use this isolated registry. After adding or removing a content file run `node tools/build-content.mjs`; it rewrites `index.ts`, keeps existing entries in place and appends new ones, so seeded rolls stay stable.
 - `node tools/preview.mjs breed <id>` writes a portrait sheet PNG (rows are flavors); `move <id>` writes one cycle of frames. Look before committing.
 - Breeds are drawn in the browser too: rebuild `server/public/arcade.js` after changing one. An unknown coat paints as `FALLBACK_BREED`, so removing a file never breaks a save.
 
@@ -98,3 +98,23 @@ claude plugin tag --push
 - Name booleans `is*`/`has*`. Files use LF line endings (`.gitattributes`).
 - Use Conventional Commits with a scope, such as `feat(arcade): …` or `fix(saves): …`.
 - Add a README row whenever you add a command, key or game.
+
+## Content modules v2
+
+The append-only barrel has thirteen registries: breeds (28), moves (22), worlds (6), named cats (6), reactions (5), interactions (5), expeditions (7), quests (6), events (2), skills (21), furniture (29), shop (17), materials (7). Each item is one file. New kinds use schemas and `*Problems()` validators in `hooks/content/progression.ts`, re-exported from `types.ts`. `hooks/content/registries.test.ts` validates every file and reference.
+
+`SKILLS`, `CATALOG`, and `MILES_SHOP` retain their legacy module exports. The first barrel was seeded in the exact old 12-skill, 24-furniture and four-shop order; never sort existing imports. `legacy-fixture.ts` captures the 40-day stock sequence and old skill totals from f199b33. Nyan excludes cost/tier-gated Curio furniture, so appending the late pack preserves stock.
+
+Save version remains 3. `newHome` defaults `bonds`, `quests`, `expeditions`, `materials`, `gear`, and `exchanges`; old v3 saves inherit these through `migrate`. `normalizeProgression` repairs malformed containers and finite counts, drops invalid/duplicate party runs, and preserves valid frozen loot and inbox receipts. Each run stores its seed, frozen loot, wall-clock end, XP and bond reward. Cats remain reserved until claim, including offline completed runs. Ready runs populate the inbox without auto-claim; its receipts suppress return notifications across reloads. `exchanges` persists pair/visitor daily receipts. `expeditions.done` includes lifetime `material:<id>` totals for achievements.
+
+Pure engines: `reactions.ts` + `reactions/signals.ts`, `pair.ts`, `expeditions.ts`, `quests.ts`, `events.ts`, `shop.ts`, and `away.ts`. Motion, pair actors and reaction cooldowns remain in memory. Window/shelf landmarks and knead/spin/arch poses are rendered in both scene paths; shelf cups fall cosmetically. Late furniture supplies semantic art rows in its own data file.
+
+`expTime`, `matRolls`, `rareOdds`, `bond`, `party`, `expOffline`, `stardust`, `harmony`, and `oracle` extend skill effects; additive effects start at zero. Furniture expedition multipliers use capped per-item values. Coin loot is capped at 240 coin-rate minutes at departure; duration remains 10–720 minutes after all bonuses.
+
+All thirteen generator skills are byte-identical under `.claude/skills/` and `.agents/skills/`. Run `node --test tools/content.test.mjs` for mirrors and builder order. Preview supports `interaction <id>` and `furniture <id>` alongside existing kinds. The Expeditions Client keyboard row posts only left/right/return keys to `register.tsx`; all mutations still pass through `change()`.
+
+## Settings menu
+
+`/cat settings` and the Settings tab (`v`) expose every `afk-cat.*` config row from `$.config.list()`, including sound and a preview. Keep namespaced config keys. Host-managed rows show their locked state; denied writes leave runtime values intact. Plugin-origin writes skip the plugin's own hooks, so `setSetting` applies the accepted result explicitly; external `config.set` changes use the shared `applySetting`. World, weather and arcade display preferences still persist through `change()` in the Home save.
+
+Review fixes are recorded in `docs/content-v2-review-fixes.md`. Reactions are best-effort around real tool/turn results. A long test may nap at 20 seconds and celebrate on completion. World expedition gates require the current yard; changing worlds preserves in-flight runs. Unlock validators check achievement ids and map grant tokens, and Miles listings accept only a positive Miles cost. String config rows use the Settings menu’s explicit choice lists when the host does not provide options.

@@ -67,8 +67,8 @@ export const breedProblems = (b: Breed): string[] => [
 ]
 
 /** Body poses the cat renderers know; a move picks one and adds travel and lift. */
-export type PoseKind = 'sit' | 'walk' | 'run' | 'loaf' | 'sleep' | 'groom' | 'stretch' | 'crouch'
-export const POSE_KINDS: readonly PoseKind[] = ['sit', 'walk', 'run', 'loaf', 'sleep', 'groom', 'stretch', 'crouch']
+export type PoseKind = 'sit' | 'walk' | 'run' | 'loaf' | 'sleep' | 'groom' | 'stretch' | 'crouch' | 'knead' | 'spin' | 'arch'
+export const POSE_KINDS: readonly PoseKind[] = ['sit', 'walk', 'run', 'loaf', 'sleep', 'groom', 'stretch', 'crouch', 'knead', 'spin', 'arch']
 
 export type Move = {
   id: string
@@ -86,6 +86,9 @@ export type Move = {
   next?: readonly string[]
   /** Walks to this landmark first, then perches on it or runs through it; skipped where the yard has none. */
   seek?: LandmarkKind
+  isScripted?: boolean
+  turn?: number
+  prop?: 'cup'
 }
 
 export const defineMove = (move: Move): Move => move
@@ -103,6 +106,8 @@ export const moveProblems = (m: Move, all: readonly Move[]): string[] => [
   ...(m.when.hours && !m.when.hours.every(h => Number.isInteger(h) && h >= 0 && h <= 24) ? [`${m.id}: hours are 0 to 24`] : []),
   ...(m.next ?? []).filter(id => !all.some(o => o.id === id)).map(id => `${m.id}: next names unknown move ${id}`),
   ...(m.seek && !LANDMARK_KINDS.includes(m.seek) ? [`${m.id}: unknown landmark ${m.seek}`] : []),
+  ...(m.turn !== undefined && (!Number.isInteger(m.turn) || m.turn < 1 || m.turn > m.cycle) ? [`${m.id}: turn is a frame interval within the cycle`] : []),
+  ...(m.prop && (m.prop !== 'cup' || m.seek !== 'shelf') ? [`${m.id}: cup props seek the shelf`] : []),
   ...(m.seek && m.speed === 0 ? [`${m.id}: a seek move needs a speed to get there`] : []),
 ]
 
@@ -112,11 +117,12 @@ export const LAYER_KINDS: readonly LayerKind[] = ['hills', 'trees', 'rooftops', 
 export type SceneStyle = 'snowy-cabin' | 'neon-alley' | 'space-station' | 'beach-pier'
 export const SCENE_STYLES: readonly SceneStyle[] = ['snowy-cabin', 'neon-alley', 'space-station', 'beach-pier']
 /** Things the cat can visit; each kind's size and perch live in `scene/landmarks.ts`. */
-export type LandmarkKind = 'tower' | 'tunnel' | 'pipe'
-export const LANDMARK_KINDS: readonly LandmarkKind[] = ['tower', 'tunnel', 'pipe']
-export const LANDMARK_WIDTH: Record<LandmarkKind, number> = { tower: 12, tunnel: 22, pipe: 16 }
+export type LandmarkKind = 'tower' | 'tunnel' | 'pipe' | 'window' | 'shelf'
+export const LANDMARK_KINDS: readonly LandmarkKind[] = ['tower', 'tunnel', 'pipe', 'window', 'shelf']
+// Width per landmark kind in design units, used for world boundary and overlap checks.
+export const LANDMARK_WIDTH: Record<LandmarkKind, number> = { tower: 12, tunnel: 22, pipe: 16, window: 14, shelf: 14 }
 /** How far above the floor a cat sits on each landmark, in design units (negative is up); 0 means it runs through. */
-export const LANDMARK_PERCH: Record<LandmarkKind, number> = { tower: -28, tunnel: 0, pipe: -30 }
+export const LANDMARK_PERCH: Record<LandmarkKind, number> = { tower: -28, tunnel: 0, pipe: -30, window: -16, shelf: -20 }
 export const TIER_KEYS = ['cottage', 'house', 'manor'] as const
 
 export type World = {
@@ -190,3 +196,5 @@ export const catProblems = (c: NamedCat, coats: readonly string[], worlds: reado
   ...(c.appears.odds > 0 && c.appears.odds <= 0.25 ? [] : [`${c.id}: appears.odds is above 0 and at most 0.25`]),
   ...(c.appears.worlds ?? []).filter(w => !worlds.includes(w)).map(w => `${c.id}: unknown world ${w}`),
 ]
+
+export * from './progression'

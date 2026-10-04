@@ -93,11 +93,11 @@ export const drawHiCat = (p: Pen, x0: number, y0: number, cat: HiCat, f: Flavor)
   const wave = Math.sin((cat.pose?.phase ?? 0) * Math.PI * 2)
   const reach = Math.sin((cat.pose?.phase ?? 0) * Math.PI)
   // The head leans toward the front (grid -x) when running, dips for crouch, loaf and stretch.
-  const headX = pose === 'run' ? -2 : pose === 'walk' ? -1 : 0
-  const headY = pose === 'loaf' ? 3 : pose === 'crouch' ? 3 : pose === 'stretch' ? Math.round(6 * reach) : pose === 'run' ? 1 : 0
-  const bodyY = pose === 'loaf' || pose === 'crouch' ? 2 : 0
+  const headX = pose === 'run' ? -2 : pose === 'walk' ? -1 : pose === 'spin' ? Math.round(wave * 4) : 0
+  const headY = pose === 'loaf' ? 3 : pose === 'crouch' ? 3 : pose === 'stretch' ? Math.round(6 * reach) : pose === 'run' ? 1 : pose === 'arch' ? -4 : pose === 'knead' ? Math.round(reach * 2) : 0
+  const bodyY = pose === 'loaf' || pose === 'crouch' ? 2 : pose === 'arch' ? -6 : 0
   const bodyW = pose === 'loaf' ? 3 : pose === 'stretch' ? Math.round(4 * reach) : 0
-  const step = pose === 'walk' ? 1.5 : pose === 'run' ? 3 : 0
+  const step = pose === 'walk' ? 1.5 : pose === 'run' ? 3 : pose === 'knead' ? 3 : pose === 'spin' ? 2 : 0
 
   // Back layer: cape, cloud puffs and the tail.
   if (form === 'royal') g.ellipse(28, 42, 24, 11, f.mauve)
@@ -184,6 +184,13 @@ export const drawHiCat = (p: Pen, x0: number, y0: number, cat: HiCat, f: Flavor)
     g.ellipse(28, -10, 2, 2, f.yellow)
   }
   g.shift(0, 0)
+
+  // Kneading paws reach over the chest in alternation, with visible pink pads.
+  if (pose === 'knead') for (const [cx, lift] of [[19, Math.max(0, wave)], [37, Math.max(0, -wave)]]) {
+    const cy = 47 - lift! * 4
+    g.ellipse(cx!, cy, 5, 3, 'f')
+    g.ellipse(cx!, cy + 1, 2.5, 1, 'i')
+  }
 
   // Outline every shape, then shade fur from a top-left light; both widths follow the scale.
   const ink = inkOf(f)

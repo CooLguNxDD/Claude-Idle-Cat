@@ -34,6 +34,12 @@
       "title": "Pane canvas",
       "description": "auto draws the scene as a 4x pixel picture where the terminal shows images (kitty, Ghostty) and as half-block cells elsewhere; image or text forces one",
       "default": "auto"
+    },
+    "reactions": {
+      "type": "string",
+      "title": "Claude reactions",
+      "description": "on animates and shows lines; quiet animates; off disables reactions",
+      "default": "on"
     }
   }
 }
