@@ -11,7 +11,7 @@ One file per bank in `hooks/content/speech/<id>.ts`. Choose a unique lowercase k
 
 Triggers: `idle`, `plan`, `done`, `bowl.empty`, `wake`, `pair.start`, `pair.end`, `pet`, `play`, `fill`, `gift`, `gift.loved`, `levelup`, `weather`, `festival`, `stray`, `catch`, `welcome`, `claude.prompt`, `claude.tool`, `claude.done`, `claude.error`, `test.pass`, `test.fail`.
 
-Tokens, only these: `{name}` `{buddy}` `{food}` `{gift}` `{tool}` `{weather}`. Lines are 1–60 characters, 1–12 per bank. Weight is 0–10. Hours are two different hours from 0 to 23 and may wrap, as moves do. Glyphs are font-safe: `!` `?` `♥` `z` `*`. `role` is only `lead` or `partner`, and only on `pair.start` or `pair.end`.
+Tokens, only these: `{name}` `{buddy}` `{food}` `{gift}` `{tool}` `{weather}` `{bowl}`. `{bowl}` is the placed bowl's name, filled on `done` and `fill`. Lines are 1–60 characters, 1–12 per bank. Weight is 0–10. Hours are two different hours from 0 to 23 and may wrap, as moves do. Glyphs are font-safe: `!` `?` `♥` `z` `*`. `role` is only `lead` or `partner`, and only on `pair.start` or `pair.end`. Optional `when.minBowl` is a whole cap from 4 to 24; the bank is eligible only when the placed bowl's cap is at least that.
 
 `about` ids must exist for `plan` and `done` (behaviors) and for `pair.start` and `pair.end` (interactions). Weather, festival, gift and tool banks use `about` as a filter, not a new engine concept.
 
@@ -63,7 +63,7 @@ export default defineSpeech({
 })
 ```
 
-Personality, moods, `minFriend` and `minBond` narrow `when`. Pair banks should name `{buddy}`. Owner and Claude lines stay short enough to read in the pane.
+Personality, moods, `minFriend`, `minBond` and `minBowl` narrow `when`. Pair banks should name `{buddy}`. A fancy-bowl bank can require `minBowl: 14` and say `{bowl}`. Owner and Claude lines stay short enough to read in the pane.
 
 ## 3. Register, look and test
 

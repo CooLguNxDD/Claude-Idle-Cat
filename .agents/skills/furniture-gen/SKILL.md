@@ -22,7 +22,7 @@ export default defineFurniture({
 })
 ```
 
-Pick an existing slot. Whole price is nonnegative; bait 0–10; minTier 3–6. Cost may use known materials (whole amounts 1–1000). Numeric mod caps: coin/regen/eventRate/gift 1–2.5, joyDecay 0.5–1, expTime 0.8–1, bond/matOdds 1–1.5; autoFeed is boolean. Optional art uses rectangular semantic rows and theme-token colors. Create a matching Curio shop recipe via shop-gen for craftable furniture. Keep existing furniture imports in exact order; append the new one. Cost-gated furniture never enters Nyan stock.
+Pick an existing slot. Whole price is nonnegative; bait 0–10; minTier 3–6. Cost may use known materials (whole amounts 1–1000). Numeric mod caps: coin/regen/eventRate/gift 1–2.5, joyDecay 0.5–1, expTime 0.8–1, bond/matOdds 1–1.5; autoFeed is boolean. Optional `bowl` stats belong only on `slot: 'bowl'`: whole cap 4–24, portion 10–60, joy and energy 0–15, xp 0–5. The ladder runs Basic 8/30, Ceramic 10/35, Automatic 10/30, Deluxe 12/35 joy +5, Golden 14/40 joy +5 xp +1, Royal 16/40 joy +5 energy +5, Ultimate 20/50 joy +10 energy +5 xp +3. `bowlCap` reads the placed bowl; a smaller bowl keeps overflow until it is eaten. Optional art uses rectangular semantic rows and theme-token colors. Create a matching Curio shop recipe via shop-gen for craftable furniture. Keep existing furniture imports in exact order; append the new one. Cost-gated furniture never enters Nyan stock.
 
 ## 3. Register, look and test
 

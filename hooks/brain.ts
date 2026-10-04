@@ -1,6 +1,6 @@
 import type { Cat, Home } from '../types'
 import { catsAtHome } from './away'
-import { BOWL_CAP } from './bowl'
+import { bowlCap, bowlOf } from './bowl'
 import { BEHAVIORS, GOALS } from './content'
 import type { Behavior, Goal } from './content/types'
 import { factsOf } from './brain/facts'
@@ -38,10 +38,19 @@ const complete = (home: Home, catId: string, now: number, rng: Rng): BrainStep =
     event: { on: 'bowl.empty', catId, vars: { food: 'kibble' } },
   }
   const interaction = behavior.partner && partner ? pickInteraction(home, cat, partner, rng) : null
-  let next: Home = { ...home, bowl: { food: Math.max(0, Math.min(BOWL_CAP, home.bowl.food + (fx.bowl ?? 0))) } }
+  const eats = (fx.bowl ?? 0) < 0
+  const bowl = bowlOf(home)
+  const delta = fx.bowl ?? 0
+  const raw = home.bowl.food + delta
+  const food = delta > 0 ? Math.min(bowlCap(home), Math.max(0, raw)) : Math.max(0, raw)
+  const hunger = eats ? bowl.portion : (fx.hunger ?? 0)
+  const joy = (fx.joy ?? 0) + (eats ? bowl.joy ?? 0 : 0)
+  const energy = (fx.energy ?? 0) + (eats ? bowl.energy ?? 0 : 0)
+  const xp = (fx.xp ?? 0) + (eats ? bowl.xp ?? 0 : 0)
+  let next: Home = { ...home, bowl: { food } }
   next = withCat(next, catId, c => {
-    let updated: Cat = { ...c, hunger: clamp(c.hunger + (fx.hunger ?? 0)), energy: clamp(c.energy + (fx.energy ?? 0)),
-      joy: clamp(c.joy + (fx.joy ?? 0)), isAsleep: fx.sleep ? true : c.isAsleep }
+    let updated: Cat = { ...c, hunger: clamp(c.hunger + hunger), energy: clamp(c.energy + energy),
+      joy: clamp(c.joy + joy), isAsleep: fx.sleep ? true : c.isAsleep }
     if (fx.friendship) updated = befriend(updated, fx.friendship, now)
     return dropIntent(updated)
   })
@@ -56,10 +65,12 @@ const complete = (home: Home, catId: string, now: number, rng: Rng): BrainStep =
       next = { ...next, cats: next.cats.map(c => pair.includes(c.id) ? { ...c, joy: clamp(c.joy + 5) } : c) }
     next = track(next, 'bond', (next.bonds[key]?.points ?? 0) - before, now)
   }
-  const line = `${cat.name} ${behavior.line}`
+  // Name the bowl and restate the xp; with no xp the tag and its space go.
+  const phrase = eats ? behavior.line.replace('the bowl', `the ${bowl.name}`).replace(/\s*\+\d+xp/, xp ? ` +${xp}xp` : '') : behavior.line
+  const line = `${cat.name} ${phrase}`
   const logged = { ...next, log: line }
-  const done = !fx.xp ? logged : gainXp(logged, catId, fx.xp, now)
-  return { home: done, event: { on: 'done', catId, about: [behavior.id], ...(partner ? { buddyId: partner.id } : {}) } }
+  const done = !xp ? logged : gainXp(logged, catId, xp, now)
+  return { home: done, event: { on: 'done', catId, about: [behavior.id], vars: { bowl: bowl.name }, ...(partner ? { buddyId: partner.id } : {}) } }
 }
 
 const choose = (home: Home, cat: Cat, now: number, rng: Rng): BrainStep => {

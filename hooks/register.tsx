@@ -47,7 +47,7 @@ import { buyWorld, canBuyWorld, isWorldOwned, setWorld } from './world'
 import { thinkWithEvents } from './brain'
 import { eventsOf, quoteOf, speak } from './speech'
 import type { Said, SpeechEvent } from './speech'
-import { BOWL_CAP, fillBowl } from './bowl'
+import { bowlCap, bowlOf, bowlPerk, fillBowl } from './bowl'
 import { BEHAVIORS, WORLDS, EXPEDITIONS, SHOP, INTERACTIONS } from './content'
 import { DESIGN } from './scene/fine/draw'
 import { seeded } from './rng'
@@ -1343,7 +1343,11 @@ export const register: Register = (on, options) => {
             </Box>
           ))}
           <Text bold color={tone.accent}>Placed</Text>
-          <Text color={tone.muted}>{tier.slots.map(slot => `${slot}: ${furniture(home.decor[slot])?.name ?? '—'}`).join(' · ')}</Text>
+          <Text color={tone.muted}>{tier.slots.map(slot => {
+            const item = furniture(home.decor[slot])
+            const perk = slot === 'bowl' && item?.bowl ? ` · ${bowlPerk(item.bowl)}` : ''
+            return `${slot}: ${item?.name ?? '—'}${perk}`
+          }).join(' · ')}</Text>
           {spare.map(id => (
             <Button key={`place-${id}`} plain label={`Place ${furniture(id)?.name} (${furniture(id)?.slot})`}
               onPress={() => change($, prev => place(prev, id))} />
@@ -1353,7 +1357,7 @@ export const register: Register = (on, options) => {
           </Text>
           {stock.map(item => (
             <Button key={`buy-${item.id}`} plain
-              label={`${home.owned.includes(item.id) ? '✓' : ' '} ${item.name} · ${item.price}c · ${item.slot} · ${item.perk}`}
+              label={`${home.owned.includes(item.id) ? '✓' : ' '} ${item.name} · ${item.price}c · ${item.slot} · ${item.bowl ? `${bowlPerk(item.bowl)} · ${item.perk}` : item.perk}`}
               onPress={() => change($, (prev, t) => buyItem(prev, item.id, t, hourOf(t)))} />
           ))}
           <Text bold color={tone.accent}>Pip’s Curio shop · always open</Text>
@@ -1449,7 +1453,12 @@ export const register: Register = (on, options) => {
         {stat('Hunger', cat.hunger)}
         {stat('Joy', cat.joy)}
         {stat('Energy', cat.energy)}
-        <Text color={tone.accent}>Bowl {'▮'.repeat(Math.max(0, Math.min(BOWL_CAP, home.bowl.food)))}{'▯'.repeat(BOWL_CAP - Math.max(0, Math.min(BOWL_CAP, home.bowl.food)))} {home.bowl.food}/{BOWL_CAP}</Text>
+        <Text color={tone.accent}>{(() => {
+          const bowl = bowlOf(home)
+          const food = Math.max(0, home.bowl.food)
+          const filled = Math.min(10, Math.round(Math.min(food, bowl.cap) / bowl.cap * 10))
+          return `${bowl.name} ${'▮'.repeat(filled)}${'▯'.repeat(10 - filled)} ${food}/${bowl.cap}`
+        })()}</Text>
         <Text color={tone.accent}>
           XP {bar((cat.xp / xpToNext(cat.level)) * 100, 10)} {cat.xp}/{xpToNext(cat.level)}
         </Text>
@@ -1475,7 +1484,7 @@ export const register: Register = (on, options) => {
                 const run = a.run
                 if (run === 'play') { await routeTo($, 'arcade'); await openArcade($); return }
                 if (run === 'fill') return change($, (prev, t) => fillBowl(prev, 1, t))
-                if (run === 'top') return change($, (prev, t) => fillBowl(prev, BOWL_CAP, t))
+                if (run === 'top') return change($, (prev, t) => fillBowl(prev, bowlCap(prev), t))
                 if (run === 'pet' || run === 'nap') return change($, (prev, t) => act(prev, run, t))
               }} />
           ))}

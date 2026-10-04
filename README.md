@@ -67,7 +67,7 @@ Then type `/cat` to open the pane. Meow.
 | `/cat weather refresh` | update weather now (at most once per minute) |
 | `/cat weather units c\|f` | choose Celsius/km/h or Fahrenheit/mph |
 | `/cat weather off` | stop weather requests and clear the saved location |
-| `/cat fill [n]` | add n portions to the shared bowl (5c each, 10 max). `f` adds one, `u` fills it to the top |
+| `/cat fill [n]` | add n portions to the shared bowl (5c each, up to the placed bowl's cap). `f` adds one, `u` fills it to the top |
 | `/cat world [id]` | list every world as owned or priced, or move to a world you own |
 | `/cat world buy <id>` | buy a world and move the yard there |
 | `f` / `u` | fill the bowl by one portion (5c) / fill it to the top |
@@ -106,7 +106,8 @@ Pip's furniture recipes unlock at the following house tiers. Each item occupies 
 | Craft id | Slot / tier | Cost | Perk |
 | --- | --- | --- | --- |
 | `map-table` | toy / Villa | 1200c + 10 pine-cone | −10% expedition duration |
-| `shell-fountain` | bowl / Villa | 1500c + 12 shell | auto-feed, +60% gifts |
+| `shell-fountain` | bowl / Villa | 1500c + 12 shell | cap 16 · +40 hunger, joy +5, energy +5 |
+| `celestial-bowl` | bowl / Castle | 9000c + 25 stardust | cap 20 · +50 hunger, joy +10, energy +5, xp +3 |
 | `neon-sign` | hanging / Mansion | 3000c + 15 neon-scrap | double AFK events |
 | `moon-hammock` | bed / Castle | 6000c + 20 stardust | +150% regen, +25% bonds |
 | `starlit-rug` | rug / Palace | 12000c + 30 stardust | joy fades 50% slower |
@@ -180,7 +181,17 @@ Short version: stats drop, coins pile up, cats judge you silently.
 - Cats grow from kitten to cat (red collar) at level 5. At level 10 they evolve into the form of their strongest branch: **Ninja** 🥷 (headband), **Royal** 👑 (crown and cape) or **Cloud** ☁️ (halo and wings). A cat with no skills becomes a **Chonk**. (No shame. Chonk is a lifestyle.)
 - The terminal shows an animated pixel-art scene with a day, dusk and night sky that follows your clock. Other surfaces show an ASCII cat.
 - The active cat roams the yard on its own: it walks, trots, hops, pounces, grooms, stretches, loafs and gets the zoomies, picking moves by mood, personality and time of day. A napping cat pads to its bed first.
-- Every cat at home has a small GOAP brain. Hunger under 45, energy under 30 and low joy become goals. The cat plans a few steps: eat from the shared bowl, nap, play with another awake cat, or groom. You fill the bowl; the cat spends a portion when it eats. An empty bowl gets a meow instead of a meal. Only the active cat, and a pair partner, are animated. The others still finish their plans on the 10s tick.
+- Every cat at home has a small GOAP brain. Hunger under 45, energy under 30 and low joy become goals. The cat plans a few steps: eat from the shared bowl, nap, play with another awake cat, or groom. You fill the bowl; the cat spends one portion when it eats, and hunger, joy, energy and xp follow the placed bowl's class. An empty bowl gets a meow instead of a meal. Only the active cat, and a pair partner, are animated. The others still finish their plans on the 10s tick.
+
+| Class | Item | How to get | Cap | Portion | Eating bonus |
+| --- | --- | --- | --- | --- | --- |
+| Basic | `bowl` | free | 8 | +30 hunger | — |
+| Ceramic | `ceramic-bowl` | Curio 150c | 10 | +35 hunger | — |
+| Automatic | `feeder` | Nyan 60c | 10 | +30 hunger | auto-refill |
+| Deluxe | `sushi` | Nyan 320c | 12 | +35 hunger | joy +5 |
+| Golden | `goldbowl` | 800 miles | 14 | +40 hunger | joy +5, xp +1 |
+| Royal | `shell-fountain` | Curio 1500c + 12 shell, Villa | 16 | +40 hunger | joy +5, energy +5 |
+| Ultimate | `celestial-bowl` | Curio 9000c + 25 stardust, Castle | 20 | +50 hunger | joy +10, energy +5, xp +3, auto-feed, gifts ×1.8 |
 
 ### 💕 Friends tab (`r`)
 
