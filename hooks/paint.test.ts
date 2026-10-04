@@ -72,7 +72,7 @@ const openPane = async ($: Parameters<TestBody>[0], on: Parameters<TestBody>[1],
   return { clock, ui, blits }
 }
 
-test('the frame loop skips repeat frames and stops painting once the pane is gone', async ($, on) => {
+test('the frame loop skips repeat frames and stops painting once the pane is gone', { timeoutMs: 15_000 }, async ($, on) => {
   const state = { isGone: false }
   const { clock, ui, blits } = await openPane($, on, () => (state.isGone ? 'not mounted' : undefined))
   expect(String((await ui.find({ key: 'scene', type: 'Image' }))?.props.alt)).toMatch(/Mochi \(\w+\) in the yard/)

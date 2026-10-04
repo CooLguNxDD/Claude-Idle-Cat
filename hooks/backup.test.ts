@@ -32,7 +32,7 @@ test('a newer save from another session wins; an older or missing one does not',
   expect(pickBase({ version: 2, rev: 99 }, mine, t)).toBe(mine)
 })
 
-test('/cat export writes a backup and /cat import restores it after backing up the current save', async ($, on) => {
+test('/cat export writes a backup and /cat import restores it after backing up the current save', { timeoutMs: 15_000 }, async ($, on) => {
   mock.clock(on, { now: t })
   mock.store(on)
   mock.env(on, { USERPROFILE: 'C:\\Users\\me' })

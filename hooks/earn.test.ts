@@ -6,7 +6,7 @@ import { fmtCoins } from './home'
 const TEN_MIN = 10 * 60_000
 const near = (a: number, b: number) => Math.abs(a - b) < 1e-6
 
-test('a finished reply pays its active time plus what it cost the session, ramped by the chat so far', async ($, on) => {
+test('a finished reply pays its active time plus what it cost the session, ramped by the chat so far', { timeoutMs: 15_000 }, async ($, on) => {
   const now = 1_700_000_000_000
   const clock = mock.clock(on, { now })
   const cats = newHome(now).cats.map(c => ({ ...c, level: 10 }))

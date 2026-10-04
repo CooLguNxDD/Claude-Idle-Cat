@@ -3,7 +3,7 @@ import type { Skill } from '../skills'
 import type { Furniture } from '../home'
 import type { Counter } from '../collection'
 import type { Mood } from '../game'
-import type { Availability, Move } from './types'
+import type { Availability, LandmarkKind, Move } from './types'
 import { COLOR_TOKENS } from '../theme'
 import { availabilityProblems } from './types'
 
@@ -23,6 +23,15 @@ export type Reaction = { id: string; on: Signal; tools?: readonly string[]; move
 export type Interaction = { id: string; label: string; roles: { lead: string; partner: string }
   spacing: 'touch' | 'face' | 'chase' | 'pile'; seconds: number
   when: { minBond: number; moods?: readonly Mood[]; pair?: readonly Personality[]; weight: number }; bond: number; line: string }
+export const FACT_KEYS = ['isAwake', 'isHungry', 'isTired', 'isLonely', 'isBored', 'hasEnergy', 'bowlHasFood', 'hasBuddy'] as const
+export type Fact = typeof FACT_KEYS[number]
+export type Facts = Partial<Record<Fact, boolean>>
+export type BehaviorEffect = { hunger?: number; energy?: number; joy?: number; xp?: number; bowl?: number; sleep?: true; bond?: number; friendship?: number }
+export type Behavior = { id: string; label: string; pre: Facts; post: Facts; cost: number; seconds: number
+  goTo?: 'bowl' | 'bed'; seek?: LandmarkKind; move: string; partner?: boolean; effect: BehaviorEffect; line: string }
+export type Goal = { id: string; label: string; want: Facts
+  need: { stat: 'hunger' | 'energy' | 'joy'; below: number; weight: number }
+  personality?: Partial<Record<Personality, number>> }
 export type Expedition = { id: string; label: string; blurb: string; minutes: number; party: readonly [number, number]
   minLevel: number; cost: { coins: number; energy: number }; available?: Availability; unlock?: Unlock
   loot: { coins: readonly [number, number]; materials: Record<string, number>; rolls: readonly [number, number]
@@ -38,6 +47,8 @@ export const defineShop = (s: ShopItem) => s
 export const defineMaterial = (s: Material) => s
 export const defineReaction = (s: Reaction) => s
 export const defineInteraction = (s: Interaction) => s
+export const defineBehavior = (s: Behavior) => s
+export const defineGoal = (s: Goal) => s
 export const defineExpedition = (s: Expedition) => s
 export const defineQuest = (s: Quest) => s
 export const defineEvent = (s: GameEvent) => s
@@ -78,6 +89,29 @@ export const materialProblems = (s: Material): string[] => [...name(s),
 export const reactionProblems = (s: Reaction, moves: readonly Move[]): string[] => [...base(s),
   ...(s.effect && !['hearts', 'fish', 'yarn', 'coins', 'levelup', 'evolve', 'shop', 'adopt', 'visitor', 'welcome', 'gift', 'catch', 'award', 'birthday', 'medal'].includes(s.effect) ? ['unknown cosmetic effect'] : []), ...(!SIGNALS.includes(s.on) ? ['unknown signal'] : []), ...(!moves.some(m => m.id === s.move) ? ['unknown move'] : []),
   ...(!range(s.odds, 0, 1) || !range(s.cooldownSec, 1, 3600) ? ['invalid odds or cooldown'] : [])]
+const factProblems = (f: Facts, at: string) => Object.keys(f).filter(k => !(FACT_KEYS as readonly string[]).includes(k)).map(k => `${at}: unknown fact ${k}`)
+const effectProblems = (e: BehaviorEffect): string[] => [
+  ...(e.hunger !== undefined && !range(e.hunger, -100, 100) ? ['effect.hunger is -100 to 100'] : []),
+  ...(e.energy !== undefined && !range(e.energy, -100, 100) ? ['effect.energy is -100 to 100'] : []),
+  ...(e.joy !== undefined && !range(e.joy, -100, 100) ? ['effect.joy is -100 to 100'] : []),
+  ...(e.xp !== undefined && !range(e.xp, 0, 200) ? ['effect.xp is 0 to 200'] : []),
+  ...(e.bowl !== undefined && !range(e.bowl, -10, 10) ? ['effect.bowl is -10 to 10'] : []),
+  ...(e.bond !== undefined && !range(e.bond, 0, 5) ? ['effect.bond is 0 to 5'] : []),
+  ...(e.friendship !== undefined && !range(e.friendship, 0, 10) ? ['effect.friendship is 0 to 10'] : []),
+  ...(e.sleep !== undefined && e.sleep !== true ? ['effect.sleep is true'] : []),
+]
+export const behaviorProblems = (s: Behavior, moves: readonly Move[]): string[] => [...name(s),
+  ...factProblems(s.pre, `${s.id}.pre`), ...factProblems(s.post, `${s.id}.post`),
+  ...(!range(s.cost, 0, 100) ? ['cost is 0 to 100'] : []),
+  ...(!range(s.seconds, 0, 600) ? ['seconds is 0 to 600'] : []),
+  ...(!moves.some(m => m.id === s.move) ? [`unknown move ${s.move}`] : []),
+  ...(s.goTo && s.goTo !== 'bowl' && s.goTo !== 'bed' ? ['goTo is bowl or bed'] : []),
+  ...(s.seek && !['tower', 'tunnel', 'pipe', 'window', 'shelf'].includes(s.seek) ? [`unknown landmark ${s.seek}`] : []),
+  ...effectProblems(s.effect)]
+export const goalProblems = (s: Goal): string[] => [...name(s), ...factProblems(s.want, `${s.id}.want`),
+  ...(!['hunger', 'energy', 'joy'].includes(s.need.stat) ? ['need.stat is hunger, energy or joy'] : []),
+  ...(!range(s.need.below, 1, 100) || !range(s.need.weight, 0, 10) ? ['invalid goal limits'] : []),
+  ...Object.values(s.personality ?? {}).filter(n => !range(n, 0, 3)).map(() => 'personality multiplier is 0 to 3')]
 export const interactionProblems = (s: Interaction, moves: readonly Move[]): string[] => [...name(s),
   ...(!['touch', 'face', 'chase', 'pile'].includes(s.spacing) ? ['unknown spacing'] : []),
   ...Object.values(s.roles).filter(id => !moves.some(m => m.id === id)).map(id => `unknown role move ${id}`),

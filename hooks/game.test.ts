@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Home } from '../types'
+import { fillBowl } from './bowl'
 import { ACTIVE_CAP_MINUTES, DECAY_FLOOR, IDLE_SHARE, TOOL_CHANCE, act, activeCat, activePay, adopt, checkIn, coinRate,
   migrate, moodOf, newHome, nextCat, idleRate, rampOf, rollToolPay, spendPay, stageOf, switchTo, tick, tickTally, toolPay } from './game'
 import { seeded } from './rng'
@@ -23,14 +24,18 @@ test('coins accrue while AFK, capped at 8h, and stats never drop below the floor
   expect(moodOf(away)).toBe('grumpy')
 })
 
-test('feeding costs coins and fills hunger; sleeping blocks play', async () => {
-  const home = newHome(0)
-  const hungry = { ...home, cats: home.cats.map(c => ({ ...c, hunger: 40 })) }
-  const fed = act(hungry, 'feed', 1)
-  expect(fed.coins).toBe(hungry.coins - 5)
-  expect(activeCat(fed).hunger).toBe(70)
-  expect(fed.effect?.kind).toBe('fish')
-  const asleep = act(hungry, 'nap', 1)
+test('filling the bowl costs 5c a portion and sleeping still blocks play', async () => {
+  const home = { ...newHome(0), coins: 30, bowl: { food: 0 }, cats: newHome(0).cats.map(c => ({ ...c, hunger: 40 })) }
+  const filled = fillBowl(home, 1, 1)
+  expect(filled.coins).toBe(25)
+  expect(filled.bowl.food).toBe(1)
+  expect(filled.effect?.kind).toBe('fish')
+  expect(activeCat(filled).hunger).toBe(40)
+  const full = fillBowl({ ...home, coins: 1000 }, 100, 1)
+  expect(full.bowl.food).toBe(10)
+  expect(full.coins).toBe(950)
+  expect(fillBowl({ ...home, coins: 4 }, 1, 1).coins).toBe(4)
+  const asleep = act(home, 'nap', 1)
   expect(moodOf(activeCat(asleep))).toBe('sleeping')
   expect(activeCat(act(asleep, 'play', 1)).joy).toBe(activeCat(asleep).joy)
 })
@@ -43,19 +48,20 @@ test('xp levels up and evolves the cat', async () => {
   expect(stageOf(10)).toBe('cat')
 })
 
-test('a placed auto-feeder feeds every hungry cat', async () => {
-  const once: Home = { ...rich(newHome(0)), owned: [...newHome(0).owned, 'feeder'], decor: { ...newHome(0).decor, bowl: 'feeder' } }
-  const two = adopt(once, 1, seeded(1))
-  const hungry = { ...two, lastTick: 0, cats: two.cats.map(c => ({ ...c, hunger: 10 })) }
-  expect(tick(hungry, 60_000, noEvents).cats.every(c => c.hunger > 30)).toBe(true)
+test('a placed auto-feeder refills an empty bowl once', async () => {
+  const once: Home = { ...rich(newHome(0)), owned: [...newHome(0).owned, 'feeder'], decor: { ...newHome(0).decor, bowl: 'feeder' }, bowl: { food: 0 } }
+  const later = tick(once, 60_000, noEvents)
+  expect(later.bowl.food).toBe(1)
+  expect(tick({ ...once, bowl: { food: 2 } }, 60_000, noEvents).bowl.food).toBe(2)
 })
 
 test('a tick reports what the auto-feeder spent, so earnings count gross income', async () => {
-  const once: Home = { ...rich(newHome(0)), owned: [...newHome(0).owned, 'feeder'], decor: { ...newHome(0).decor, bowl: 'feeder' } }
+  const once: Home = { ...rich(newHome(0)), owned: [...newHome(0).owned, 'feeder'], decor: { ...newHome(0).decor, bowl: 'feeder' }, bowl: { food: 0 } }
   const two = adopt(once, 1, seeded(1))
-  const hungry = { ...two, lastTick: 0, cats: two.cats.map(c => ({ ...c, hunger: 10 })) }
+  const hungry = { ...two, lastTick: 0, bowl: { food: 0 } }
   const { home, deducted } = tickTally(hungry, 60_000, noEvents)
-  expect(deducted).toBe(10)
+  expect(deducted).toBe(5)
+  expect(home.bowl.food).toBe(1)
   expect(Math.abs(home.coins + deducted - hungry.coins - idleRate(hungry))).toBeLessThan(1e-9)
 })
 

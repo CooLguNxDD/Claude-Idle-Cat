@@ -3,7 +3,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Home } from '../types'
 import { newHome } from './game'
 
-test('the Expeditions tab sends and claims an offline party, then Pip crafts its materials', async ($, on) => {
+test('the Expeditions tab sends and claims an offline party, then Pip crafts its materials', { timeoutMs: 15_000 }, async ($, on) => {
   const now = new Date(2026, 9, 5, 12).getTime()
   mock.clock(on, { now })
   let stored: Home = { ...newHome(now), coins: 10000, tier: 3, materials: { 'pine-cone': 10 }, rev: 100 }

@@ -49,6 +49,7 @@ import moveKnead from './moves/knead'
 import moveReactionNap from './moves/reaction-nap'
 import moveSneakAttack from './moves/sneak-attack'
 import moveWindowWatch from './moves/window-watch'
+import moveEat from './moves/eat'
 import worldBackyard from './worlds/backyard'
 import worldRooftops from './worlds/rooftops'
 import worldBeachPier from './worlds/beach-pier'
@@ -160,7 +161,15 @@ import materialPumpkin from './materials/pumpkin'
 import materialShell from './materials/shell'
 import materialSnowflake from './materials/snowflake'
 import materialStardust from './materials/stardust'
-import type { Breed, Move, World, NamedCat, Reaction, Interaction, Expedition, Quest, GameEvent, SkillSpec, FurnitureSpec, ShopItem, Material } from './types'
+import behaviorEatBowl from './behaviors/eat-bowl'
+import behaviorGroomSelf from './behaviors/groom-self'
+import behaviorNapBed from './behaviors/nap-bed'
+import behaviorPlayBuddy from './behaviors/play-buddy'
+import goalFed from './goals/fed'
+import goalRested from './goals/rested'
+import goalSocial from './goals/social'
+import goalTidy from './goals/tidy'
+import type { Breed, Move, World, NamedCat, Reaction, Interaction, Expedition, Quest, GameEvent, SkillSpec, FurnitureSpec, ShopItem, Material, Behavior, Goal } from './types'
 
 // breeds definitions in pinned order; engines apply runtime eligibility.
 export const BREEDS: readonly Breed[] = [
@@ -217,6 +226,7 @@ export const MOVES: readonly Move[] = [
   moveReactionNap,
   moveSneakAttack,
   moveWindowWatch,
+  moveEat,
 ]
 // worlds definitions in pinned order; engines apply runtime eligibility.
 export const WORLDS: readonly World[] = [
@@ -361,4 +371,18 @@ export const MATERIALS: readonly Material[] = [
   materialShell,
   materialSnowflake,
   materialStardust,
+]
+// behaviors definitions in pinned order; engines apply runtime eligibility.
+export const BEHAVIORS: readonly Behavior[] = [
+  behaviorEatBowl,
+  behaviorGroomSelf,
+  behaviorNapBed,
+  behaviorPlayBuddy,
+]
+// goals definitions in pinned order; engines apply runtime eligibility.
+export const GOALS: readonly Goal[] = [
+  goalFed,
+  goalRested,
+  goalSocial,
+  goalTidy,
 ]

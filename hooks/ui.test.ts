@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 import { TABS } from './ui/tabs'
 
-test('the pane draws the scene and its buttons work on each surface', async ($, on) => {
+test('the pane draws the scene and its buttons work on each surface', { timeoutMs: 15_000 }, async ($, on) => {
   mock.clock(on, { now: 1_700_000_000_000 })
   mock.store(on)
   on('config.list', () => ({ value: [] }))

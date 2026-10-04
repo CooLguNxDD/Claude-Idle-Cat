@@ -1,7 +1,7 @@
 import { defineWorld } from '../types'
 
 export default defineWorld({
-  id: 'snowy-cabin', label: 'Snowy Cabin', scene: 'snowy-cabin',
+  id: 'snowy-cabin', label: 'Snowy Cabin', scene: 'snowy-cabin', cost: { coins: 5000 },
   width: { cottage: 80, house: 160, manor: 240 },
   layers: [
     { kind: 'cabins', parallax: 0.35, tint: { mix: ['green', 'surface1', 0.4] } },

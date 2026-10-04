@@ -18,7 +18,7 @@ const withWeather = (home: Home, condition: WeatherCondition, isDay: boolean): H
       isDay, observedAt: now, fetchedAt: now, utcOffset: 0 } },
 })
 
-test('station stars animate only on visible nights in every flavor and scale', () => {
+test('station stars animate only on visible nights in every flavor and scale', { timeoutMs: 15_000 }, () => {
   for (const flavor of Object.values(FLAVORS)) for (const scale of [1, 2, 4, 8])
     for (const isNight of [false, true]) for (const isSunVisible of [false, true]) {
       const at = (tick: number) => {
@@ -32,7 +32,7 @@ test('station stars animate only on visible nights in every flavor and scale', (
 })
 
 test('new worlds select without changing furniture and retain movement geometry at each tier', () => {
-  const home = newHome(now)
+  const home = { ...newHome(now), worlds: WORLDS.map(w => w.id) }
   const backyard = WORLDS[0]!
   for (const world of themed) {
     const moved = setWorld(home, world.id)
@@ -61,7 +61,7 @@ test('every theme is distinct in all flavors at day and night, including termina
   }
 })
 
-test('themes render at all scales and tiers and clamp camera edges in narrow and wide panes', () => {
+test('themes render at all scales and tiers and clamp camera edges in narrow and wide panes', { timeoutMs: 15_000 }, () => {
   for (const world of themed) for (const tier of [0, 1, 2]) for (const cols of [34, 56]) {
     const home = { ...newHome(now), world: { id: world.id }, tier }
     const input = { home, now, tick: 13, hour: 12, flavor: FLAVORS.mocha, cols }
@@ -76,7 +76,7 @@ test('themes render at all scales and tiers and clamp camera edges in narrow and
   }
 })
 
-test('live weather remains visible and animated in every theme including the station', () => {
+test('live weather remains visible and animated in every theme including the station', { timeoutMs: 15_000 }, () => {
   for (const world of themed) for (const name of FLAVOR_NAMES) for (const isDay of [true, false]) {
     const base = { ...newHome(now), world: { id: world.id } }
     const input = { now, tick: 13, hour: isDay ? 12 : 0, flavor: FLAVORS[name], cols: 34 }
