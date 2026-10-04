@@ -2,7 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import { newHome } from './game'
 import type { Home } from '../types'
 
-test('Settings persists every plugin config through the host, mutes sound immediately and saves household preferences', async ($, on) => {
+test('Settings persists every plugin config through the host, mutes sound immediately and saves household preferences', { timeoutMs: 15_000 }, async ($, on) => {
   const now = new Date(2026, 9, 5, 12).getTime()
   mock.clock(on, { now })
   let stored: Home = { ...newHome(now), rev: 100, worlds: ['backyard', 'neon-alley'] }

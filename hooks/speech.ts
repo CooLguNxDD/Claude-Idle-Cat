@@ -2,7 +2,7 @@ import type { Cat, Home } from '../types'
 import { SPEECH } from './content'
 import type { Speech, SpeechTrigger } from './content/types'
 import { decorate, friendLevel, giftById, dayOf } from './friends'
-import { activeCat, moodOf } from './game'
+import { AUTO_FEED_LOG, activeCat, moodOf } from './game'
 import { bondLevel } from './pair'
 import { seeded } from './rng'
 import type { Rng } from './rng'
@@ -44,27 +44,24 @@ const pickBank = (pool: readonly Speech[], rng: Rng): Speech | undefined => {
   return pool[pool.length - 1]
 }
 
-/** One line for this event, or null when nothing fits. Recent lines are skipped while another remains. */
+/** One line for this event, or null when nothing fits. Recent lines are skipped while another remains; else one repeats. */
 export const speak = (home: Home, ev: SpeechEvent, now: number, hour: number, rng: Rng, recent: readonly string[]): Said | null => {
   const cat = home.cats.find(c => c.id === ev.catId)
   if (!cat) return null
-  const pool = SPEECH.filter(bank => eligible(bank, ev, cat, home, hour))
   const buddy = ev.buddyId ? home.cats.find(c => c.id === ev.buddyId)?.name ?? ev.vars?.buddy ?? '' : ev.vars?.buddy ?? ''
   const vars = { name: cat.name, buddy, food: '', gift: '', tool: '', weather: '', ...ev.vars }
-  const banks = [...pool]
-  while (banks.length) {
-    const bank = pickBank(banks, rng)
-    if (!bank) break
-    banks.splice(banks.indexOf(bank), 1)
-    const filled = bank.lines.map(line => fill(line, vars)).filter((line): line is string => !!line)
-    const fresh = filled.filter(line => !recent.includes(line))
-    const choice = (fresh.length ? fresh : [])[Math.floor(rng() * (fresh.length || 1))]
-    if (!choice) continue
-    const text = decorate(cat, choice, hour + idHash(cat.id))
-    const hold = Math.max(4_000, Math.min(9_000, text.length * 90))
-    return { catId: cat.id, text, glyph: bank.glyph, at: now, until: now + hold, priority: priorityOf(ev.on) }
-  }
-  return null
+  const filled = SPEECH.filter(bank => eligible(bank, ev, cat, home, hour))
+    .map(bank => ({ bank, lines: bank.lines.map(line => fill(line, vars)).filter((line): line is string => !!line) }))
+    .filter(row => row.lines.length)
+  const fresh = filled.map(row => ({ ...row, lines: row.lines.filter(line => !recent.includes(line)) })).filter(row => row.lines.length)
+  const rows = fresh.length ? fresh : filled
+  const bank = pickBank(rows.map(row => row.bank), rng)
+  const lines = rows.find(row => row.bank === bank)?.lines ?? []
+  const choice = lines[Math.floor(rng() * lines.length)]
+  if (!bank || !choice) return null
+  const text = decorate(cat, choice, hour + idHash(cat.id))
+  const hold = Math.max(4_000, Math.min(9_000, text.length * 90))
+  return { catId: cat.id, text, glyph: bank.glyph, at: now, until: now + hold, priority: priorityOf(ev.on) }
 }
 
 const effectEvent = (before: Home, after: Home): SpeechEvent | null => {
@@ -73,7 +70,7 @@ const effectEvent = (before: Home, after: Home): SpeechEvent | null => {
   const kind = after.effect.kind
   if (kind === 'hearts') return { on: 'pet', catId }
   if (kind === 'yarn') return { on: 'play', catId }
-  if (kind === 'fish' && after.bowl.food > before.bowl.food) return { on: 'fill', catId, vars: { food: String(after.bowl.food) } }
+  if (kind === 'fish' && after.bowl.food > before.bowl.food && after.log !== AUTO_FEED_LOG) return { on: 'fill', catId, vars: { food: String(after.bowl.food) } }
   if (kind === 'gift') {
     const cat = activeCat(after)
     const gift = cat.lastGift ? giftById(cat.lastGift.id) : undefined

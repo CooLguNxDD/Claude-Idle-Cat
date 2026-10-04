@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 import type { Cat, Home } from '../types'
 import { thinkWithEvents } from './brain'
 import { fillBowl } from './bowl'
-import { act, giveGift, newCat, newHome } from './game'
+import { AUTO_FEED_LOG, act, giveGift, newCat, newHome } from './game'
 import { GIFTS } from './friends'
 import { eventsOf, quoteOf, speak } from './speech'
 import { seeded } from './rng'
@@ -35,7 +35,8 @@ test('speak skips recent lines and lines with an unfilled token', () => {
   const said = speak(home(), { on: 'pet', catId: 'c1' }, now, 12, seeded(1), recent)
   expect(said?.text).toBe('Okay. More. Briefly.')
   const blocked = ['{food} portions. Noted.', 'The bowl has a future.', 'Fish sound. I heard that.', 'Refill accepted. Grudgingly.', 'More food. Correct choice.', 'Bowl status: less tragic.']
-  expect(speak(home(), { on: 'fill', catId: 'c1' }, now, 12, seeded(1), blocked.slice(1))).toBeNull()
+  // Every fillable line is recent: one repeats rather than going silent.
+  expect(blocked.slice(1)).toContain(speak(home(), { on: 'fill', catId: 'c1' }, now, 12, seeded(1), blocked.slice(1))?.text)
   const filled = speak(home(), { on: 'fill', catId: 'c1', vars: { food: '4' } }, now, 12, seeded(9), blocked.slice(1))
   expect(filled?.text).toBe('4 portions. Noted.')
   expect(filled?.until).toBeGreaterThanOrEqual(now + 4_000)
@@ -49,6 +50,8 @@ test('eventsOf notices care, gifts, waking and strays', () => {
   expect(eventsOf(before, act(before, 'play', now), now)[0]?.on).toBe('play')
   const filled = fillBowl({ ...before, coins: 100 }, 2, now)
   expect(eventsOf(before, filled, now)[0]).toMatchObject({ on: 'fill', vars: { food: '5' } })
+  const fed = { ...before, bowl: { food: before.bowl.food + 1 }, effect: { kind: 'fish' as const, at: now }, log: AUTO_FEED_LOG }
+  expect(eventsOf(before, fed, now).some(e => e.on === 'fill')).toBe(false)
   const gifted = giveGift({ ...before, coins: 100 }, 'tuna', now)
   expect(eventsOf(before, gifted, now)[0]?.on).toBe('gift.loved')
   const plain = giveGift({ ...home('lazy'), coins: 100 }, 'tuna', now)

@@ -880,15 +880,17 @@ export const register: Register = (on, options) => {
     try {
       const ran = await next(e)
       void queue(() => change($, (h, t) => track(reward(h, rollToolPay(h, Math.random) * rampOf(chatMinutes)), 'tools', 1, t)))
-      await emitReaction($, signalsOf({ tool: e.tool, command, isError: ran.isError === true || !!ran.deny, ms: 0 }), e.tool).catch(() => undefined)
+      const signals = signalsOf({ tool: e.tool, command, isError: ran.isError === true || !!ran.deny, ms: 0 })
+      await emitReaction($, signals, e.tool).catch(() => undefined)
+      // Speech is fire-and-forget: it never delays or changes the tool result.
       try {
         const catId = latest ? activeCat(latest).id : ''
         if (catId) {
-          await say($, { on: 'claude.tool', catId, about: [e.tool], vars: { tool: e.tool } })
-          for (const signal of signalsOf({ tool: e.tool, command, isError: ran.isError === true || !!ran.deny, ms: 0 }))
-            if (signal === 'test.pass' || signal === 'test.fail') await say($, { on: signal, catId })
+          void say($, { on: 'claude.tool', catId, about: [e.tool], vars: { tool: e.tool } }).catch(() => undefined)
+          for (const signal of signals)
+            if (signal === 'test.pass' || signal === 'test.fail') void say($, { on: signal, catId }).catch(() => undefined)
         }
-      } catch { /* speech never changes the tool result */ }
+      } catch { /* cosmetic */ }
       return ran
     } catch (error) {
       await emitReaction($, ['tool.error'], e.tool).catch(() => undefined)
@@ -899,14 +901,14 @@ export const register: Register = (on, options) => {
   on('turn.start', async ($, e, next) => {
     earned.prompt = 0
     const result = await next(e)
-    try { if (latest) await say($, { on: 'claude.prompt', catId: activeCat(latest).id }) } catch { /* cosmetic */ }
+    try { if (latest) void say($, { on: 'claude.prompt', catId: activeCat(latest).id }).catch(() => undefined) } catch { /* cosmetic */ }
     return result
   })
 
   on('turn.complete', async ($, e, next) => {
     await emitReaction($, [turnSignal(e.reason)]).catch(() => undefined)
     try {
-      if (latest) await say($, { on: turnSignal(e.reason) === 'turn.error' ? 'claude.error' : 'claude.done', catId: activeCat(latest).id })
+      if (latest) void say($, { on: turnSignal(e.reason) === 'turn.error' ? 'claude.error' : 'claude.done', catId: activeCat(latest).id }).catch(() => undefined)
     } catch { /* cosmetic */ }
     await queue(async () => {
       const usd = await sessionUsd($)

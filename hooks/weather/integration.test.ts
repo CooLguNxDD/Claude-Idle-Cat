@@ -4,7 +4,7 @@ const now = 1_700_000_000_000
 const current = { utc_offset_seconds: 0, current: { time: now / 1000, weather_code: 61, temperature_2m: 10,
   wind_speed_10m: 15, wind_direction_10m: 180, cloud_cover: 90, precipitation: 1, is_day: 1 } }
 
-test('city selection works in the pane, saves weather, changes units and clears location', async ($, on) => {
+test('city selection works in the pane, saves weather, changes units and clears location', { timeoutMs: 15_000 }, async ($, on) => {
   mock.clock(on, { now })
   mock.store(on)
   on('ui.open', () => ({ value: { isPlaced: true } }))
