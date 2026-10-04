@@ -1,3 +1,6 @@
+import { BEHAVIORS } from './content'
+import { normalizeBowl } from './bowl'
+import { normalizeWorlds } from './world'
 import { normalizeProgression } from './progression-save'
 import { catsAtHome, isAway } from './away'
 import type { Cat, EffectKind, Genes, Home, Slot } from '../types'
@@ -36,7 +39,7 @@ const RAMP_MAX = 2
 // Time away never pushes a stat below this: cats get grumpy, never sad.
 export const DECAY_FLOOR = 25
 
-export type Action = 'feed' | 'play' | 'pet' | 'nap'
+export type Action = 'play' | 'pet' | 'nap'
 export type Mood = 'sleeping' | 'grumpy' | 'happy' | 'ok'
 export type Stage = 'kitten' | 'cat'
 
@@ -57,8 +60,14 @@ export const newCat = (id: string, name: string, genes: Genes, now: number): Cat
   ...NEW_FRIEND,
 })
 
-// Fills fields older saves lack on a cat.
-const normalizeCat = (cat: Cat): Cat => ({ ...NEW_FRIEND, ...cat })
+// Fills fields older saves lack on a cat and drops behaviour ids this build doesn't know.
+const normalizeCat = (cat: Cat): Cat => {
+  const next = { ...NEW_FRIEND, ...cat }
+  const intent = next.intent
+  if (!intent || (BEHAVIORS.some(b => b.id === intent.id) && Number.isFinite(intent.at))) return next
+  const { intent: _drop, ...rest } = next
+  return rest
+}
 
 const STARTER_DECOR: Partial<Record<Slot, string>> = { bowl: 'bowl', bed: 'box', toy: 'yarn' }
 
@@ -69,7 +78,7 @@ export const newHome = (now: number, cat: Cat = newCat('c1', 'Mochi', GINGER, no
   book: EMPTY_BOOK, pocket: {}, museum: [], miles: EMPTY_MILES, achievements: {}, shinyCharm: false,
   celebrated: [], catnip: { week: 0, qty: 0, paid: 0 }, arcade: { day: 0, plays: {}, best: {}, golds: 0, open: null },
   rev: 0, prefs: { glow: true, crt: false }, weather: emptyWeather(), shelter: emptyShelter(),
-  world: { id: 'backyard' },
+  world: { id: 'backyard' }, worlds: ['backyard'], bowl: { food: 3 },
   expeditions: { runs: [], done: {}, inbox: [] }, materials: {}, gear: {}, bonds: {},
   quests: { day: 0, progress: {}, claimed: [] }, exchanges: { day: 0, pairs: [], visitors: [] },
 })
@@ -105,13 +114,15 @@ export const migrate = (saved: unknown, now: number): Home => {
     const home = saved as Home
     // A round left open by a closed session is dropped (its energy stays spent).
     return { ...base, ...home, cats: home.cats.map(normalizeCat), arcade: { ...base.arcade, ...home.arcade, open: null },
-      weather: normalizeWeather(home.weather, now), shelter: normalizeShelter(home.shelter, home.cats), ...normalizeProgression(home, home.cats) }
+      weather: normalizeWeather(home.weather, now), shelter: normalizeShelter(home.shelter, home.cats), ...normalizeProgression(home, home.cats),
+      worlds: normalizeWorlds(home.worlds, home.world?.id ?? base.world.id), bowl: normalizeBowl(home.bowl) }
   }
   if (version === 2) {
     const { upgrades, maxCats: _old, ...v2 } = saved as V2Home & { maxCats?: number }
     const nextId = Math.max(0, ...v2.cats.map(c => Number(c.id.slice(1)) || 0)) + 1
     return { ...base, ...v2, cats: v2.cats.map(normalizeCat), version: 3, ...furnitureFromUpgrades(upgrades), nextId,
-      weather: normalizeWeather(v2.weather, now), shelter: normalizeShelter(v2.shelter, v2.cats) }
+      weather: normalizeWeather(v2.weather, now), shelter: normalizeShelter(v2.shelter, v2.cats),
+      worlds: normalizeWorlds(v2.worlds, v2.world?.id), bowl: normalizeBowl(v2.bowl) }
   }
   const v1 = saved as V1Cat
   const cat: Cat = {
@@ -131,7 +142,7 @@ export const activeCat = (home: Home): Cat => {
   const here = catsAtHome(home)
   return here.find(c => c.id === home.activeId) ?? here[0] ?? home.cats[0]!
 }
-const withCat = (home: Home, id: string, fn: (cat: Cat) => Cat): Home =>
+export const withCat = (home: Home, id: string, fn: (cat: Cat) => Cat): Home =>
   ({ ...home, cats: home.cats.map(c => (c.id === id ? fn(c) : c)) })
 
 export const xpToNext = (level: number) => level * 50
@@ -159,7 +170,7 @@ export const rampOf = (chatMinutes: number) =>
 export const spendPay = (home: Home, usd: number) =>
   coinRate(home) * Math.max(0, usd) * MINUTES_PER_USD
 
-const gainXp = (home: Home, id: string, xp: number, now: number): Home => {
+export const gainXp = (home: Home, id: string, xp: number, now: number): Home => {
   let log = home.log
   let effect = home.effect
   const next = withCat(home, id, cat => {
@@ -212,14 +223,10 @@ export const tickTally = (home: Home, now: number, rng: Rng = Math.random): { ho
     const woke = cat.isAsleep && !ticked.get(cat.id)?.isAsleep
     if (woke) next.log = `${cat.name} wakes up fully rested.`
   }
-  if (deco.autoFeed) {
-    for (const cat of next.cats.filter(c => hereIds.has(c.id))) {
-      if (cat.hunger < 40 && next.coins >= 5) {
-        deducted += 5
-        next = withCat({ ...next, coins: next.coins - 5, effect: fx('fish', now),
-          log: `The auto-feeder served ${cat.name} a fish.` }, cat.id, c => ({ ...c, hunger: clamp(c.hunger + 30) }))
-      }
-    }
+  if (deco.autoFeed && next.bowl.food < 1 && next.coins >= 5) {
+    deducted += 5
+    next = { ...next, coins: next.coins - 5, bowl: { food: next.bowl.food + 1 }, effect: fx('fish', now),
+      log: 'The auto-feeder adds a portion to the bowl.' }
   }
   const finder = here.length ? pick(rng, here) : null
   const events = finder ? Math.floor(min * EVENTS_PER_MIN * modsOf(finder).eventRate * deco.eventRate + rng()) : 0
@@ -251,7 +258,7 @@ export const checkIn = (home: Home, now: number): { home: Home; bonus: number } 
     log: `Day ${streak} streak! The cats bring you ${bonus}c.` } }
 }
 
-// Feed, play, pet or nap the active cat; each one counts toward today's Paw Miles.
+// Play, pet or nap the active cat. Filling the bowl is fillBowl; eating is the cat's own plan.
 export const act = (home: Home, action: Action, now: number): Home => {
   if (!catsAtHome(home).length) return { ...home, log: 'All cats are away on expeditions.' }
   const done = care(home, action, now)
@@ -267,12 +274,6 @@ const care = (home: Home, action: Action, now: number): Home => {
     return withCat({ ...home, log }, cat.id, c => ({ ...c, isAsleep: !c.isAsleep }))
   }
   if (cat.isAsleep) return { ...home, log: `Shh… ${cat.name} is sleeping.` }
-  if (action === 'feed') {
-    if (home.coins < 5) return { ...home, log: 'Not enough coins for fish (5).' }
-    const fed = withCat({ ...home, coins: home.coins - 5, effect: fx('fish', now),
-      log: `${cat.name} munches a fish. Nom. +2xp` }, cat.id, c => befriend({ ...c, hunger: clamp(c.hunger + 30) }, 1, now))
-    return gainXp(fed, cat.id, 2, now)
-  }
   if (action === 'play') {
     if (cat.energy < 10) return { ...home, log: `${cat.name} is too tired to play.` }
     const played = withCat({ ...home, effect: fx('yarn', now), log: `${cat.name} chases the yarn ball! +5xp` }, cat.id,

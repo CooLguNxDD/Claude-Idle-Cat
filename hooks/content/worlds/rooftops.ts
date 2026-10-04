@@ -2,7 +2,7 @@ import { defineWorld } from '../types'
 
 // A city stray's turf: chimneys far off, a pipe to nap on and a tower on the highest roof.
 export default defineWorld({
-  id: 'rooftops', label: 'Rooftops',
+  id: 'rooftops', label: 'Rooftops', cost: { coins: 500 },
   width: { cottage: 72, house: 144, manor: 216 },
   layers: [
     { kind: 'rooftops', parallax: 0.25, tint: { mix: ['overlay0', 'crust', 0.45] } },

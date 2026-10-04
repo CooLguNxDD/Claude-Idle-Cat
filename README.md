@@ -66,8 +66,11 @@ Then type `/cat` to open the pane. Meow.
 | `/cat weather refresh` | update weather now (at most once per minute) |
 | `/cat weather units c\|f` | choose Celsius/km/h or Fahrenheit/mph |
 | `/cat weather off` | stop weather requests and clear the saved location |
-| `/cat world [id]` | list the worlds, or move the yard to another world file |
-| `f` `e` `n` | Feed (5c) · Pet · Nap/Wake |
+| `/cat fill [n]` | add n portions to the shared bowl (5c each, 10 max). `f` adds one, `u` fills it to the top |
+| `/cat world [id]` | list every world as owned or priced, or move to a world you own |
+| `/cat world buy <id>` | buy a world and move the yard there |
+| `f` / `u` | fill the bowl by one portion (5c) / fill it to the top |
+| `e` `n` | Pet · Nap/Wake |
 | `j` / `l` / `0` | (Cat tab) pan the yard left / right · follow the cat again (it resumes on its own after 10 s) |
 | `p` | Play: opens the Arcade in your browser |
 | `o` | (Arcade tab) open or reopen the browser arcade |
@@ -159,7 +162,7 @@ Short version: stats drop, coins pile up, cats judge you silently.
 - Nyan's shop is open 08:00–22:00 by your clock, with 4 new items every day.
 - Furniture goes in yard spots (bowl, bed, toy, rug, plant, something hanging) and changes the rules: an auto-feeder, sleep regen, coin boosts, slower joy decay, more AFK events, bigger gifts.
 - The yard is wider than the pane and grows with the house: 80 columns for the Cottage, 160 for the House, 240 for the Manor and every bigger house. The view follows the cat; a strip along the top shows where you are. The House unlocks a cat tower and a tunnel, the Manor a big pipe to lounge on, and the cat visits all of them by itself.
-- Six worlds are available for free through `/cat world <id>`: `backyard`, `rooftops`, `snowy-cabin`, `neon-alley`, `space-station` and `beach-pier`. The four new worlds theme the sky, backdrops, floor, fence and landmarks while keeping your furniture and the same movement geometry. Live weather and seasonal effects work everywhere, even aboard the station; pumpkins and Christmas lights still appear.
+- Worlds are bought from the yard list. `backyard` is free. `rooftops` is 500c, `beach-pier` 3000c, `snowy-cabin` 5000c, `neon-alley` 8000c, and `space-station` is 25000c plus 30 stardust once the house is tier 3. A save keeps the yard it was already standing in. The themed worlds change the sky, backdrops, floor, fence and landmarks while keeping your furniture and the same movement geometry. Live weather and seasonal effects work everywhere, even aboard the station; pumpkins and Christmas lights still appear.
 - Tom Mew builds a bigger house (House, Manor, Villa, Mansion, Castle, Palace, and on forever) on an interest-free loan. Every house holds one more cat. The first loan is 400c and each one after doubles (800c, 1.6kc, …). A quarter of income pays it back, and there's no deadline. Best landlord in town.
 - Six named cats can drop by instead of plain strays: Captain Whiskers visits every world; wizard Merlin Meow visits the backyard and snowy cabin; pirate rival Admiral Claw visits rooftops and the beach pier; astronaut Nova visits the station; courier Pixel visits the neon alley; and gentle ghost Boo visits every world in October. Each eligible character gets a 5% roll in registry order, so later characters have slightly lower overall chances. All can be adopted for free.
 - Stray cats visit the yard, drawn by your decor (each item attracts certain personalities). They sit on the fence for a few hours, leave a gift, and you can adopt them for free. Remember, you were one once.
@@ -171,11 +174,12 @@ Short version: stats drop, coins pile up, cats judge you silently.
 - Each level gives a skill point for the Skills tab (`s`). There are three branches: **Hunter** (coins, AFK finds, gifts), **Cuddler** (joy, xp) and **Dreamer** (sleep, time away). Resetting skills costs coins.
 - Cats grow from kitten to cat (red collar) at level 5. At level 10 they evolve into the form of their strongest branch: **Ninja** 🥷 (headband), **Royal** 👑 (crown and cape) or **Cloud** ☁️ (halo and wings). A cat with no skills becomes a **Chonk**. (No shame. Chonk is a lifestyle.)
 - The terminal shows an animated pixel-art scene with a day, dusk and night sky that follows your clock. Other surfaces show an ASCII cat.
-- The active cat roams the yard on its own: it walks, trots, hops, pounces, grooms, stretches, loafs and gets the zoomies, picking moves by mood, personality and time of day. Hungry cats head for the bowl, tired ones for the bed, and a napping cat pads to its bed first.
+- The active cat roams the yard on its own: it walks, trots, hops, pounces, grooms, stretches, loafs and gets the zoomies, picking moves by mood, personality and time of day. A napping cat pads to its bed first.
+- Every cat at home has a small GOAP brain. Hunger under 45, energy under 30 and low joy become goals. The cat plans a few steps: eat from the shared bowl, nap, play with another awake cat, or groom. You fill the bowl; the cat spends a portion when it eats. An empty bowl gets a meow instead of a meal. Only the active cat, and a pair partner, are animated. The others still finish their plans on the 10s tick.
 
 ### 💕 Friends tab (`r`)
 
-- Each cat has a friendship score with six levels, from Stranger to Best friend. Petting, feeding and playing add to it, up to 10 points a day.
+- Each cat has a friendship score with six levels, from Stranger to Best friend. Petting, eating from the bowl and playing add to it, up to 10 points a day.
 - You can give each cat one gift a day. Every personality has a favorite, and you find out which by trying.
 - Friendship unlocks a nickname for you (level 3), a catchphrase (level 4) and a photo (level 6).
 - Cats talk. What they say changes through the day, and they remember a favorite gift for a couple of days.
@@ -410,7 +414,7 @@ node tools/build-web.mjs
 
 ### 🧶 Generator skills
 
-New content is a data file, and thirteen mirrored project skills in `.claude/skills/` and `.agents/skills/` write one for you in a Claude Code session in this repo. Each writes the file, registers it with `node tools/build-content.mjs`, renders a preview with `node tools/preview.mjs`, then runs the checks.
+New content is a data file, and fifteen mirrored project skills in `.claude/skills/` and `.agents/skills/` write one for you in a Claude Code session in this repo. `behavior-gen` and `goal-gen` add GOAP behaviours and goals. Each writes the file, registers it with `node tools/build-content.mjs`, renders a preview with `node tools/preview.mjs`, then runs the checks.
 
 | Skill | Ask for | Writes |
 | --- | --- | --- |

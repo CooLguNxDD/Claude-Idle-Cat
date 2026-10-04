@@ -32,7 +32,7 @@ test('station stars animate only on visible nights in every flavor and scale', (
 })
 
 test('new worlds select without changing furniture and retain movement geometry at each tier', () => {
-  const home = newHome(now)
+  const home = { ...newHome(now), worlds: WORLDS.map(w => w.id) }
   const backyard = WORLDS[0]!
   for (const world of themed) {
     const moved = setWorld(home, world.id)

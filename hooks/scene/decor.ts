@@ -35,8 +35,10 @@ export const drawDecor = (c: SceneCanvas, home: Home, now: number, tick: number,
     if (id === 'lantern' && yard.isNight) c.put(x + 2, y + 3, tick % 12 < 6 ? f.yellow : f.peach)
     if (id === 'moonlamp' && yard.isNight) for (const dx of [-1, 5]) c.put(x + dx, y + 2, f.yellow)
     if (id === 'birds') c.put(x + (tick % 12 < 6 ? -1 : 5), y + 4, f.blue)
-    if (slot === 'bowl' && home.effect?.kind === 'fish' && (now - home.effect.at) / 1000 < 3)
-      for (let dx = 2; dx <= 5; dx++) c.put(x + dx, y, f.peach)
+    if (slot === 'bowl' && (home.bowl.food > 0 || (home.effect?.kind === 'fish' && (now - home.effect.at) / 1000 < 3))) {
+      const rows = home.bowl.food >= 8 ? 3 : home.bowl.food >= 4 ? 2 : 1
+      for (let row = 0; row < rows; row++) for (let dx = 2; dx <= 5; dx++) c.put(x + dx, y - row, f.peach)
+    }
   }
   if (yard.festival === 'pumpkins') {
     const x = at.bowl - 4

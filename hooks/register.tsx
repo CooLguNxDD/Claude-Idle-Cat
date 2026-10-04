@@ -43,8 +43,10 @@ import { CLASSIC_X } from './scene/cats'
 import { forceMove, motionCtxOf, startMotion, stepMotion } from './motion'
 import { followCam, panCam } from './camera'
 import type { Camera } from './camera'
-import { setWorld } from './world'
-import { WORLDS, EXPEDITIONS, SHOP, INTERACTIONS } from './content'
+import { buyWorld, canBuyWorld, isWorldOwned, setWorld } from './world'
+import { think } from './brain'
+import { BOWL_CAP, fillBowl } from './bowl'
+import { BEHAVIORS, WORLDS, EXPEDITIONS, SHOP, INTERACTIONS } from './content'
 import { DESIGN } from './scene/fine/draw'
 import { seeded } from './rng'
 import type { Rng } from './rng'
@@ -85,6 +87,7 @@ let frame = 0
 let motion = startMotion(CLASSIC_X)
 let motionCatId = ''
 let pairRun: PairRun | null = null
+let intentKey = ''
 let reactionMemory: ReactionMemory = {}
 let reactionMode: ReactionMode = 'on'
 let reactionUntil = 0
@@ -271,11 +274,12 @@ const openArcade = async ($: EngineInterface, isForced = false) => {
   return true
 }
 
-const ACTIONS: { action: Action; label: string; hotkey: string }[] = [
-  { action: 'feed', label: 'Feed 5c', hotkey: 'f' },
-  { action: 'play', label: 'Play ▸', hotkey: 'p' },
-  { action: 'pet', label: 'Pet', hotkey: 'e' },
-  { action: 'nap', label: 'Nap/Wake', hotkey: 'n' },
+const ACTIONS: { id: string; label: string; hotkey: string; run: 'play' | 'fill' | 'top' | Action }[] = [
+  { id: 'fill', label: 'Fill bowl +1 (5c)', hotkey: 'f', run: 'fill' },
+  { id: 'fill-top', label: 'Fill to top (u)', hotkey: 'u', run: 'top' },
+  { id: 'play', label: 'Play ▸', hotkey: 'p', run: 'play' },
+  { id: 'pet', label: 'Pet', hotkey: 'e', run: 'pet' },
+  { id: 'nap', label: 'Nap/Wake', hotkey: 'n', run: 'nap' },
 ]
 
 const hourOf = (now: number) => new Date(now).getHours()
@@ -426,8 +430,10 @@ const HELP = [
   '/cat import <file> — load a backup (your current save is backed up first)',
   '/cat weather <city> — real weather; system for device location, off to clear, refresh to update',
   '/cat theme <latte|frappe|macchiato|mocha> — switch Claude Code to that Catppuccin theme',
-  '/cat world [id] — list the worlds, or move the yard to another one',
-  'In the pane: ‹ › tabs · q back · c a s h r b m x g v t visible tab shortcuts · f e n feed/pet/nap · p arcade · w cat list',
+  '/cat fill [n] — add n portions to the shared bowl (5c each)',
+  '/cat world [id] — list worlds with prices, or move to one you own',
+  '/cat world buy <id> — buy a world and move the yard there',
+  'In the pane: ‹ › tabs · q back · c a s h r b m x g v t visible tab shortcuts · f u fill bowl · e n pet/nap · p arcade · w cat list',
   'On the Cat tab: j and l pan the yard · 0 follows the cat again',
 ].join('\n')
 
@@ -555,7 +561,7 @@ export const register: Register = (on, options) => {
     let returns: string[] = []
     const home = await change($, (_, t) => {
       const loaded = resumeExpeditions(migrate(saved, t), t)
-      const day = checkIn(tick(loaded, t), t)
+      const day = checkIn(think(tick(loaded, t), t, Math.random), t)
       bonus = day.bonus
       returns = readyRuns(day.home, t).filter(r => !day.home.expeditions.inbox.includes(r.id)).map(r => r.exp)
       return finishExpeditions(saved ? welcomeBack(loaded, day.home, t) : day.home, t)
@@ -575,7 +581,7 @@ export const register: Register = (on, options) => {
       return change($, (prev, t) => {
         const r = tickTally(prev, t)
         auto = r.deducted
-        return r.home
+        return think(r.home, t, Math.random)
       }, () => auto)
     }))
     // Keeps the arcade server alive; it shuts itself down two minutes after the pings stop.
@@ -615,9 +621,24 @@ export const register: Register = (on, options) => {
         if (paint.isMounted) {
           motionRng ??= seeded(now)
           const cat = activeCat(latest), ctx = motionCtxOf(latest, cols, hourOf(now))
-          if (motionCatId !== cat.id) { motion = startMotion(CLASSIC_X); motionCatId = cat.id; pairRun = null }
+          if (motionCatId !== cat.id) { motion = startMotion(CLASSIC_X); motionCatId = cat.id; pairRun = null; intentKey = '' }
           if (pairRun && (pairRun.leadId !== cat.id || isAway(latest, pairRun.partnerId) || isAway(latest, pairRun.leadId))) pairRun = null
-          if (!pairRun && frame >= reactionUntil && frame % 240 === 0 && !isAway(latest, cat.id)) {
+          const intent = cat.intent
+          const behavior = intent ? BEHAVIORS.find(b => b.id === intent.id) : undefined
+          const key = intent ? `${cat.id}:${intent.id}:${intent.at}` : ''
+          if (behavior && intent && intentKey !== key) {
+            intentKey = key
+            if (behavior.partner && intent.with) {
+              const yard = latest
+              const buddy = yard.cats.find(c => c.id === intent.with && !c.isAsleep && !isAway(yard, c.id))
+              const picked = buddy && pickInteraction(latest, cat, buddy, motionRng)
+              pairRun = picked && buddy ? startPair(picked, cat.id, buddy.id, motion, ctx, motionRng) : null
+            } else {
+              pairRun = null
+              motion = forceMove(motion, behavior.move, ctx, motionRng, behavior.seconds)
+            }
+          }
+          if (!pairRun && !intent && frame >= reactionUntil && frame % 240 === 0 && !isAway(latest, cat.id)) {
             const buddy = partnerOf(latest, cat.id, motionRng)
             const i = buddy && pickInteraction(latest, cat, buddy, motionRng)
             if (i) pairRun = startPair(i, cat.id, buddy!.id, motion, ctx, motionRng)
@@ -713,8 +734,18 @@ export const register: Register = (on, options) => {
     }
     if (sub === 'export' || sub === 'import') return backupCommand($, sub, arg)
     if (sub === 'theme') return themeCommand($, arg)
+    if (sub === 'fill') {
+      const n = arg ? Number(arg) : 1
+      if (!Number.isInteger(n) || n < 1) return { text: 'Usage: /cat fill [portions]' }
+      return { text: (await change($, (h, t) => fillBowl(h, n, t))).log }
+    }
     if (sub === 'world') {
-      if (!arg) return { text: `Worlds: ${WORLDS.map(w => `${w.id} (${w.label})`).join(', ')}. Use /cat world <id>.` }
+      if (rest[0] === 'buy') return { text: (await change($, (p, t) => buyWorld(p, rest.slice(1).join(' ').trim().toLowerCase(), t))).log }
+      if (!arg) {
+        const home = await change($, h => h)
+        const lines = WORLDS.map(w => `${w.id} (${w.label}) ${isWorldOwned(home, w.id) ? 'owned' : costText(w.cost ?? {})}`)
+        return { text: `Worlds: ${lines.join(', ')}. /cat world <id> · /cat world buy <id>.` }
+      }
       return { text: (await change($, prev => setWorld(prev, arg.trim().toLowerCase()))).log }
     }
     if (sub === 'weather') {
@@ -924,8 +955,13 @@ export const register: Register = (on, options) => {
         {FLAVOR_NAMES.map(name => <Button key={`settings-theme-${name}`} plain label={name}
           onPress={async () => { const result = await themeCommand($, name); $.ui.toast(result.text) }} />)}
         <Text bold color={tone.title}>Yard world · {home.world.id}</Text>
-        {WORLDS.map(world => <Button key={`settings-world-${world.id}`} plain label={`${home.world.id === world.id ? '●' : '○'} ${world.label}`}
-          onPress={() => change($, h => setWorld(h, world.id))} />)}
+        {WORLDS.map(world => {
+          if (isWorldOwned(home, world.id)) return <Button key={`settings-world-${world.id}`} plain label={`${home.world.id === world.id ? '●' : '○'} ${world.label}`}
+            onPress={() => change($, h => setWorld(h, world.id))} />
+          const check = canBuyWorld(home, world.id)
+          const label = check.ok ? `Buy ${world.label} — ${costText(world.cost ?? {})}` : `${world.label} — ${check.reason}`
+          return <Button key={`settings-world-${world.id}`} plain label={label} onPress={() => change($, (h, t) => buyWorld(h, world.id, t))} />
+        })}
         <Text bold color={tone.title}>Weather · {weatherSummary(home.weather, now)}</Text>
         <Button key="settings-weather" plain label="Choose weather location" onPress={() => routeTo($, 'weather')} />
         <Button key="settings-weather-units" plain label={home.weather.units === 'c' ? 'Use °F' : 'Use °C'}
@@ -1312,6 +1348,7 @@ export const register: Register = (on, options) => {
         {stat('Hunger', cat.hunger)}
         {stat('Joy', cat.joy)}
         {stat('Energy', cat.energy)}
+        <Text color={tone.accent}>Bowl {'▮'.repeat(Math.max(0, Math.min(BOWL_CAP, home.bowl.food)))}{'▯'.repeat(BOWL_CAP - Math.max(0, Math.min(BOWL_CAP, home.bowl.food)))} {home.bowl.food}/{BOWL_CAP}</Text>
         <Text color={tone.accent}>
           XP {bar((cat.xp / xpToNext(cat.level)) * 100, 10)} {cat.xp}/{xpToNext(cat.level)}
         </Text>
@@ -1332,11 +1369,13 @@ export const register: Register = (on, options) => {
         )}
         <Box>
           {ACTIONS.map(a => (
-            <Button key={a.action} label={a.label} hotkey={a.hotkey}
+            <Button key={a.id} label={a.label} hotkey={a.hotkey}
               onPress={async () => {
-                if (a.action !== 'play') return change($, (prev, t) => act(prev, a.action, t))
-                await routeTo($, 'arcade')
-                await openArcade($)
+                const run = a.run
+                if (run === 'play') { await routeTo($, 'arcade'); await openArcade($); return }
+                if (run === 'fill') return change($, (prev, t) => fillBowl(prev, 1, t))
+                if (run === 'top') return change($, (prev, t) => fillBowl(prev, BOWL_CAP, t))
+                if (run === 'pet' || run === 'nap') return change($, (prev, t) => act(prev, run, t))
               }} />
           ))}
         </Box>

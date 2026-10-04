@@ -1,7 +1,7 @@
 import { defineWorld } from '../types'
 
 export default defineWorld({
-  id: 'neon-alley', label: 'Neon Alley', scene: 'neon-alley',
+  id: 'neon-alley', label: 'Neon Alley', scene: 'neon-alley', cost: { coins: 8000 },
   width: { cottage: 80, house: 160, manor: 240 },
   layers: [
     { kind: 'rooftops', parallax: 0.2, tint: 'overlay0' },

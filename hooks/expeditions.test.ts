@@ -75,7 +75,7 @@ test('all-away households cannot earn yard income, find critters or receive care
   const later = tick(away, now + 3600000, () => 0)
   expect(later.coins).toBe(away.coins); expect(later.pocket).toEqual({})
   expect(later.cats[0]!.energy).toBe(away.cats[0]!.energy)
-  expect(act(away, 'feed', now).coins).toBe(away.coins)
+  expect(act(away, 'pet', now).coins).toBe(away.coins)
   expect(reward(away, 0, 10, now).cats[0]!.xp).toBe(away.cats[0]!.xp)
 })
 test('v3 saves missing the new fields receive independent defaults and remain v3', () => {

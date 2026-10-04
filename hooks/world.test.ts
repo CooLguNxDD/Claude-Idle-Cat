@@ -1,18 +1,18 @@
 import { expect, test } from 'claude-code/testing'
 
 import { followCam, panCam, FOLLOW_AFTER } from './camera'
-import { WORLDS } from './content'
+import { MATERIALS, WORLDS } from './content'
 import { worldProblems } from './content/types'
 import type { World } from './content/types'
 import { migrate, newHome } from './game'
 import { frameCells, frameImage, yardCols } from './scene'
 import { FLAVORS } from './theme'
-import { landmarksOf, setWorld, worldCols, worldOf } from './world'
+import { buyWorld, isWorldOwned, landmarksOf, setWorld, worldCols, worldOf } from './world'
 
 const backyard = WORLDS.find(w => w.id === 'backyard')!
 
 test('every world file is valid and the validator names bad ones', () => {
-  for (const world of WORLDS) expect(worldProblems(world)).toEqual([])
+  for (const world of WORLDS) expect(worldProblems(world, MATERIALS, WORLDS)).toEqual([])
   const bad: World = { ...backyard, id: 'Bad', width: { cottage: 90, house: 80, manor: 400 },
     slots: { ...backyard.slots, bowl: 85 }, landmarks: [{ kind: 'tower', x: 70, tier: 0 }, { kind: 'pipe', x: 75, tier: 1 }] }
   expect(worldProblems(bad).length).toBe(6)
@@ -24,6 +24,36 @@ test('the yard grows with the house and unlocks landmarks by tier', () => {
   expect(landmarksOf(backyard, 0)).toEqual([])
   expect(landmarksOf(backyard, 1).map(l => l.kind)).toEqual(['window', 'tower', 'shelf', 'tunnel'])
   expect(landmarksOf(backyard, 2).map(l => l.kind)).toEqual(['window', 'tower', 'shelf', 'tunnel', 'pipe'])
+})
+
+test('worlds are bought with coins and a locked yard cannot be entered', () => {
+  const home = { ...newHome(0), coins: 100 }
+  expect(isWorldOwned(home, 'backyard')).toBe(true)
+  expect(isWorldOwned(home, 'rooftops')).toBe(false)
+  const refused = setWorld(home, 'rooftops')
+  expect(refused.world.id).toBe('backyard')
+  expect(refused.log).toMatch(/500c/)
+  expect(refused.log).toMatch(/\/cat world buy rooftops/)
+  const poor = buyWorld(home, 'rooftops', 1)
+  expect(poor.coins).toBe(100)
+  expect(poor.world.id).toBe('backyard')
+  const bought = buyWorld({ ...home, coins: 500 }, 'rooftops', 1)
+  expect(bought.world.id).toBe('rooftops')
+  expect(bought.coins).toBe(0)
+  expect(bought.worlds).toContain('rooftops')
+  expect(bought.effect?.kind).toBe('shop')
+  const gated = buyWorld({ ...bought, coins: 1_000_000, materials: { stardust: 100 } }, 'space-station', 1)
+  expect(gated.world.id).toBe('rooftops')
+  expect(gated.log).toMatch(/tier 3/)
+})
+
+test('migrate keeps free yards and grandfathers the yard a save is already in', () => {
+  const { worlds: _drop, ...old } = { ...newHome(0), world: { id: 'neon-alley' } }
+  const next = migrate(old, 0)
+  expect(next.worlds).toContain('backyard')
+  expect(next.worlds).toContain('neon-alley')
+  expect(next.worlds).not.toContain('rooftops')
+  expect(next.bowl).toEqual({ food: 3 })
 })
 
 test('old saves land in the backyard and an unknown world falls back to it', () => {

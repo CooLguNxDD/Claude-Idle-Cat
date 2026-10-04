@@ -1,7 +1,7 @@
 import { ACHIEVEMENTS } from '../collection'
 import { expect, test } from 'claude-code/testing'
-import { EVENTS, EXPEDITIONS, FURNITURE, INTERACTIONS, MATERIALS, MOVES, QUESTS, REACTIONS, SHOP, SKILL_FILES, WORLDS } from './index'
-import { eventProblems, expeditionProblems, furnitureProblems, interactionProblems, materialProblems, questProblems, reactionProblems, shopProblems, skillProblems, unlockProblems } from './types'
+import { BEHAVIORS, EVENTS, EXPEDITIONS, FURNITURE, GOALS, INTERACTIONS, MATERIALS, MOVES, QUESTS, REACTIONS, SHOP, SKILL_FILES, WORLDS } from './index'
+import { behaviorProblems, eventProblems, expeditionProblems, furnitureProblems, goalProblems, interactionProblems, materialProblems, questProblems, reactionProblems, shopProblems, skillProblems, unlockProblems, worldProblems } from './types'
 import { dailyStock } from '../home'
 import { newHome } from '../game'
 import { skillTotals } from '../skills'
@@ -15,6 +15,9 @@ test('all content modules validate and every registry has unique ids', () => {
     [INTERACTIONS, INTERACTIONS.flatMap(s => interactionProblems(s, MOVES))], [EVENTS, EVENTS.flatMap(eventProblems)],
     [EXPEDITIONS, EXPEDITIONS.flatMap(s => [...expeditionProblems(s, MATERIALS, [...FURNITURE, ...SHOP]), ...unlockProblems(s.unlock, { expeditions: EXPEDITIONS, shop: SHOP, worlds: WORLDS, achievements: ACHIEVEMENTS })])],
     [QUESTS, QUESTS.flatMap(s => questProblems(s, MATERIALS, FURNITURE))],
+    [BEHAVIORS, BEHAVIORS.flatMap(s => behaviorProblems(s, MOVES))],
+    [GOALS, GOALS.flatMap(goalProblems)],
+    [WORLDS, WORLDS.flatMap(w => worldProblems(w, MATERIALS, WORLDS))],
   ] as const) {
     expect(problems).toEqual([])
     expect(new Set(registry.map(s => s.id)).size).toBe(registry.length)
@@ -38,6 +41,9 @@ test('validators reject excess bonuses, broken references, NaN and out-of-season
   expect(expeditionProblems({ ...EXPEDITIONS[0]!, available: { months: [0] } }, MATERIALS).length).toBeGreaterThan(0)
   expect(reactionProblems({ ...REACTIONS[0]!, odds: NaN }, MOVES).length).toBeGreaterThan(0)
   expect(interactionProblems({ ...INTERACTIONS[0]!, roles: { lead: 'missing', partner: 'sit' } }, MOVES).length).toBeGreaterThan(0)
+  expect(behaviorProblems({ ...BEHAVIORS[0]!, move: 'missing', seconds: 601 }, MOVES).length).toBeGreaterThan(0)
+  expect(goalProblems({ ...GOALS[0]!, need: { ...GOALS[0]!.need, weight: 11 } }).length).toBeGreaterThan(0)
+  expect(worldProblems({ ...WORLDS[0]!, cost: { coins: -1 } }, MATERIALS, WORLDS).length).toBeGreaterThan(0)
   expect(shopProblems({ ...SHOP[0]!, cost: { materials: { unknown: 1 } } }, MATERIALS, FURNITURE).length).toBeGreaterThan(0)
 })
 

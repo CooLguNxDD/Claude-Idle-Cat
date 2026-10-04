@@ -5,7 +5,7 @@ description: Add a new world (a themed yard the cats live in, with width per hou
 
 # world-gen: add a world
 
-A world is one file in `hooks/content/worlds/<id>.ts`. The scene draws the sky on the pane and everything else on a world-wide canvas scrolled by the camera, so a new file is the whole change. Players switch with `/cat world <id>`.
+A world is one file in `hooks/content/worlds/<id>.ts`. The scene draws the sky on the pane and everything else on a world-wide canvas scrolled by the camera, so a new file is the whole change. Players buy a priced world with `/cat world buy <id>` and switch to an owned one with `/cat world <id>`.
 
 ## 1. Pin down the world
 
@@ -37,6 +37,8 @@ Rules, which `worldProblems` checks:
 - `tint` is a shade: a Catppuccin token (`rosewater flamingo pink mauve red maroon peach yellow green teal sky sapphire blue lavender text subtext1 subtext0 overlay2 overlay1 overlay0 surface2 surface1 surface0 base mantle crust`), `light`, `ink`, or `{ mix: [a, b, t] }` with `t` from 0 to 1. Never a hex colour: shades follow all four flavors.
 - Every furniture slot sits inside the cottage; a landmark's `x + width` fits the yard of its `tier`; landmarks don't overlap.
 - The cat walks to the bowl at `slots.bowl - 14` and naps at `slots.bed`, so leave room left of the bowl.
+- Optional `cost` is `{ coins, miles, materials }`. Coins and miles are nonnegative whole numbers. Material ids must exist. Omit `cost`, or leave it empty, for a free yard. Optional `unlock` uses the same gates as shop items (`tier`, `level`, `achievement`, `expedition`, `item`, `world`); `unlockProblems` checks them.
+- Price on a grind: a small theme is a few hundred coins, a mid yard a few thousand, and a late yard stacks a large coin cost with a rare material plus a house tier. Backyard stays free. Rooftops is the cheap first purchase (500c). Space Station is the expensive one (25000c and 30 stardust, tier 3).
 
 ## 3. Register, look, test
 
@@ -53,4 +55,4 @@ Then the checks from `CLAUDE.md` (`claude plugin validate .`, both `tsc` runs, `
 
 ## 4. Commit
 
-`feat(worlds): add the <label> world`. A world is content, not a command, so no README row is needed; mention it can be picked with `/cat world <id>`.
+`feat(worlds): add the <label> world`. Mention its price and that it is bought with `/cat world buy <id>`.

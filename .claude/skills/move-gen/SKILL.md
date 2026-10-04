@@ -27,6 +27,7 @@ export default defineMove({
   when: { moods: ['ok', 'happy'], personality: { curious: 2.5 }, hours: [18, 6], weight: 1.5 },
   next: ['pounce', 'sit'],                   // optional: moves that may follow
   seek: 'tower',                             // optional: walk to a landmark, then perch on it or run through it
+  goTo: 'bowl',                              // optional: walk to the bowl or the bed, then stay. 'bed' is the other spot
 })
 ```
 
@@ -42,7 +43,7 @@ Rules, which `moveProblems` checks:
 - `when.hours` is `[from, to]` in local hours and may wrap past midnight (`[18, 6]`).
 - `isScripted: true` excludes the move from random planning; reactions and interactions use `forceMove`. `turn` flips facing every 1–cycle frames. `prop: 'cup'` requires `seek: 'shelf'`.
 - `next` names existing move ids only. `seek` is `tower`, `tunnel`, `pipe`, `window` or `shelf` (perch heights live in `LANDMARK_PERCH`).
-- Hunger below 50 sends any `walk`-pose move to the bowl, and energy below 40 sends it to the bed. Keep that in mind when naming a walk.
+- `goTo` is `bowl` or `bed`. The cat walks there and stays, even when `speed` is 0. Hunger and energy do not steer ordinary walks; the GOAP brain owns that.
 
 ## 3. Register, look, test
 

@@ -2,6 +2,7 @@ import { defineWorld } from '../types'
 
 export default defineWorld({
   id: 'space-station', label: 'Space Station', scene: 'space-station',
+  cost: { coins: 25000, materials: { stardust: 30 } }, unlock: { tier: 3 },
   width: { cottage: 80, house: 160, manor: 240 },
   layers: [
     { kind: 'station-windows', parallax: 0.2, tint: 'overlay1' },

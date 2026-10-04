@@ -1,7 +1,7 @@
 import { defineWorld } from '../types'
 
 export default defineWorld({
-  id: 'beach-pier', label: 'Beach Pier', scene: 'beach-pier',
+  id: 'beach-pier', label: 'Beach Pier', scene: 'beach-pier', cost: { coins: 3000 },
   width: { cottage: 80, house: 160, manor: 240 },
   layers: [
     { kind: 'ocean', parallax: 0.25, tint: 'sapphire' },

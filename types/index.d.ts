@@ -27,6 +27,8 @@ export type Cat = {
   // Today's friendship: points earned (capped) and whether a gift was given.
   daily: { day: number; points: number; gifted: boolean }
   lastGift: { id: string; day: number } | null
+  // What the cat is in the middle of. Unknown behaviour ids are dropped on load.
+  intent?: { id: string; at: number; with?: string }
 }
 
 // A stray in the yard: it stays a while, leaves a gift, and can be adopted.
@@ -112,6 +114,10 @@ export type Home = {
   shelter: Shelter
   // Which world file the yard is drawn from; an unknown id falls back to the first world.
   world: { id: string }
+  // World ids this household has bought. Free yards are always included.
+  worlds: string[]
+  // Shared food bowl, in portions. Cats eat from it; the owner fills it.
+  bowl: { food: number }
 }
 
 declare module 'claude-code' {

@@ -1,5 +1,5 @@
 import type { Home, Personality } from '../types'
-import { MOVES } from './content'
+import { BEHAVIORS, MOVES } from './content'
 import { LANDMARK_PERCH } from './content/types'
 import type { LandmarkKind, Move, PoseKind } from './content/types'
 import { activeCat, moodOf } from './game'
@@ -26,6 +26,8 @@ export type MotionCtx = {
   spots: { bowl: number; bed: number }
   /** Unlocked landmarks, in design units. */
   landmarks: readonly { kind: LandmarkKind; x: number; w: number }[]
+  /** The active cat's current behaviour, when it has one. */
+  intent?: { move: string; goTo?: 'bowl' | 'bed'; seek?: LandmarkKind; partner?: string }
 }
 export type Pose = { kind: PoseKind; phase: number; facing: 1 | -1; lift: number }
 
@@ -80,12 +82,11 @@ const landmarkFor = (kind: LandmarkKind, x: number, ctx: MotionCtx) => {
   return { entry: clampX(entry, ctx), exit: clampX(exit, ctx), perch: LANDMARK_PERCH[kind] }
 }
 
-// Walks head for the bowl when hungry and the bed when tired; other travel picks a fresh spot.
+// A goTo move walks to the bowl or the bed. Other travel picks a landmark or a fresh spot.
 const targetOf = (m: Move, x: number, facing: 1 | -1, ctx: MotionCtx, rng: Rng) => {
+  if (m.goTo) return clampX(ctx.spots[m.goTo], ctx)
   if (m.seek) return landmarkFor(m.seek, x, ctx)?.entry ?? x
   if (m.speed === 0) return x
-  if (m.pose === 'walk' && ctx.hunger < 50) return clampX(ctx.spots.bowl, ctx)
-  if (m.pose === 'walk' && ctx.energy < 40) return clampX(ctx.spots.bed, ctx)
   if (m.pose === 'crouch') return clampX(x + facing * m.speed * m.cycle, ctx)
   return clampX(ctx.minX + rng() * (ctx.maxX - ctx.minX), ctx)
 }
@@ -95,12 +96,13 @@ const toward = (target: number, x: number, facing: 1 | -1) => (target > x + NEAR
 const begin = (m: Move, base: Motion, ctx: MotionCtx, rng: Rng): Motion => {
   const [lo, hi] = m.seconds
   const target = targetOf(m, base.x, base.facing, ctx, rng)
-  return { ...base, y: 0, isHidden: false, stage: m.seek ? 'go' : 'free', move: m.id, frame: 0,
+  return { ...base, y: 0, isHidden: false, stage: m.seek || m.goTo ? 'go' : 'free', move: m.id, frame: 0,
     left: Math.round((lo + rng() * (hi - lo)) * FPS), target, facing: toward(target, base.x, base.facing) }
 }
 
 // A seek move that reached its landmark perches on it, or dives into the tunnel and heads for the far mouth.
 const arrive = (m: Motion, move: Move, ctx: MotionCtx): Motion => {
+  if (move.goTo && !move.seek) return { ...m, stage: 'stay', y: 0, frame: 0 }
   const spot = move.seek ? landmarkFor(move.seek, m.x, ctx) : null
   if (!spot) return { ...m, left: 0 }
   if (spot.perch) return { ...m, stage: 'stay', y: spot.perch, frame: 0 }
@@ -124,7 +126,8 @@ export const stepMotion = (m: Motion, ctx: MotionCtx, rng: Rng): Motion => {
   const isTravelling = cur.stage === 'go' || cur.stage === 'through' || (cur.stage === 'free' && move.speed > 0)
   const isArrived = isTravelling && Math.abs(cur.target - cur.x) < 0.01
   if (isArrived && cur.stage === 'go') return arrive(cur, move, ctx)
-  if (cur.left <= 0 || isArrived || (!isAsleep && move.pose === 'sleep' && !move.isScripted)) {
+  const holdsNap = ctx.intent?.move === move.id
+  if (cur.left <= 0 || isArrived || (!isAsleep && move.pose === 'sleep' && !move.isScripted && !holdsNap)) {
     if (isAsleep && move.id === WALK.id) return Math.abs(cur.x - bed) <= NEAR ? begin(NAP, cur, ctx, rng) : toBed(cur, bed)
     return begin(pickMove(move, ctx, rng), cur, ctx, rng)
   }
@@ -149,10 +152,12 @@ export const motionCtxOf = (home: Home, paneCols: number, hour: number): MotionC
   const cat = activeCat(home)
   const world = worldOf(home)
   const cols = worldCols(world, home.tier, paneCols)
+  const behavior = cat.intent ? BEHAVIORS.find(b => b.id === cat.intent!.id) : undefined
   return { mood: moodOf(cat), personality: cat.genes.personality, hour, hunger: cat.hunger, energy: cat.energy, minX: 0,
     maxX: Math.max(0, (cols - 16) * DESIGN),
     spots: { bowl: (world.slots.bowl - 14) * DESIGN, bed: world.slots.bed * DESIGN },
-    landmarks: landmarksOf(world, home.tier).map(l => ({ kind: l.kind, x: l.x * DESIGN, w: l.w * DESIGN })) }
+    landmarks: landmarksOf(world, home.tier).map(l => ({ kind: l.kind, x: l.x * DESIGN, w: l.w * DESIGN })),
+    ...(behavior && cat.intent ? { intent: { move: behavior.move, goTo: behavior.goTo, seek: behavior.seek, partner: cat.intent.with } } : {}) }
 }
 
 /** Start a registered move without changing the save or consuming planner weights. */

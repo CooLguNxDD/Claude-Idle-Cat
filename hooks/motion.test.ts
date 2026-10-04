@@ -65,9 +65,15 @@ test('a sleepy cat in a manor yard walks the whole way to its bed before it naps
   expect(path[path.length - 1]!.move).toBe('nap-curl')
 })
 
-test('a hungry cat walks toward its bowl', () => {
-  const toBowl = run(startMotion(20), ctx({ hunger: 20, mood: 'grumpy' }), 60 * FPS).find(m => moveOf(m.move).pose === 'walk')
-  expect(toBowl?.target).toBe(140)
+test('a goTo move walks to the bowl and stays there', () => {
+  const c = ctx({ spots: { bowl: 140, bed: 10 } })
+  let m = forceMove(startMotion(20), 'eat', c, seeded(1), 4)
+  expect(m.stage).toBe('go')
+  expect(m.target).toBe(140)
+  for (let i = 0; i < 200 && m.stage === 'go'; i++) m = stepMotion(m, c, seeded(2))
+  expect(m.stage).toBe('stay')
+  expect(m.y).toBe(0)
+  expect(Math.abs(m.x - 140)).toBeLessThanOrEqual(4)
 })
 
 test('poses report cycle phase, facing and lift', () => {

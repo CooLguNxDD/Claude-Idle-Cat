@@ -1,4 +1,5 @@
 import type { Eyes, Marking, Personality, Rarity, Silhouette, Slot } from '../../types'
+import { costProblems, unlockProblems, type Cost, type Material, type Unlock } from './progression'
 import type { Mood } from '../game'
 import { COLOR_TOKENS, inkOf, mix } from '../theme'
 import type { ColorName, Flavor } from '../theme'
@@ -89,6 +90,8 @@ export type Move = {
   isScripted?: boolean
   turn?: number
   prop?: 'cup'
+  /** Walk to the bowl or the bed, then stay. The brain uses this; hunger no longer steers walks. */
+  goTo?: 'bowl' | 'bed'
 }
 
 export const defineMove = (move: Move): Move => move
@@ -106,6 +109,7 @@ export const moveProblems = (m: Move, all: readonly Move[]): string[] => [
   ...(m.when.hours && !m.when.hours.every(h => Number.isInteger(h) && h >= 0 && h <= 24) ? [`${m.id}: hours are 0 to 24`] : []),
   ...(m.next ?? []).filter(id => !all.some(o => o.id === id)).map(id => `${m.id}: next names unknown move ${id}`),
   ...(m.seek && !LANDMARK_KINDS.includes(m.seek) ? [`${m.id}: unknown landmark ${m.seek}`] : []),
+  ...(m.goTo && m.goTo !== 'bowl' && m.goTo !== 'bed' ? [`${m.id}: goTo is bowl or bed`] : []),
   ...(m.turn !== undefined && (!Number.isInteger(m.turn) || m.turn < 1 || m.turn > m.cycle) ? [`${m.id}: turn is a frame interval within the cycle`] : []),
   ...(m.prop && (m.prop !== 'cup' || m.seek !== 'shelf') ? [`${m.id}: cup props seek the shelf`] : []),
   ...(m.seek && m.speed === 0 ? [`${m.id}: a seek move needs a speed to get there`] : []),
@@ -138,6 +142,9 @@ export type World = {
   landmarks: readonly { kind: LandmarkKind; x: number; tier: 0 | 1 | 2 }[]
   /** Fence-top spots for the other cats and visiting strays, in scene x. */
   perches: readonly number[]
+  /** Missing or empty means the yard is free. */
+  cost?: Cost
+  unlock?: Unlock
 }
 
 export const defineWorld = (world: World): World => world
@@ -145,7 +152,7 @@ export const defineWorld = (world: World): World => world
 const SLOTS: readonly Slot[] = ['bowl', 'bed', 'toy', 'rug', 'plant', 'hanging']
 
 /** Every problem with a world spec; empty means the yard can draw it. */
-export const worldProblems = (w: World): string[] => {
+export const worldProblems = (w: World, materials: readonly Material[] = [], worlds: readonly { id: string }[] = [w]): string[] => {
   const widths = TIER_KEYS.map(k => w.width[k])
   const out: string[] = []
   if (w.scene && !SCENE_STYLES.includes(w.scene)) out.push(`${w.id}: unknown scene style ${w.scene}`)
@@ -169,6 +176,8 @@ export const worldProblems = (w: World): string[] => {
     .map(l => [l.x, l.x + LANDMARK_WIDTH[l.kind]] as const).sort((a, b) => a[0] - b[0])
   if (spans.some((s, i) => i > 0 && s[0] < spans[i - 1]![1])) out.push(`${w.id}: landmarks overlap`)
   if (w.perches.some(x => x < 0 || x + 7 > w.width.cottage)) out.push(`${w.id}: perches must sit inside the cottage`)
+  if (w.cost) out.push(...costProblems(w.cost, materials).map(p => `${w.id}: ${p}`))
+  out.push(...unlockProblems(w.unlock, { worlds }).map(p => `${w.id}: ${p}`))
   return out
 }
 
