@@ -218,7 +218,34 @@ import speechWeatherRain from './speech/weather-rain'
 import speechWeatherSnow from './speech/weather-snow'
 import speechWelcome from './speech/welcome'
 import speechDoneEatFancy from './speech/done-eat-fancy'
-import type { Breed, Move, World, NamedCat, Reaction, Interaction, Expedition, Quest, GameEvent, SkillSpec, FurnitureSpec, ShopItem, Material, Behavior, Goal, Speech } from './types'
+import trailEventBeeBuzz from './trail-events/bee-buzz'
+import trailEventBigRaccoon from './trail-events/big-raccoon'
+import trailEventButterflyChase from './trail-events/butterfly-chase'
+import trailEventCampfireNap from './trail-events/campfire-nap'
+import trailEventCrabPinch from './trail-events/crab-pinch'
+import trailEventCritterScuffle from './trail-events/critter-scuffle'
+import trailEventCrowCaw from './trail-events/crow-caw'
+import trailEventCuriousSign from './trail-events/curious-sign'
+import trailEventFishLeap from './trail-events/fish-leap'
+import trailEventForage from './trail-events/forage'
+import trailEventHeadHome from './trail-events/head-home'
+import trailEventIceSlide from './trail-events/ice-slide'
+import trailEventJackChest from './trail-events/jack-chest'
+import trailEventLittleAlien from './trail-events/little-alien'
+import trailEventLogLeap from './trail-events/log-leap'
+import trailEventMeteorDodge from './trail-events/meteor-dodge'
+import trailEventMushroomRing from './trail-events/mushroom-ring'
+import trailEventOwlStare from './trail-events/owl-stare'
+import trailEventPatchGhost from './trail-events/patch-ghost'
+import trailEventPigeonSquabble from './trail-events/pigeon-squabble'
+import trailEventRogueDrone from './trail-events/rogue-drone'
+import trailEventRooftopGap from './trail-events/rooftop-gap'
+import trailEventSnowballFight from './trail-events/snowball-fight'
+import trailEventStrayHello from './trail-events/stray-hello'
+import trailEventStreamHop from './trail-events/stream-hop'
+import trailEventStroll from './trail-events/stroll'
+import trailEventTreasureChest from './trail-events/treasure-chest'
+import type { Breed, Move, World, NamedCat, Reaction, Interaction, Expedition, Quest, GameEvent, SkillSpec, FurnitureSpec, ShopItem, Material, Behavior, Goal, Speech, TrailEvent } from './types'
 
 // breeds definitions in pinned order; engines apply runtime eligibility.
 export const BREEDS: readonly Breed[] = [
@@ -486,4 +513,34 @@ export const SPEECH: readonly Speech[] = [
   speechWeatherSnow,
   speechWelcome,
   speechDoneEatFancy,
+]
+// trail-events definitions in pinned order; engines apply runtime eligibility.
+export const TRAIL_EVENTS: readonly TrailEvent[] = [
+  trailEventBeeBuzz,
+  trailEventBigRaccoon,
+  trailEventButterflyChase,
+  trailEventCampfireNap,
+  trailEventCrabPinch,
+  trailEventCritterScuffle,
+  trailEventCrowCaw,
+  trailEventCuriousSign,
+  trailEventFishLeap,
+  trailEventForage,
+  trailEventHeadHome,
+  trailEventIceSlide,
+  trailEventJackChest,
+  trailEventLittleAlien,
+  trailEventLogLeap,
+  trailEventMeteorDodge,
+  trailEventMushroomRing,
+  trailEventOwlStare,
+  trailEventPatchGhost,
+  trailEventPigeonSquabble,
+  trailEventRogueDrone,
+  trailEventRooftopGap,
+  trailEventSnowballFight,
+  trailEventStrayHello,
+  trailEventStreamHop,
+  trailEventStroll,
+  trailEventTreasureChest,
 ]

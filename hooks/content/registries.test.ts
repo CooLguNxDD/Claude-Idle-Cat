@@ -1,7 +1,7 @@
 import { ACHIEVEMENTS } from '../collection'
 import { expect, test } from 'claude-code/testing'
-import { BEHAVIORS, EVENTS, EXPEDITIONS, FURNITURE, GOALS, INTERACTIONS, MATERIALS, MOVES, QUESTS, REACTIONS, SHOP, SKILL_FILES, SPEECH, WORLDS } from './index'
-import { behaviorProblems, eventProblems, expeditionProblems, furnitureProblems, goalProblems, interactionProblems, materialProblems, questProblems, reactionProblems, shopProblems, skillProblems, speechProblems, unlockProblems, worldProblems } from './types'
+import { BEHAVIORS, EVENTS, EXPEDITIONS, FURNITURE, GOALS, INTERACTIONS, MATERIALS, MOVES, QUESTS, REACTIONS, SHOP, SKILL_FILES, SPEECH, TRAIL_EVENTS, WORLDS } from './index'
+import { behaviorProblems, eventProblems, expeditionProblems, flowProblems, furnitureProblems, goalProblems, interactionProblems, materialProblems, questProblems, reactionProblems, shopProblems, skillProblems, speechProblems, trailEventProblems, unlockProblems, worldProblems } from './types'
 import { dailyStock } from '../home'
 import { newHome } from '../game'
 import { skillTotals } from '../skills'
@@ -19,6 +19,7 @@ test('all content modules validate and every registry has unique ids', () => {
     [GOALS, GOALS.flatMap(goalProblems)],
     [SPEECH, SPEECH.flatMap(s => speechProblems(s, { behaviors: BEHAVIORS, interactions: INTERACTIONS }))],
     [WORLDS, WORLDS.flatMap(w => worldProblems(w, MATERIALS, WORLDS))],
+    [TRAIL_EVENTS, [...TRAIL_EVENTS.flatMap(s => trailEventProblems(s, MOVES, EXPEDITIONS)), ...EXPEDITIONS.flatMap(s => flowProblems(s, TRAIL_EVENTS))]],
   ] as const) {
     expect(problems).toEqual([])
     expect(new Set(registry.map(s => s.id)).size).toBe(registry.length)
@@ -62,4 +63,13 @@ test('unlock references use achievements and map grants; miles listings cannot h
   const miles = SHOP.find(s => s.shop === 'miles')!
   for (const cost of [{ coins: 10 }, { miles: 0 }, { miles: 10, materials: { feather: 1 } }, { miles: 10, coins: 1 }])
     expect(shopProblems({ ...miles, cost }, MATERIALS, FURNITURE).length).toBeGreaterThan(0)
+})
+test('trail validators reject unknown moves, props, trails and flow references', () => {
+  const crab = TRAIL_EVENTS.find(e => e.id === 'crab-pinch')!
+  expect(trailEventProblems({ ...crab, moves: ['moonwalk'] }, MOVES, EXPEDITIONS)).toContain('unknown move moonwalk')
+  expect(trailEventProblems({ ...crab, prop: 'dragon' as never }, MOVES, EXPEDITIONS)).toContain('unknown prop dragon')
+  expect(trailEventProblems({ ...crab, trails: ['atlantis'] }, MOVES, EXPEDITIONS)).toContain('unknown trail atlantis')
+  expect(trailEventProblems({ ...crab, seconds: 99 }, MOVES, EXPEDITIONS)).toContain('invalid trail limits')
+  expect(flowProblems({ ...EXPEDITIONS[0]!, flow: { events: ['nope'], boss: 'stroll' } }, TRAIL_EVENTS).length).toBe(2)
+  expect(EXPEDITIONS.every(e => e.flow?.events?.some(id => TRAIL_EVENTS.find(t => t.id === id)?.kind === 'return'))).toBe(true)
 })

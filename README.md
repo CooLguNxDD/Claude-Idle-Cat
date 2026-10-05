@@ -40,7 +40,8 @@ Then type `/cat` to open the pane. Meow.
 | `/cat` (or `/cat show`) | open the pane (knock, knock) |
 | `/cat hide` | close the pane (the cats keep earning, they're professionals) |
 | `/cat help` | list the commands |
-| `/cat expedition` / `x` | Expeditions tab: slots, party picker, gear, trails, rewards |
+| `/cat expedition` / `x` | Expedition tab (between Home and Friends): the animated trail, slots, party picker, gear, collapsible trail lists, rewards. While parties are out the tab turns green and reads `Expedition-N` |
+| `‹` / `›` beside the trail caption | (Expedition tab, two or more parties) switch which party the trail picture follows |
 | `/cat send <exp> <cat…> [+gear…]` | send 1–3 cats by id or single-word name; gear is consumed per run |
 | `/cat claim [run-id]` | collect one ready party or every ready party; rewards pay once |
 | `/cat quests` | open daily quest chains alongside Paw Miles |
@@ -78,7 +79,7 @@ Then type `/cat` to open the pane. Meow.
 | `w` | open/close the cat list |
 | `‹` / `›` in the top bar | previous / next tab; wraps at either end, with tabs fitting on one line |
 | `q` / `↶` in the top bar | go back to the previously visited tab |
-| `c` `a` `s` `h` `r` `b` `m` `x` `g` `v` `t` | shortcuts for visible tabs: Cat · Adopt · Skills · Home · Friends · Book · Miles · Expeditions · Arcade · Settings · Weather |
+| `c` `a` `s` `h` `x` `r` `b` `m` `g` `v` `t` | shortcuts for visible tabs: Cat · Adopt · Skills · Home · Expedition · Friends · Book · Miles · Arcade · Settings · Weather |
 | Arcade Display menu / Fullscreen | fit the 320×180 art canvas to the window, choose a 1×–6× size (up to 1080p), or fill the screen |
 
 ### 💾 Saves
@@ -89,7 +90,9 @@ Then type `/cat` to open the pane. Meow.
 
 ## 🧭 Expeditions, friends and late-game curios
 
-Garden Patrol starts at 15 minutes. Choose awake cats, send them out, and claim their seeded coin, material and critter finds after they return. They leave the yard and running band until claimed; a household with every cat away shows an away sign and paw prints. Timers keep running while the plugin is closed. One slot grows to two at House, three at Manor and four at Castle; an Expedition permit adds one slot within that four-slot cap. Matriarch can bring a fourth party member.
+Garden Patrol starts at 15 minutes. Choose awake cats, send them out, and claim their seeded coin, material and critter finds after they return. They leave the yard and running band until claimed; a household with every cat away shows an away sign and paw prints. Timers keep running while the plugin is closed.
+
+The Expedition tab's picture follows a party along its trail. Each run plays beats from its own seed: walking, foraging, treasure chests, fights against crows, crabs and pigeons, campfire naps, obstacles, friendly strays, a boss on longer trails, and the walk home with the loot sack. Treasure and forage beats reveal the rewards frozen at departure, so the "found so far" tally ends at exactly what you claim. The events are cosmetic and never change loot. Trails are listed in collapsible **Available**, **Seasonal** and **Locked** sections. Available rows show only the length, blurb and finds; Locked rows show what unlocks them. One slot grows to two at House, three at Manor and four at Castle; an Expedition permit adds one slot within that four-slot cap. Matriarch can bring a fourth party member.
 
 Pip’s Curio shop is always open. Garden feathers craft the Harbor map, which opens Riverbank for shells. Deep Woods opens at House; Neon Rooftops needs Neon Alley; Moon Crater needs Castle and a Star map. Pumpkin Patch opens in October, and Snow Trail in December through February. Gather materials to craft late furniture, maps, gear and charms. Gear is chosen per party and consumed at departure. At levels 15, 20 and 25, each existing skill branch extends with expedition and bond perks. Astral advances the expedition clock by 1.2× while the plugin is closed; Oracle reveals rewards already stored in the party’s run.
 
@@ -358,6 +361,7 @@ hooks/art/                  typed cat, furniture and background registry
 hooks/weather/              location search, API parsing, condition mapping and cached weather state
 hooks/scene/weather/        registered sky, ground and foreground weather layers
 hooks/scene/season.ts        seasonal particles when live weather permits them
+hooks/trail.ts + scene/trail.ts  seeded, cosmetic expedition beats and the Expedition tab's trail picture
 hooks/genes.ts               coats, eyes, personalities, shiny odds, coat painting
 hooks/genes/paint.ts         themed coat colors and deterministic markings
 hooks/adoption/             rarity/coat registry and shelter receipts
@@ -442,6 +446,7 @@ New content is a data file, and sixteen mirrored project skills in `.claude/skil
 | `speech-gen` | a context speech bank | `hooks/content/speech/<id>.ts` |
 | `interaction-gen` | pair play | `hooks/content/interactions/<id>.ts` |
 | `expedition-gen` | a timed expedition | `hooks/content/expeditions/<id>.ts` |
+| `expedition-event-gen` | an animated trail beat (treasure, fight, boss, rest, obstacle…) and expedition flows | `hooks/content/trail-events/<id>.ts` |
 | `quest-gen` | a quest chain | `hooks/content/quests/<id>.ts` |
 | `event-gen` | an exchange or boost event | `hooks/content/events/<id>.ts` |
 | `skill-gen` | a skill in an existing branch | `hooks/content/skills/<id>.ts` |

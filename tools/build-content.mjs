@@ -23,6 +23,7 @@ const KINDS = [
   { dir: 'behaviors', list: 'BEHAVIORS', type: 'Behavior', prefix: 'behavior' },
   { dir: 'goals', list: 'GOALS', type: 'Goal', prefix: 'goal' },
   { dir: 'speech', list: 'SPEECH', type: 'Speech', prefix: 'speech' },
+  { dir: 'trail-events', list: 'TRAIL_EVENTS', type: 'TrailEvent', prefix: 'trailEvent' },
 ]
 const isCheck = process.argv.includes('--check')
 
