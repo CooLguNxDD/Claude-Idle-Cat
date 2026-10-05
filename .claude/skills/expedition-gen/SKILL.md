@@ -21,10 +21,11 @@ export default defineExpedition({
   minutes: 15, party: [1, 3], minLevel: 1, cost: { coins: 10, energy: 10 },
   loot: { coins: [5, 15], materials: { feather: 6, 'pine-cone': 3 }, rolls: [1, 2], critters: 0.4, },
   likes: { curious: 1.3, playful: 1.2 }, xp: 40, bond: 3,
+  flow: { events: ['stroll', 'forage', 'butterfly-chase', 'bee-buzz', 'treasure-chest', 'stray-hello', 'head-home'], backdrop: 'garden' },
 })
 ```
 
-Minutes are 10–720; parties contain 1–3 cats before skills; minLevel is 1–25. Cost: coins 0–10000, energy 0–100 per cat. Loot coins are coin-rate minutes, each at most 240 (4 hours); material rolls 1–8 per cat, material weights 0.1–10. Critter odds 0–1, optionally filtered by `critterKinds` bug/fish/mouse; rare odds at most 0.1, naming a furniture id. XP at most 200; bond at most 5. Personality multipliers 1–1.5. Use existing materials and unlock ids. Achievement ids must exist; `unlock.item` names a map’s permanent `grants` token. World gates apply to the currently selected yard and do not cancel parties already sent. Wall-clock completion waits for claim. Loot and event boosts freeze at departure.
+Minutes are 10–720; parties contain 1–3 cats before skills; minLevel is 1–25. Cost: coins 0–10000, energy 0–100 per cat. Loot coins are coin-rate minutes, each at most 240 (4 hours); material rolls 1–8 per cat, material weights 0.1–10. Critter odds 0–1, optionally filtered by `critterKinds` bug/fish/mouse; rare odds at most 0.1, naming a furniture id. XP at most 200; bond at most 5. Personality multipliers 1–1.5. Use existing materials and unlock ids. Achievement ids must exist; `unlock.item` names a map’s permanent `grants` token. World gates apply to the currently selected yard and do not cancel parties already sent. Wall-clock completion waits for claim. Loot and event boosts freeze at departure. `flow` is optional and cosmetic: it names the trail events, boss and backdrop the Expedition tab animates. Write new events with the `expedition-event-gen` skill.
 
 ## 3. Register, look and test
 
@@ -40,7 +41,7 @@ node --test tools/content.test.mjs
 node tools/build-web.mjs
 ```
 
-Inspect a preview when one applies. Add the README row for new user-facing content. Mirror the complete skill byte-for-byte between `.claude/skills/expedition-gen/` and `.agents/skills/expedition-gen/`.
+Inspect `node tools/preview.mjs trail <id>`. Add the README row for new user-facing content. Mirror the complete skill byte-for-byte between `.claude/skills/expedition-gen/` and `.agents/skills/expedition-gen/`.
 
 ## 4. Commit
 
