@@ -5,7 +5,7 @@ import { newHome } from './game'
 import { canSend, lootOf, send } from './expeditions'
 import { trailCells, trailImage } from './scene/trail'
 import { FLAVORS } from './theme'
-import { beatAt, captionOf, foundSoFar, isFound, trailOf } from './trail'
+import { beatAt, captionOf, foundSoFar, isFound, partyOf, trailOf } from './trail'
 
 const now = new Date(2026, 9, 5, 12).getTime()
 const family = (): Home => { const h = newHome(now), cat = h.cats[0]!; return { ...h, tier: 5, coins: 10000, owned: [...h.owned, 'harbor-map', 'star-map'],
@@ -67,4 +67,27 @@ test('the trail picture draws a camp with no runs and the watched run in both sc
     expect(trailImage(home, t, 3, FLAVORS.latte, 40, 5, 4).width).toBe(160)
   }
   expect(trailCells(sent, now + 60_000, 3, FLAVORS.mocha, 40, 0)).not.toBe(trailCells(idle, now + 60_000, 3, FLAVORS.mocha, 40, 0))
+})
+test('every trail reserves a finding beat before the walk home, even at ten minutes', () => {
+  const finds = ['forage', 'treasure', 'discover']
+  for (const e of EXPEDITIONS.filter(e => canSend(family(), e.id, ['c1', 'c2'], now).ok)) for (let seed = 0; seed < 30; seed++) {
+    const run = runOf(e.id, seed), short = { ...run, endsAt: run.startAt + 600_000 }
+    for (const r of [run, short]) expect(trailOf(r).beats.slice(0, -1).some(b => finds.includes(b.event.kind))).toBe(true)
+  }
+})
+test('a run that ends at or before departure still draws and reveals its whole loot', () => {
+  const run = runOf('garden-patrol', 4)
+  for (const endsAt of [run.startAt, run.startAt - 5000]) {
+    const odd = { ...run, endsAt }, trail = trailOf(odd)
+    expect(trail.beats.every(b => b.at >= run.startAt && b.until <= trail.endsAt && b.at <= b.until)).toBe(true)
+    expect(beatAt(trail, run.startAt).index).toBe(trail.beats.length - 1)
+    expect(foundSoFar(trail, run.startAt).coins).toBe(lootOf(run).coins)
+  }
+})
+test('the caption lead is the last cat still home in the run, as drawn', () => {
+  const h = family(), sent = send(h, 'garden-patrol', ['c1', 'c2'], [], now, 2), run = sent.expeditions.runs[0]!
+  expect(partyOf(sent, run).lead).toBe('Cat1')
+  const gone = { ...sent, cats: sent.cats.filter(c => c.id !== 'c2') }
+  expect(partyOf(gone, run)).toEqual({ cats: [gone.cats[0]!], lead: 'Cat0' })
+  expect(partyOf({ ...sent, cats: [] }, run).lead).toBe('The party')
 })

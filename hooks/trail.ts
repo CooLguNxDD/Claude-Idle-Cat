@@ -40,11 +40,15 @@ export const trailOf = (run: Run, events: readonly TrailEvent[] = TRAIL_EVENTS, 
   const middle = pool.filter(e => e.kind !== 'return' && e.kind !== 'boss' && e.weight > 0)
   const boss = exp?.flow?.boss ? byId.get(exp.flow.boss) : undefined
   const rng = seeded((run.seed ^ TRAIL_SALT) >>> 0)
-  const span = Math.max(1, run.endsAt - run.startAt)
+  // An imported run may end at or before it starts; every beat still fits inside [startAt, endsAt].
+  const endsAt = Math.max(run.startAt, run.endsAt), span = Math.max(1, endsAt - run.startAt)
   const count = Math.max(2, Math.min(9, Math.round(span / 600_000)))
   const picked: TrailEvent[] = []
   const walk = middle.find(e => e.kind === 'walk')
   if (walk) picked.push(walk)
+  // Reserve one finding beat so even the shortest trail reveals loot on the way out.
+  const finders = middle.filter(e => FIND_KINDS.includes(e.kind))
+  if (finders.length && picked.length < count) picked.push(pickEvent(rng, finders, picked.at(-1)?.id))
   while (middle.length && picked.length < count) picked.push(pickEvent(rng, middle, picked.at(-1)?.id))
   if (boss && picked.length >= 3) picked.splice(Math.floor(picked.length * 0.8), 0, boss)
   picked.push(back)
@@ -52,13 +56,13 @@ export const trailOf = (run: Run, events: readonly TrailEvent[] = TRAIL_EVENTS, 
   const sum = shares.reduce((n, s) => n + s, 0)
   let at = run.startAt
   const beats: Beat[] = picked.map((event, i) => {
-    const until = i === picked.length - 1 ? run.endsAt : at + Math.round((span * shares[i]!) / sum)
+    const until = i === picked.length - 1 ? endsAt : Math.min(endsAt, at + Math.round((span * shares[i]!) / sum))
     const beat = { event, at, until, finds: none() }
     at = until
     return beat
   })
   dealLoot(beats, run.loot)
-  return { ...(exp ? { exp } : {}), backdrop: exp?.flow?.backdrop ?? 'garden', beats, startAt: run.startAt, endsAt: run.endsAt }
+  return { ...(exp ? { exp } : {}), backdrop: exp?.flow?.backdrop ?? 'garden', beats, startAt: run.startAt, endsAt }
 }
 
 // Deals the frozen loot over the finding beats in order, so the last tally equals the claim.
@@ -108,6 +112,11 @@ export const foundSoFar = (trail: Trail, now: number): Finds => {
   return out
 }
 
+/** The run's cats still in the household, in run order; the last one leads the line and the caption. */
+export const partyOf = (home: Home, run: Run) => {
+  const cats = run.cats.map(id => home.cats.find(c => c.id === id)).filter((c): c is Home['cats'][number] => !!c)
+  return { cats, lead: cats.at(-1)?.name ?? 'The party' }
+}
 /** The beat's caption with the lead cat's name. */
 export const captionOf = (beat: Beat, lead: string) => beat.event.line.replaceAll('{cat}', lead)
 /** One-line summary of finds, e.g. "12c · 3 feather · 1 critter". */

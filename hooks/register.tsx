@@ -12,7 +12,7 @@ import { signalsOf, turnSignal } from './reactions/signals'
 import type { Signal } from './content/types'
 import { isContentAvailable } from './content/availability'
 import { isUnlocked, unlockHint } from './content/types'
-import { beatAt, captionOf, findsText, foundSoFar, isFound, trailOf } from './trail'
+import { beatAt, captionOf, findsText, foundSoFar, isFound, partyOf, trailOf } from './trail'
 import { trailCells, trailImage } from './scene/trail'
 import { skillTotals } from './skills'
 import { homeMods } from './home'
@@ -105,7 +105,7 @@ let partnerReply: { frame: number; ev: SpeechEvent } | null = null
 let reactionUntil = 0
 let partySelection: string[] = []
 let gearSelection: string[] = []
-let expeditionChoice = 0
+let expeditionPick: string | null = null
 // The run the trail picture follows and which trail sections are open; never saved.
 let watchRun = 0
 let trailBeatKey = ''
@@ -611,6 +611,10 @@ const departure = ($: EngineInterface, expId: string, ids: string[], gear: strin
     return next
   })
 }
+// The picked trail, else the first unlocked trail in season, so Send never targets a hidden default.
+const selectedTrail = (home: Home, now: number) => EXPEDITIONS.find(e => e.id === expeditionPick)
+  ?? EXPEDITIONS.find(e => isUnlocked(home, e.unlock) && isContentAvailable(e.available, now)) ?? EXPEDITIONS[0]!
+const sectionOf = (home: Home, e: (typeof EXPEDITIONS)[number]) => e.available ? 'seasonal' : isUnlocked(home, e.unlock) ? 'available' : 'locked'
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 export const register: Register = (on, options) => {
@@ -816,7 +820,7 @@ export const register: Register = (on, options) => {
     } else if (key === 'return' && here.length) {
       const selected = partySelection.filter(id => here.some(c => c.id === id))
       const ids = selected.length ? selected : here.slice(0, 1).map(c => c.id)
-      await departure($, EXPEDITIONS[expeditionChoice % EXPEDITIONS.length]!.id, ids, gearSelection.filter(id => (latest!.gear[id] ?? 0) > 0))
+      await departure($, selectedTrail(latest, await $.clock.now()).id, ids, gearSelection.filter(id => (latest!.gear[id] ?? 0) > 0))
     }
     return {}
   })
@@ -1000,7 +1004,7 @@ export const register: Register = (on, options) => {
       const run = watchedRun(home)
       if (!run) return 'A quiet camp: no parties are out'
       const trail = trailOf(run), { beat } = beatAt(trail, Math.min(now, run.endsAt))
-      return `${trail.exp?.label ?? run.exp}: ${captionOf(beat, home.cats.find(c => c.id === run.cats.at(-1))?.name ?? 'The party')}`
+      return `${trail.exp?.label ?? run.exp}: ${captionOf(beat, partyOf(home, run).lead)}`
     }
     const sceneAlt = view === 'expedition' ? trailAlt() : view !== 'adopt' ? catsAtHome(home).length ? `${cat.name} (${mood}) in the yard` : 'All cats are away on expeditions'
       : reveal ? `${reveal.name} at the adoption shelter` : 'A mystery parcel at the adoption shelter'
@@ -1232,25 +1236,25 @@ export const register: Register = (on, options) => {
       const catById = new Map(home.cats.map(c => [c.id, c]))
       const here = catsAtHome(home), selection = partySelection.filter(id => here.some(c => c.id === id))
       const ids = selection.length ? selection : here.slice(0, 1).map(c => c.id)
-      const selected = EXPEDITIONS[expeditionChoice % EXPEDITIONS.length]!
+      const selected = selectedTrail(home, now)
       const gear = gearSelection.filter(id => (home.gear[id] ?? 0) > 0)
       const cycleParty = (step: number) => { partyCursor = (partyCursor + step + here.length) % Math.max(1, here.length); partySelection = here[partyCursor] ? [here[partyCursor]!.id] : []; $.ui.invalidate('ui.render') }
       const runs = home.expeditions.runs, watched = watchedRun(home)
       const trail = watched && trailOf(watched)
       const beat = watched && trail && beatAt(trail, Math.min(now, watched.endsAt))
       const found = trail && foundSoFar(trail, now)
-      const lead = watched && catById.get(watched.cats.at(-1) ?? '')?.name
+      const lead = watched ? partyOf(home, watched).lead : 'The party'
       const watch = (step: number) => { watchRun = (watchRun + step + runs.length) % Math.max(1, runs.length); $.ui.invalidate('ui.render') }
       const toggle = (id: string) => { if (!openSections.delete(id)) openSections.add(id); $.ui.invalidate('ui.render') }
-      const choose = (id: string) => { expeditionChoice = Math.max(0, EXPEDITIONS.findIndex(e => e.id === id)); $.ui.invalidate('ui.render') }
+      const choose = (id: string) => { expeditionPick = id; $.ui.invalidate('ui.render') }
       const finds = (e: (typeof EXPEDITIONS)[number]) => `Finds ${Object.keys(e.loot.materials).join(', ')}${e.loot.rare ? ` · rare ${e.loot.rare.item}` : ''}`
       const sections = [
-        { id: 'available', label: 'Available expeditions', items: EXPEDITIONS.filter(e => !e.available && isUnlocked(home, e.unlock)),
+        { id: 'available', label: 'Available expeditions', items: EXPEDITIONS.filter(e => sectionOf(home, e) === 'available'),
           detail: (e: (typeof EXPEDITIONS)[number]) => `${e.blurb} · ${finds(e)}` },
-        { id: 'seasonal', label: 'Seasonal expeditions', items: EXPEDITIONS.filter(e => e.available),
+        { id: 'seasonal', label: 'Seasonal expeditions', items: EXPEDITIONS.filter(e => sectionOf(home, e) === 'seasonal'),
           detail: (e: (typeof EXPEDITIONS)[number]) => [isContentAvailable(e.available, now) ? 'In season now' : 'Out of season', e.available!.months.map(m => MONTHS[m - 1]).join(', '),
             isUnlocked(home, e.unlock) ? '' : `needs ${unlockHint(e.unlock)}`, e.blurb].filter(Boolean).join(' · ') },
-        { id: 'locked', label: 'Locked expeditions', items: EXPEDITIONS.filter(e => !e.available && !isUnlocked(home, e.unlock)),
+        { id: 'locked', label: 'Locked expeditions', items: EXPEDITIONS.filter(e => sectionOf(home, e) === 'locked'),
           detail: (e: (typeof EXPEDITIONS)[number]) => `Needs ${unlockHint(e.unlock)} · ${e.blurb}` },
       ]
       return <Box flexDirection="column">
@@ -1261,7 +1265,7 @@ export const register: Register = (on, options) => {
             <Text bold color={tone.ok}>{runs.length > 1 ? ` Watching ${(watchRun % runs.length) + 1}/${runs.length} · ` : ''}{trail.exp?.label ?? watched.exp} · beat {beat.index + 1}/{trail.beats.length} · {beat.beat.event.label}</Text>
             {runs.length > 1 && <Button key="trail-watch-next" plain label=" ›" onPress={() => watch(1)} />}
           </Box>
-          <Text color={tone.muted}>{captionOf(beat.beat, lead ?? 'The party')} · found so far: {(found && findsText(found)) || 'nothing yet'}</Text>
+          <Text color={tone.muted}>{captionOf(beat.beat, lead)} · found so far: {(found && findsText(found)) || 'nothing yet'}</Text>
         </Box> : <Text color={tone.muted}>No parties on the trail. Pick a party and a trail below.</Text>}
         <Text bold color={tone.title}>Expeditions · {runs.length}/{slotsOf(home)} slots used</Text>
         {runs.map(r => {
@@ -1286,7 +1290,7 @@ export const register: Register = (on, options) => {
           </Box>)}
           {openSections.has(sec.id) && !sec.items.length && <Text color={tone.muted}>{'    '}None right now.</Text>}
         </Box>)}
-        <Button key="expedition-send" plain hotkey="d" label={`Send to ${selected.label} · ${selected.cost.coins}c + ${selected.cost.energy} energy/cat`} onPress={() => departure($, selected.id, ids, gear)} />
+        <Button key="expedition-send" plain hotkey="d" label={`Send to ${selected.label}${openSections.has(sectionOf(home, selected)) ? '' : ' (hidden)'} · ${selected.cost.coins}c + ${selected.cost.energy} energy/cat`} onPress={() => departure($, selected.id, ids, gear)} />
         {(() => { const check = canSend(home, selected.id, ids, now); return check.ok ? null : <Text color={tone.warn}>{check.reason}</Text> })()}
         <Text italic color={tone.log}>{home.log}</Text>
       </Box>

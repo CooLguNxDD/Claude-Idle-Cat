@@ -3,7 +3,7 @@ import type { TrailBackdrop, TrailProp } from '../content/types'
 import { inkOf, mix } from '../theme'
 import type { Flavor } from '../theme'
 import type { Motion } from '../motion'
-import { APPROACH, RESOLVE, beatAt, captionOf, trailOf } from '../trail'
+import { APPROACH, RESOLVE, beatAt, captionOf, partyOf, trailOf } from '../trail'
 import type { BeatView, Trail } from '../trail'
 import { canvas, HEIGHT } from './canvas'
 import type { RgbaImage, SceneCanvas } from './canvas'
@@ -141,7 +141,7 @@ const drawRun = (c: SceneCanvas, home: Home, trail: Trail, run: Run, now: number
   const walked = isWalk ? elapsed : loops * loop * APPROACH + Math.min(t, APPROACH) * loop
   const scroll = (walked / 1000) * SPEED + (beat.at - trail.startAt) / 400
   drawBackdrop(p, trail.backdrop, scroll, tick, f)
-  const party = run.cats.map(id => home.cats.find(cat => cat.id === id)).filter((cat): cat is Cat => !!cat)
+  const { cats: party, lead } = partyOf(home, run)
   // The lead leaves room for the prop on its right; followers spread behind it, overlapping on narrow panes.
   const leadX = Math.max(4, p.W - 56 - 52)
   const step = party.length > 1 ? Math.min(52, Math.max(14, (leadX - 2) / (party.length - 1))) : 0
@@ -170,7 +170,6 @@ const drawRun = (c: SceneCanvas, home: Home, trail: Trail, run: Run, now: number
   if (beat.event.kind === 'meet' && stage === 'resolve') c.text(Math.round(stop / DESIGN) + 2, 3, '♥', f.pink)
   if (beat.event.kind === 'discover' && stage === 'action') c.text(Math.round(leadX / DESIGN) + 6, 2, '!', f.yellow)
   for (let x = 0; x < c.w; x++) c.put(x, 2, x < Math.round(c.w * view.progress) ? f.green : mix(f.crust, f.surface1, 0.5))
-  const lead = party[party.length - 1]?.name ?? 'The party'
   c.text(1, 0, `${label} ${view.index + 1}/${trail.beats.length}`.slice(0, c.w - 2), f.text)
   c.text(1, 11, captionOf(beat, lead).slice(0, c.w - 2), stage === 'resolve' ? f.yellow : f.text)
 }

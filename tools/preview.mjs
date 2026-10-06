@@ -52,8 +52,10 @@ export const pairing = (id) => {
   })]
 }
 // A sent party of three: every beat of the trail, or one event's stages, drawn mid-action.
+// Sends on a day inside the trail's season so seasonal trails (Snow Trail) get a run.
 const party = (exp) => {
-  const now = new Date(2026, 9, 5, 12).getTime(), base = newHome(now), cat = base.cats[0]
+  const month = EXPEDITIONS.find(e => e.id === exp)?.available?.months[0] ?? 10
+  const now = new Date(2026, month - 1, 5, 12).getTime(), base = newHome(now), cat = base.cats[0]
   const coats = ['ginger', 'tuxedo', 'calico']
   const home = { ...base, tier: 5, coins: 1e6, owned: [...base.owned, 'harbor-map', 'star-map'], world: { id: exp === 'neon-rooftops' ? 'neon-alley' : base.world.id },
     cats: coats.map((coat, i) => ({ ...cat, id: "c" + (i + 1), name: ['Mochi', 'Miso', 'Tofu'][i], level: 25, genes: { ...cat.genes, coat } })) }
