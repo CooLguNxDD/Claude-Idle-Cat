@@ -164,7 +164,7 @@ Short version: stats drop, coins pile up, cats judge you silently.
 - Rarity odds: **Common 60%**, **Uncommon 25%**, **Rare 10%**, **Epic 4%**, **Legendary 1%**. Available coats within a tier have equal odds; today's pool is visible in the tab. Rarity describes appearance and does not change stats or income.
 - New coats include russian blue, chocolate, cinnamon, silver, smoke, tortoiseshell, ragdoll, bengal, lynx and the starry Nebula 🌌. Markings and silhouettes roll independently. Duplicate coats are possible, and every successful pull adds a cat; cats are never replaced.
 - The expanded pack adds Calico Void, legendary Golden Glitch, Snowshoe, Tiger Tabby, Starpoint, Blue Cream, Copper Bengal and Moon Smoke year-round. The epic Ghost coat joins shelter pulls and stray visits throughout October, by your local clock. Ghost cats you adopt or import stay permanently; October visitors can finish their stay and move in after the month ends.
-- Shiny is a separate 1/64 roll in every rarity tier. The Paw Miles shiny charm guarantees the next successful shelter adoption is shiny.
+- Shiny is a separate 1/64 roll in every rarity tier. The Paw Miles shiny charm guarantees the next successful shelter adoption is shiny, including when that parcel is rerolled. The paid parcel holds one house slot until you confirm, so a yard visitor cannot take the last room.
 - The tab keeps your latest arrival card with Meet and Reroll breed, shelter-pull count, house expansion link and free adoption of yard visitors. `q` returns to the tab you came from.
 
 ### 🏠 Home tab (`h`)

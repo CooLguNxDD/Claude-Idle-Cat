@@ -12,7 +12,7 @@ import type { Counter } from './collection'
 import { addToPocket, critter, donate, findCritters } from './critters'
 import { NEW_FRIEND, befriend, giftById, levelName, receiveGift } from './friends'
 import { GINGER, rollGenes } from './genes'
-import { STARTER, buyFurniture, homeMods, maxCats, repayFromIncome } from './home'
+import { STARTER, buyFurniture, homeMods, maxCats, repayFromIncome, reservedCats } from './home'
 import { modsOf } from './mods'
 import { pick } from './rng'
 import { FORM_LEVEL, canLearn, formOf, learn, respecPrice } from './skills'
@@ -287,8 +287,11 @@ const care = (home: Home, action: Action, now: number): Home => {
 }
 
 // Takes in a new cat with random genes, if the house has room and the fee is paid.
+export const arrivalLog = (name: string, genes: Genes) =>
+  `Welcome home, ${name}! ${RARITIES[rarityOf(genes)].label} ${genes.coat}.${genes.isShiny ? ' ✨ A shiny cat!' : ''}`
+
 export const adopt = (home: Home, now: number, rng: Rng = Math.random, name?: string): Home => {
-  if (home.cats.length >= maxCats(home)) return { ...home, log: `The house is full (${maxCats(home)} cats).` }
+  if (reservedCats(home) >= maxCats(home)) return { ...home, log: `The house is full (${maxCats(home)} cats).` }
   const price = adoptPrice(home)
   if (home.coins < price) return { ...home, log: `Adoption costs ${price}c.` }
   const taken = new Set(home.cats.map(c => c.name))
@@ -297,14 +300,14 @@ export const adopt = (home: Home, now: number, rng: Rng = Math.random, name?: st
   const cat = newCat(`c${home.nextId}`, name?.slice(0, 20) || pick(rng, free.length ? free : NAMES), genes, now)
   return { ...home, coins: home.coins - price, cats: [...home.cats, cat], activeId: cat.id, nextId: home.nextId + 1,
     shinyCharm: false, shelter: { ...home.shelter, pulls: home.shelter.pulls + 1, last: { catId: cat.id, at: now, cost: price } },
-    effect: fx('adopt', now), log: `Welcome home, ${cat.name}! ${RARITIES[rarityOf(genes)].label} ${genes.coat}.${genes.isShiny ? ' ✨ A shiny cat!' : ''}` }
+    effect: fx('adopt', now), log: arrivalLog(cat.name, genes) }
 }
 
 // A stray in the yard moves in for free (if there's room) and keeps its gift for later.
 export const adoptVisitor = (home: Home, visitorId: string, now: number): Home => {
   const visitor = home.visitors.find(v => v.id === visitorId)
   if (!visitor) return { ...home, log: 'That stray already wandered off.' }
-  if (home.cats.length >= maxCats(home)) return { ...home, log: `The house is full (${maxCats(home)} cats).` }
+  if (reservedCats(home) >= maxCats(home)) return { ...home, log: `The house is full (${maxCats(home)} cats).` }
   const cat = newCat(`c${home.nextId}`, visitor.name, visitor.genes, now)
   return { ...home, cats: [...home.cats, cat], activeId: cat.id, nextId: home.nextId + 1,
     visitors: home.visitors.filter(v => v.id !== visitorId), coins: home.coins + visitor.gift,

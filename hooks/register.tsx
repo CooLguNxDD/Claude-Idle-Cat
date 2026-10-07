@@ -908,7 +908,8 @@ export const register: Register = (on, options) => {
         : action === 'again' ? await change($, (prev, t) => applyCatCommand(prev, { type: 'breed.again' }, t, Math.random))
         : named ? await change($, (prev, t) => applyCatCommand(prev, { type: 'breed.reroll', catId: named.id }, t, Math.random))
         : current
-      await routeTo($, action === 'confirm' || action === 'rollback' ? 'adopt' : 'reroll')
+      const isSettled = (action === 'confirm' || action === 'rollback') && !home.shelter.offer
+      await routeTo($, isSettled ? 'adopt' : 'reroll')
       await $.ui.open({ id: PANE, title: 'AFK Cat' })
       return { text: named || action ? home.log : 'Pick a cat to reroll.' }
     }

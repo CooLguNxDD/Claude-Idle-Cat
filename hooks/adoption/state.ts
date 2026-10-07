@@ -24,7 +24,9 @@ const pendingOf = (data: PendingCat | null | undefined, cats: Home['cats']): Pen
   if (typeof data.id !== 'string' || !data.id || typeof data.name !== 'string' || !data.name) return null
   if (!Number.isFinite(data.bornAt) || !Number.isFinite(data.cost) || data.cost < 0 || !Number.isFinite(data.pulledAt)) return null
   const openedAt = data.openedAt === null || (Number.isFinite(data.openedAt) && data.openedAt >= data.pulledAt) ? data.openedAt : null
-  return { id: data.id, name: data.name.slice(0, 20), genes, bornAt: data.bornAt, cost: data.cost, pulledAt: data.pulledAt, openedAt }
+  const isCharmed = data.isCharmed === true
+  return { id: data.id, name: data.name.slice(0, 20), genes: isCharmed ? { ...genes, isShiny: true } : genes,
+    bornAt: data.bornAt, cost: data.cost, pulledAt: data.pulledAt, openedAt, isCharmed }
 }
 
 const offerOf = (data: BreedOffer | null | undefined, cats: Home['cats']): BreedOffer | null => {

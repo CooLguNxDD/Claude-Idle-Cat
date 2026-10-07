@@ -29,8 +29,6 @@ export type Cat = {
   lastGift: { id: string; day: number } | null
   // What the cat is in the middle of. Unknown behaviour ids are dropped on load.
   intent?: { id: string; at: number; with?: string }
-  // Confirmed breed rerolls. The next one costs more.
-  breedRolls?: number
 }
 
 // A stray in the yard: it stays a while, leaves a gift, and can be adopted.
@@ -42,6 +40,8 @@ export type View = 'cat' | 'skills' | 'home' | 'friends' | 'book' | 'miles' | 'a
 export type Route = { view: View; history: View[] }
 export type PendingCat = {
   id: string; name: string; genes: Genes; bornAt: number; cost: number; pulledAt: number; openedAt: number | null
+  // The shiny charm was spent on this parcel. Rerolls keep the guarantee.
+  isCharmed: boolean
 }
 export type BreedOffer = { catId: string; before: Genes; after: Genes; cost: number; at: number; openedAt: number | null }
 export type CatCommand =

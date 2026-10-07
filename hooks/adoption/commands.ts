@@ -1,8 +1,8 @@
 import type { CatCommand, Genes, Home } from '../../types'
 import { isAway } from '../away'
-import { adoptPrice, newCat } from '../game'
+import { adoptPrice, arrivalLog, newCat } from '../game'
 import { rollGenes } from '../genes'
-import { maxCats } from '../home'
+import { maxCats, reservedCats } from '../home'
 import { pick } from '../rng'
 import type { Rng } from '../rng'
 
@@ -11,7 +11,6 @@ const NAMES = ['Tofu', 'Miso', 'Sushi', 'Nori', 'Biscuit', 'Pudding', 'Luna', 'P
   'Ziggy', 'Kiwi', 'Waffles', 'Socks', 'Pepper', 'Mango', 'Dumpling']
 
 const fail = (home: Home, log: string): Home => ({ ...home, log })
-const held = (home: Home) => home.cats.length + (home.shelter.pending ? 1 : 0)
 const named = (home: Home, preferred: string | undefined, rng: Rng) => {
   const clean = preferred?.trim().slice(0, 20)
   if (clean) return clean
@@ -23,13 +22,14 @@ const cosmetic = (genes: Genes, rng: Rng, now: number): Genes => ({ ...rollGenes
 
 const pull = (home: Home, now: number, rng: Rng, name?: string): Home => {
   if (home.shelter.pending) return fail(home, 'Open the parcel you already paid for.')
-  if (held(home) >= maxCats(home)) return fail(home, `The house is full (${maxCats(home)} cats).`)
+  if (reservedCats(home) >= maxCats(home)) return fail(home, `The house is full (${maxCats(home)} cats).`)
   const price = adoptPrice(home)
   if (home.coins < price) return fail(home, `Adoption costs ${price}c.`)
-  const genes = { ...rollGenes(rng, now), ...(home.shinyCharm ? { isShiny: true } : {}) }
+  const isCharmed = home.shinyCharm
+  const genes = { ...rollGenes(rng, now), ...(isCharmed ? { isShiny: true } : {}) }
   const cat = newCat(`c${home.nextId}`, named(home, name, rng), genes, now)
   return { ...home, coins: home.coins - price, nextId: home.nextId + 1, shinyCharm: false,
-    shelter: { ...home.shelter, pending: { id: cat.id, name: cat.name, genes, bornAt: now, cost: price, pulledAt: now, openedAt: null } },
+    shelter: { ...home.shelter, pending: { id: cat.id, name: cat.name, genes, bornAt: now, cost: price, pulledAt: now, openedAt: null, isCharmed } },
     log: `A parcel is waiting. Open it to meet your cat.` }
 }
 
@@ -53,7 +53,8 @@ const rerollPending = (home: Home, now: number, rng: Rng): Home => {
   if (!pending) return fail(home, 'There is no parcel to reroll.')
   if (pending.openedAt === null) return fail(home, 'Open the parcel first.')
   if (home.coins < BREED_COST) return fail(home, `A reroll costs ${BREED_COST}c.`)
-  const genes = rollGenes(rng, now)
+  const rolled = rollGenes(rng, now)
+  const genes = pending.isCharmed ? { ...rolled, isShiny: true } : rolled
   return { ...home, coins: home.coins - BREED_COST,
     shelter: { ...home.shelter, pending: { ...pending, genes, openedAt: null } },
     log: `The parcel is closed again. Open it to see ${genes.coat}${genes.isShiny ? ' ✨' : ''}.` }
@@ -68,7 +69,7 @@ const confirmPull = (home: Home, now: number): Home => {
   return { ...home, cats: [...home.cats, cat], activeId: cat.id,
     shelter: { ...home.shelter, pending: null, pulls: home.shelter.pulls + 1, last: { catId: cat.id, at: now, cost: pending.cost } },
     effect: { kind: 'adopt', at: now },
-    log: `Welcome home, ${cat.name}!` }
+    log: arrivalLog(cat.name, cat.genes) }
 }
 
 const rerollBreed = (home: Home, catId: string, now: number, rng: Rng): Home => {
