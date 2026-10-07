@@ -35,7 +35,19 @@ export type Goal = { id: string; label: string; want: Facts
 export type Expedition = { id: string; label: string; blurb: string; minutes: number; party: readonly [number, number]
   minLevel: number; cost: { coins: number; energy: number }; available?: Availability; unlock?: Unlock
   loot: { coins: readonly [number, number]; materials: Record<string, number>; rolls: readonly [number, number]
-    critters: number; critterKinds?: readonly ('bug' | 'fish' | 'mouse')[]; rare?: { item: string; odds: number } }; likes?: Partial<Record<Personality, number>>; xp: number; bond: number }
+    critters: number; critterKinds?: readonly ('bug' | 'fish' | 'mouse')[]; rare?: { item: string; odds: number } }; likes?: Partial<Record<Personality, number>>; xp: number; bond: number
+  flow?: TrailFlow }
+// Cosmetic trail beats the Expeditions tab plays from a run's seed; they never change loot.
+export const TRAIL_KINDS = ['walk', 'forage', 'treasure', 'fight', 'boss', 'rest', 'obstacle', 'discover', 'meet', 'return'] as const
+export type TrailKind = typeof TRAIL_KINDS[number]
+export const TRAIL_PROPS = ['bush', 'chest', 'rat', 'campfire', 'log', 'signpost', 'stray', 'sack', 'raccoon', 'butterfly', 'bee',
+  'crab', 'stream', 'fish', 'owl', 'mushroom', 'snowball', 'ice', 'pigeon', 'drone', 'gap', 'meteor', 'alien', 'crow', 'ghost', 'pumpkin'] as const
+export type TrailProp = typeof TRAIL_PROPS[number]
+export const TRAIL_BACKDROPS = ['garden', 'river', 'woods', 'snow', 'neon', 'moon', 'patch'] as const
+export type TrailBackdrop = typeof TRAIL_BACKDROPS[number]
+export type TrailFlow = { events?: readonly string[]; boss?: string; backdrop?: TrailBackdrop }
+export type TrailEvent = { id: string; label: string; kind: TrailKind; moves: readonly string[]; prop?: TrailProp
+  seconds: number; weight: number; trails?: readonly string[]; line: string }
 export type Quest = { id: string; label: string; steps: readonly { text: string; counter: Counter; goal: number; material?: string }[]
   reward: Cost & { item?: string }; available?: Availability; weight: number }
 export type GameEvent = { id: string; label: string; kind: 'exchange' | 'boost'; available?: Availability
@@ -51,6 +63,7 @@ export const defineBehavior = (s: Behavior) => s
 export const defineGoal = (s: Goal) => s
 export const defineExpedition = (s: Expedition) => s
 export const defineQuest = (s: Quest) => s
+export const defineTrailEvent = (s: TrailEvent) => s
 export const SPEECH_TRIGGERS = ['idle', 'plan', 'done', 'bowl.empty', 'wake', 'pair.start', 'pair.end',
   'pet', 'play', 'fill', 'gift', 'gift.loved', 'levelup', 'weather', 'festival', 'stray', 'catch', 'welcome',
   'claude.prompt', 'claude.tool', 'claude.done', 'claude.error', 'test.pass', 'test.fail'] as const
@@ -161,6 +174,19 @@ export const expeditionProblems = (s: Expedition, mats: readonly Material[], ite
   ...(s.loot.rare && (!items.some(i => i.id === s.loot.rare!.item) || !range(s.loot.rare.odds, 0, 0.1)) ? ['invalid rare find'] : []),
   ...(!whole(s.xp, 0, 200) || !range(s.bond, 0, 5) ? ['invalid xp or bond'] : []),
   ...Object.values(s.likes ?? {}).filter(n => !range(n, 1, 1.5)).map(() => 'personality bonus is 1 to 1.5')]
+export const trailEventProblems = (s: TrailEvent, moves: readonly Move[], expeditions: readonly { id: string }[]): string[] => [...name(s),
+  ...(!(TRAIL_KINDS as readonly string[]).includes(s.kind) ? [`unknown trail kind ${s.kind}`] : []),
+  ...(!s.moves.length || s.moves.length > 3 ? ['needs one to three moves'] : []), ...s.moves.filter(id => !moves.some(m => m.id === id)).map(id => `unknown move ${id}`),
+  ...(s.prop && !(TRAIL_PROPS as readonly string[]).includes(s.prop) ? [`unknown prop ${s.prop}`] : []),
+  ...(s.kind !== 'walk' && s.kind !== 'return' && !s.prop ? ['needs a prop'] : []),
+  ...(!whole(s.seconds, 4, 30) || !range(s.weight, 0, 10) ? ['invalid trail limits'] : []),
+  ...(!s.line.trim() || s.line.length > 40 ? ['line is 1 to 40 characters'] : []),
+  ...(s.trails ?? []).filter(id => !expeditions.some(e => e.id === id)).map(id => `unknown trail ${id}`)]
+// A flow names existing events; its boss must be a boss beat and the pool needs a return beat somewhere.
+export const flowProblems = (s: Expedition, events: readonly TrailEvent[]): string[] => !s.flow ? [] : [
+  ...(s.flow.events ?? []).filter(id => !events.some(e => e.id === id && e.kind !== 'boss')).map(id => `${s.id}: unknown flow event ${id}`),
+  ...(s.flow.boss && !events.some(e => e.id === s.flow!.boss && e.kind === 'boss') ? [`${s.id}: unknown boss ${s.flow.boss}`] : []),
+  ...(s.flow.backdrop && !(TRAIL_BACKDROPS as readonly string[]).includes(s.flow.backdrop) ? [`${s.id}: unknown backdrop`] : [])]
 // Counters shared by Paw Miles tasks and daily quest chains.
 export const COUNTERS = ['pet', 'feed', 'play', 'gift', 'buy', 'tools', 'turns', 'donate', 'visitor', 'catch', 'games', 'bond', 'react', 'expedition', 'exchange', 'craft'] as const
 export const questProblems = (s: Quest, mats: readonly Material[], items: readonly { id: string }[] = []): string[] => [...name(s),

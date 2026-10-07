@@ -1,5 +1,6 @@
-// Renders a content preview PNG to look at before committing: node tools/preview.mjs <breed|move|world|cat|interaction|furniture> <id> [--out <dir>]
+// Renders a content preview PNG to look at before committing: node tools/preview.mjs <breed|move|world|cat|interaction|furniture|trail|trail-event> <id> [--out <dir>]
 // Breed: a row per flavor in every marking and silhouette. Move: one cycle, facing left then right.
+// Trail: an expedition's beats mid-action, one row per flavor. Trail event: its loop stages on its first trail.
 // World: manor yard in every flavor at noon and midnight in June, October and December. Cat: portraits in every flavor.
 import { execSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
@@ -12,8 +13,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const [kind, id] = process.argv.slice(2)
 const outAt = process.argv.indexOf('--out')
 const out = resolve(outAt > 0 ? process.argv[outAt + 1] : join(tmpdir(), 'idle-cat-previews'))
-if (!['breed', 'move', 'world', 'cat', 'interaction', 'furniture'].includes(kind) || !id) {
-  console.error('usage: node tools/preview.mjs <breed|move|world|cat|interaction|furniture> <id> [--out <dir>]')
+if (!['breed', 'move', 'world', 'cat', 'interaction', 'furniture', 'trail', 'trail-event'].includes(kind) || !id) {
+  console.error('usage: node tools/preview.mjs <breed|move|world|cat|interaction|furniture|trail|trail-event> <id> [--out <dir>]')
   process.exit(1)
 }
 
@@ -24,13 +25,16 @@ import { canvas } from './hooks/scene/canvas'
 import { pen } from './hooks/scene/fine/draw'
 import { drawHiCat } from './hooks/scene/hicat'
 import { FLAVORS, FLAVOR_NAMES } from './hooks/theme'
-import { MOVES, NAMED_CATS, WORLDS, INTERACTIONS, FURNITURE } from './hooks/content'
+import { MOVES, NAMED_CATS, WORLDS, INTERACTIONS, FURNITURE, EXPEDITIONS, TRAIL_EVENTS } from './hooks/content'
+import { send } from './hooks/expeditions'
+import { trailOf } from './hooks/trail'
+import { runImage } from './hooks/scene/trail'
 import { startPair, stepPair } from './hooks/pair'
 import { motionCtxOf, startMotion, forceMove, stepMotion } from './hooks/motion'
 import { seeded } from './hooks/rng'
 import { newHome } from './hooks/game'
 import { frameImage } from './hooks/scene'
-export const ids = { breed: COATS, move: MOVES.map(m => m.id), world: WORLDS.map(w => w.id), cat: NAMED_CATS.map(c => c.id), interaction: INTERACTIONS.map(i => i.id), furniture: FURNITURE.map(i => i.id) }
+export const ids = { breed: COATS, move: MOVES.map(m => m.id), world: WORLDS.map(w => w.id), cat: NAMED_CATS.map(c => c.id), interaction: INTERACTIONS.map(i => i.id), furniture: FURNITURE.map(i => i.id), trail: EXPEDITIONS.map(e => e.id), 'trail-event': TRAIL_EVENTS.map(e => e.id) }
 export const furnishing = (id) => FLAVOR_NAMES.map(name => {
   const now = new Date(2026, 9, 5, 12).getTime(), item = FURNITURE.find(f => f.id === id)
   const home = { ...newHome(now), tier: 6, decor: { [item.slot]: id }, owned: [id] }
@@ -46,6 +50,27 @@ export const pairing = (id) => {
     for (let n = 0; n < 8; n++) run = stepPair(run, ctx)
     return frameImage({ home, now, tick: frame * 8, hour: 12, flavor: FLAVORS.mocha, cols: 48, motion: run.lead, partner: { id: 'c2', motion: run.partner } })
   })]
+}
+// A sent party of three: every beat of the trail, or one event's stages, drawn mid-action.
+// Sends on a day inside the trail's season so seasonal trails (Snow Trail) get a run.
+const party = (exp) => {
+  const month = EXPEDITIONS.find(e => e.id === exp)?.available?.months[0] ?? 10
+  const now = new Date(2026, month - 1, 5, 12).getTime(), base = newHome(now), cat = base.cats[0]
+  const coats = ['ginger', 'tuxedo', 'calico']
+  const home = { ...base, tier: 5, coins: 1e6, owned: [...base.owned, 'harbor-map', 'star-map'], world: { id: exp === 'neon-rooftops' ? 'neon-alley' : base.world.id },
+    cats: coats.map((coat, i) => ({ ...cat, id: "c" + (i + 1), name: ['Mochi', 'Miso', 'Tofu'][i], level: 25, genes: { ...cat.genes, coat } })) }
+  const sent = send(home, exp, ['c1', 'c2', 'c3'], [], now, 7)
+  return { home: sent, run: sent.expeditions.runs[0] }
+}
+export const trailing = (id) => {
+  const { home, run } = party(id), trail = trailOf(run)
+  return FLAVOR_NAMES.map(name => trail.beats.map((b, i) => runImage(home, run, trail, b.at + b.event.seconds * 600, i * 8, FLAVORS[name], 48, 4)))
+}
+export const eventing = (id) => {
+  const event = TRAIL_EVENTS.find(e => e.id === id), exp = event.trails?.[0] ?? 'garden-patrol'
+  const { home, run } = party(exp), base = trailOf(run)
+  const trail = { ...base, beats: [{ event, at: run.startAt, until: run.endsAt, finds: { coins: 0, materials: {}, critters: [] } }] }
+  return FLAVOR_NAMES.map(name => [0.15, 0.4, 0.6, 0.8, 0.92].map((t, i) => runImage(home, run, trail, run.startAt + event.seconds * 1000 * t, i * 5, FLAVORS[name], 48, 4)))
 }
 // A named cat's portrait at 8x, one flavor per column.
 export const card = (id) => {
@@ -104,13 +129,13 @@ const dir = mkdtempSync(join(tmpdir(), 'idle-cat-preview-'))
 const bundle = join(dir, 'preview.mjs')
 execSync(`npx -y esbuild@0.25 --bundle --format=esm --platform=node --loader=ts --outfile=${JSON.stringify(bundle)}`,
   { cwd: root, input: entry, stdio: ['pipe', 'ignore', 'pipe'] })
-const { ids, sheet, strip, panorama, card, pairing, furnishing } = await import(pathToFileURL(bundle).href)
+const { ids, sheet, strip, panorama, card, pairing, furnishing, trailing, eventing } = await import(pathToFileURL(bundle).href)
 if (!ids[kind].includes(id)) {
   console.error(`no ${kind} ${id}; known: ${ids[kind].join(', ')}`)
   process.exit(1)
 }
 
-const rows = { breed: sheet, move: strip, world: panorama, cat: card, interaction: pairing, furniture: furnishing }[kind](id)
+const rows = { breed: sheet, move: strip, world: panorama, cat: card, interaction: pairing, furniture: furnishing, trail: trailing, 'trail-event': eventing }[kind](id)
 const tile = rows[0][0]
 const width = tile.width * rows[0].length
 const height = tile.height * rows.length
@@ -152,5 +177,6 @@ const file = join(out, `${kind}-${id}.png`)
 writeFileSync(file, png)
 const LEGEND = { breed: 'rows: latte, frappe, macchiato, mocha; columns: markings x silhouettes',
   move: 'rows: facing left, facing right; columns: cycle frames', world: 'rows: each flavor in June, October, December, at noon then midnight',
-  cat: 'columns: latte, frappe, macchiato, mocha', interaction: 'columns: successive pair frames', furniture: 'rows: latte, frappe, macchiato, mocha' }
+  cat: 'columns: latte, frappe, macchiato, mocha', interaction: 'columns: successive pair frames', furniture: 'rows: latte, frappe, macchiato, mocha',
+  trail: 'rows: latte, frappe, macchiato, mocha; columns: every beat mid-loop', 'trail-event': 'rows: flavors; columns: approach, action, action, action, outcome' }
 console.log(`wrote ${file} (${LEGEND[kind]})`)

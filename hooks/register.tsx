@@ -11,7 +11,9 @@ import type { ReactionMemory, ReactionMode } from './reactions'
 import { signalsOf, turnSignal } from './reactions/signals'
 import type { Signal } from './content/types'
 import { isContentAvailable } from './content/availability'
-import { unlockHint } from './content/types'
+import { isUnlocked, unlockHint } from './content/types'
+import { beatAt, captionOf, findsText, foundSoFar, isFound, partyOf, trailOf } from './trail'
+import { trailCells, trailImage } from './scene/trail'
 import { skillTotals } from './skills'
 import { homeMods } from './home'
 import { read, update } from 'claude-code'
@@ -103,7 +105,11 @@ let partnerReply: { frame: number; ev: SpeechEvent } | null = null
 let reactionUntil = 0
 let partySelection: string[] = []
 let gearSelection: string[] = []
-let expeditionChoice = 0
+let expeditionPick: string | null = null
+// The run the trail picture follows and which trail sections are open; never saved.
+let watchRun = 0
+let trailBeatKey = ''
+const openSections = new Set<string>(['available', 'seasonal'])
 let partyCursor = 0
 const SETTING_CHOICES: Record<string, readonly string[]> = {
   'afk-cat.flavor': ['auto', 'daycycle', 'latte', 'frappe', 'macchiato', 'mocha'],
@@ -338,11 +344,20 @@ const paneQuote = (home: Home, now: number) => {
   return `${speaker.name}: "${quote.text}"`
 }
 const sceneCellsOf = (home: Home, view: View, now: number, flavor: Flavor) => view === 'adopt'
-  ? shelterCells(home, now, frame, flavor, cols) : frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion,
+  ? shelterCells(home, now, frame, flavor, cols) : view === 'expedition' ? trailCells(home, now, frame, flavor, cols, watchRun) : frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion,
     camX: camera.x, ...(pairRun ? { partner: { id: pairRun.partnerId, motion: pairRun.partner } } : {}), ...speechMark(home, now) })
 const sceneImageOf = (home: Home, view: View, now: number, flavor: Flavor): RgbaImage => view === 'adopt'
   ? shelterImage(home, now, frame, flavor, cols, PICTURE_SCALE)
+  : view === 'expedition' ? trailImage(home, now, frame, flavor, cols, watchRun, PICTURE_SCALE)
   : frameImage({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion, camX: camera.x, ...(pairRun ? { partner: { id: pairRun.partnerId, motion: pairRun.partner } } : {}), ...speechMark(home, now) })
+// The watched run's beat and whether its finds are out, so the pane text refreshes when either changes.
+const watchedRun = (home: Home) => home.expeditions.runs.length ? home.expeditions.runs[watchRun % home.expeditions.runs.length] : undefined
+const trailKeyOf = (home: Home, now: number) => {
+  const run = watchedRun(home)
+  if (!run) return ''
+  const { beat, index } = beatAt(trailOf(run), now)
+  return `${run.id}:${index}:${isFound(beat, now)}:${run.endsAt <= now}`
+}
 // A denied Image blit that names its alt means the terminal draws no pictures here.
 const isAltDeny = (deny: string) => /\balt\b|placeholder/i.test(deny)
 
@@ -462,7 +477,7 @@ const weatherCommand = async ($: EngineInterface, arg: string): Promise<{ text: 
 }
 
 const HELP = [
-  '/cat expedition — Expeditions tab (x)',
+  '/cat expedition — Expedition tab (x): watch the trail, send and claim parties',
   '/cat send <exp> <cat…> [+gear…] — send a party',
   '/cat claim [run] — collect ready rewards',
   '/cat quests — today’s chains in Miles',
@@ -485,7 +500,7 @@ const HELP = [
   '/cat fill [n] — add n portions to the shared bowl (5c each)',
   '/cat world [id] — list worlds with prices, or move to one you own',
   '/cat world buy <id> — buy a world and move the yard there',
-  'In the pane: ‹ › tabs · q back · c a s h r b m x g v t visible tab shortcuts · f u fill bowl · e n pet/nap · p arcade · w cat list',
+  'In the pane: ‹ › tabs · q back · c a s h x r b m g v t visible tab shortcuts · f u fill bowl · e n pet/nap · p arcade · w cat list',
   'On the Cat tab: j and l pan the yard · 0 follows the cat again',
 ].join('\n')
 
@@ -589,8 +604,18 @@ const emitReaction = async ($: EngineInterface, signals: readonly Signal[], tool
 }
 const departure = ($: EngineInterface, expId: string, ids: string[], gear: string[]) => {
   const seed = Math.floor(Math.random() * 4294967296)
-  return change($, (h, t) => send(h, expId, ids, gear, t, seed))
+  return change($, (h, t) => {
+    const next = send(h, expId, ids, gear, t, seed)
+    // Watch the party that just left.
+    if (next.expeditions.runs.length > h.expeditions.runs.length) watchRun = next.expeditions.runs.length - 1
+    return next
+  })
 }
+// The picked trail, else the first unlocked trail in season, so Send never targets a hidden default.
+const selectedTrail = (home: Home, now: number) => EXPEDITIONS.find(e => e.id === expeditionPick)
+  ?? EXPEDITIONS.find(e => isUnlocked(home, e.unlock) && isContentAvailable(e.available, now)) ?? EXPEDITIONS[0]!
+const sectionOf = (home: Home, e: (typeof EXPEDITIONS)[number]) => e.available ? 'seasonal' : isUnlocked(home, e.unlock) ? 'available' : 'locked'
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 export const register: Register = (on, options) => {
   reactionMode = options.reactions === 'off' || options.reactions === 'quiet' ? options.reactions : 'on'
@@ -768,6 +793,10 @@ export const register: Register = (on, options) => {
             }
           }
         }
+        if (paint.isMounted && paint.view === 'expedition') {
+          const key = trailKeyOf(latest, now)
+          if (key !== trailBeatKey) { trailBeatKey = key; $.ui.invalidate('ui.render') }
+        }
         if (band.mode !== 'raster') return
         const isSprint = frame < sprintUntil
         runX = nextX(runX, band.cols, isSprint)
@@ -791,7 +820,7 @@ export const register: Register = (on, options) => {
     } else if (key === 'return' && here.length) {
       const selected = partySelection.filter(id => here.some(c => c.id === id))
       const ids = selected.length ? selected : here.slice(0, 1).map(c => c.id)
-      await departure($, EXPEDITIONS[expeditionChoice % EXPEDITIONS.length]!.id, ids, gearSelection.filter(id => (latest!.gear[id] ?? 0) > 0))
+      await departure($, selectedTrail(latest, await $.clock.now()).id, ids, gearSelection.filter(id => (latest!.gear[id] ?? 0) > 0))
     }
     return {}
   })
@@ -971,7 +1000,13 @@ export const register: Register = (on, options) => {
     paint.last = sceneImage?.rgba ?? sceneCells
     paint.isMounted = paint.last !== ''
     // What the picture shows, for screen readers and terminals that draw the alt instead.
-    const sceneAlt = view !== 'adopt' ? catsAtHome(home).length ? `${cat.name} (${mood}) in the yard` : 'All cats are away on expeditions'
+    const trailAlt = () => {
+      const run = watchedRun(home)
+      if (!run) return 'A quiet camp: no parties are out'
+      const trail = trailOf(run), { beat } = beatAt(trail, Math.min(now, run.endsAt))
+      return `${trail.exp?.label ?? run.exp}: ${captionOf(beat, partyOf(home, run).lead)}`
+    }
+    const sceneAlt = view === 'expedition' ? trailAlt() : view !== 'adopt' ? catsAtHome(home).length ? `${cat.name} (${mood}) in the yard` : 'All cats are away on expeditions'
       : reveal ? `${reveal.name} at the adoption shelter` : 'A mystery parcel at the adoption shelter'
     const scene = sceneImage && 'Image' in ui
       ? <ui.Image key={SCENE} columns={cols} rows={ROWS} source={sceneImage} alt={sceneAlt} />
@@ -985,10 +1020,12 @@ export const register: Register = (on, options) => {
         <Button key="tabs-back" plain hotkey="q" label="↶"
           onPress={() => update($, routeRef, route => goBack(route ?? initialRoute()))} />
         <Button key="tabs-prev" plain label="‹" onPress={() => routeTo($, -1)} />
-        {visibleTabs(view, e.props.bodyColumns).map(t => (
-          <Button key={`tab-${t.view}`} plain hotkey={t.hotkey} label={t.view === view ? `▸${t.label}` : t.label}
+        {visibleTabs(view, e.props.bodyColumns, home.expeditions.runs.length).map(t => {
+          const button = <Button key={`tab-${t.view}`} plain hotkey={t.hotkey} label={t.view === view ? `▸${t.label}` : t.label}
             variant={t.view === view ? 'primary' : undefined} onPress={() => routeTo($, t.view)} />
-        ))}
+          // Parties out paint the Expedition tab green.
+          return t.isBusy ? <Box key={`tab-${t.view}-busy`} backgroundColor={tone.ok}>{button}</Box> : button
+        })}
         <Button key="tabs-next" plain label="›" onPress={() => routeTo($, 1)} />
       </Box>
     )
@@ -1199,13 +1236,39 @@ export const register: Register = (on, options) => {
       const catById = new Map(home.cats.map(c => [c.id, c]))
       const here = catsAtHome(home), selection = partySelection.filter(id => here.some(c => c.id === id))
       const ids = selection.length ? selection : here.slice(0, 1).map(c => c.id)
-      const selected = EXPEDITIONS[expeditionChoice % EXPEDITIONS.length]!
+      const selected = selectedTrail(home, now)
       const gear = gearSelection.filter(id => (home.gear[id] ?? 0) > 0)
       const cycleParty = (step: number) => { partyCursor = (partyCursor + step + here.length) % Math.max(1, here.length); partySelection = here[partyCursor] ? [here[partyCursor]!.id] : []; $.ui.invalidate('ui.render') }
+      const runs = home.expeditions.runs, watched = watchedRun(home)
+      const trail = watched && trailOf(watched)
+      const beat = watched && trail && beatAt(trail, Math.min(now, watched.endsAt))
+      const found = trail && foundSoFar(trail, now)
+      const lead = watched ? partyOf(home, watched).lead : 'The party'
+      const watch = (step: number) => { watchRun = (watchRun + step + runs.length) % Math.max(1, runs.length); $.ui.invalidate('ui.render') }
+      const toggle = (id: string) => { if (!openSections.delete(id)) openSections.add(id); $.ui.invalidate('ui.render') }
+      const choose = (id: string) => { expeditionPick = id; $.ui.invalidate('ui.render') }
+      const finds = (e: (typeof EXPEDITIONS)[number]) => `Finds ${Object.keys(e.loot.materials).join(', ')}${e.loot.rare ? ` · rare ${e.loot.rare.item}` : ''}`
+      const sections = [
+        { id: 'available', label: 'Available expeditions', items: EXPEDITIONS.filter(e => sectionOf(home, e) === 'available'),
+          detail: (e: (typeof EXPEDITIONS)[number]) => `${e.blurb} · ${finds(e)}` },
+        { id: 'seasonal', label: 'Seasonal expeditions', items: EXPEDITIONS.filter(e => sectionOf(home, e) === 'seasonal'),
+          detail: (e: (typeof EXPEDITIONS)[number]) => [isContentAvailable(e.available, now) ? 'In season now' : 'Out of season', e.available!.months.map(m => MONTHS[m - 1]).join(', '),
+            isUnlocked(home, e.unlock) ? '' : `needs ${unlockHint(e.unlock)}`, e.blurb].filter(Boolean).join(' · ') },
+        { id: 'locked', label: 'Locked expeditions', items: EXPEDITIONS.filter(e => sectionOf(home, e) === 'locked'),
+          detail: (e: (typeof EXPEDITIONS)[number]) => `Needs ${unlockHint(e.unlock)} · ${e.blurb}` },
+      ]
       return <Box flexDirection="column">
         {tabs}{scene}
-        <Text bold color={tone.title}>Expeditions · {home.expeditions.runs.length}/{slotsOf(home)} slots used</Text>
-        {home.expeditions.runs.map(r => {
+        {watched && trail && beat ? <Box flexDirection="column">
+          <Box>
+            {runs.length > 1 && <Button key="trail-watch-prev" plain label="‹" onPress={() => watch(-1)} />}
+            <Text bold color={tone.ok}>{runs.length > 1 ? ` Watching ${(watchRun % runs.length) + 1}/${runs.length} · ` : ''}{trail.exp?.label ?? watched.exp} · beat {beat.index + 1}/{trail.beats.length} · {beat.beat.event.label}</Text>
+            {runs.length > 1 && <Button key="trail-watch-next" plain label=" ›" onPress={() => watch(1)} />}
+          </Box>
+          <Text color={tone.muted}>{captionOf(beat.beat, lead)} · found so far: {(found && findsText(found)) || 'nothing yet'}</Text>
+        </Box> : <Text color={tone.muted}>No parties on the trail. Pick a party and a trail below.</Text>}
+        <Text bold color={tone.title}>Expeditions · {runs.length}/{slotsOf(home)} slots used</Text>
+        {runs.map(r => {
           const ready = r.endsAt <= now, minutes = Math.max(0, Math.ceil((r.endsAt - now) / 60000))
           return <Box flexDirection="column">
             <Text>{EXPEDITIONS.find(e => e.id === r.exp)?.label ?? r.exp} · {r.cats.map(id => catById.get(id)?.name ?? id).join(', ')} · {bar(100 * Math.min(1, (now - r.startAt) / (r.endsAt - r.startAt)), 10)} · {ready ? 'Ready to claim' : `${minutes}m left`}</Text>
@@ -1219,15 +1282,16 @@ export const register: Register = (on, options) => {
         {here.map(c => <Button key={`party-${c.id}`} plain label={`${ids.includes(c.id) ? '✓' : '·'} ${c.name} · L${c.level} · energy ${Math.floor(c.energy)}`} onPress={() => { partySelection = ids.includes(c.id) ? ids.filter(id => id !== c.id) : [...ids, c.id]; $.ui.invalidate('ui.render') }} />)}
         <Text>Gear · one of each per party, consumed when sent</Text>
         {SHOP.filter(i => i.kind === 'gear' && (home.gear[i.id] ?? 0) > 0).map(i => <Button key={`gear-${i.id}`} plain label={`${gear.includes(i.id) ? '✓' : '·'} ${i.name} (${home.gear[i.id]}) · ${i.text}`} onPress={() => { gearSelection = gear.includes(i.id) ? gear.filter(id => id !== i.id) : [...gear, i.id]; $.ui.invalidate('ui.render') }} />)}
-        <Text bold>Trails</Text>
-        {EXPEDITIONS.map((e, i) => {
-          const check = canSend(home, e.id, ids, now)
-          return <Box flexDirection="column">
-            <Button key={`expedition-${e.id}`} plain label={`${selected.id === e.id ? '▸' : '·'} ${e.label} · ${e.minutes}m · ${e.cost.coins}c + ${e.cost.energy} energy/cat · L${e.minLevel} · party ${e.party.join('–')}`} onPress={() => { expeditionChoice = i; $.ui.invalidate('ui.render') }} />
-            <Text color={check.ok ? tone.muted : tone.warn}>{check.ok ? e.blurb : check.reason} · Finds: {Object.keys(e.loot.materials).join(', ')} · {e.loot.rolls.join('–')} rolls/cat · {e.loot.coins.join('–')} × coin rate · critters{e.loot.rare ? ` · rare ${e.loot.rare.item}` : ''}</Text>
-          </Box>
-        })}
-        <Button key="expedition-send" plain hotkey="d" label={`Send to ${selected.label}`} onPress={() => departure($, selected.id, ids, gear)} />
+        {sections.map(sec => <Box key={`trails-${sec.id}`} flexDirection="column">
+          <Button key={`trails-${sec.id}-toggle`} plain label={`${openSections.has(sec.id) ? '▾' : '▸'} ${sec.label} (${sec.items.length})`} onPress={() => toggle(sec.id)} />
+          {openSections.has(sec.id) && sec.items.map(e => <Box key={`trail-${e.id}`} flexDirection="column">
+            <Button key={`expedition-${e.id}`} plain label={`  ${selected.id === e.id ? '▸' : '·'} ${e.label} · ${e.minutes}m`} onPress={() => choose(e.id)} />
+            <Text color={tone.muted}>{'    '}{sec.detail(e)}</Text>
+          </Box>)}
+          {openSections.has(sec.id) && !sec.items.length && <Text color={tone.muted}>{'    '}None right now.</Text>}
+        </Box>)}
+        <Button key="expedition-send" plain hotkey="d" label={`Send to ${selected.label}${openSections.has(sectionOf(home, selected)) ? '' : ' (hidden)'} · ${selected.cost.coins}c + ${selected.cost.energy} energy/cat`} onPress={() => departure($, selected.id, ids, gear)} />
+        {(() => { const check = canSend(home, selected.id, ids, now); return check.ok ? null : <Text color={tone.warn}>{check.reason}</Text> })()}
         <Text italic color={tone.log}>{home.log}</Text>
       </Box>
     }
