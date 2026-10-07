@@ -370,10 +370,9 @@ const trailKeyOf = (home: Home, now: number) => {
 const isAltDeny = (deny: string) => /\balt\b|placeholder/i.test(deny)
 
 // Pushes one yard picture. Skips repeats, and stops after the grace once no tab is watching.
-const pushPicture = async ($: EngineInterface, home: Home, now: number, flavor: Flavor) => {
+const pushPicture = async ($: EngineInterface, home: Home, now: number, flavor: Flavor, source = sceneImageOf(home, paint.view, now, flavor)) => {
   if (!picture.isWatching || !arcade.port || picture.isBusy) return
   if (picture.viewers === 0 && now - picture.openedAt > PICTURE_GRACE_MS) { picture.isWatching = false; return }
-  const source = sceneImageOf(home, paint.view, now, flavor)
   if (source.rgba === picture.last) return
   picture.isBusy = true
   picture.last = source.rgba
@@ -381,6 +380,7 @@ const pushPicture = async ($: EngineInterface, home: Home, now: number, flavor: 
     const res = await $.http.fetch(`http://127.0.0.1:${arcade.port}/api/pane`, {
       method: 'POST', headers: { 'content-type': 'application/json', 'x-arcade-token': arcade.token }, body: JSON.stringify(source),
     })
+    if (!res.ok) { picture.last = ''; return }
     const data = JSON.parse(res.text) as { viewers?: number }
     if (typeof data.viewers === 'number') picture.viewers = data.viewers
     if (picture.viewers === 0 && now - picture.openedAt > PICTURE_GRACE_MS) picture.isWatching = false
@@ -391,22 +391,28 @@ const pushPicture = async ($: EngineInterface, home: Home, now: number, flavor: 
   }
 }
 
-const openPicture = async ($: EngineInterface, isForced = false) => {
+type PictureOpen = 'offline' | 'opened' | 'link'
+const pictureText = (status: PictureOpen) => status === 'offline' ? 'The picture needs Node.js on your PATH.'
+  : status === 'opened' ? 'The yard picture is open in your browser.'
+  : `The browser did not open. Use ${paneUrl(arcade.port, arcade.token)} while Claude Code is running.`
+
+const openPicture = async ($: EngineInterface, isForced = false): Promise<PictureOpen> => {
   const port = await ensureArcade($)
-  if (!port) return false
+  if (!port) return 'offline'
   picture.isWatching = true
   picture.openedAt = await $.clock.now()
   picture.last = ''
   if (latest) void pushPicture($, latest, picture.openedAt, flavorNow(picture.openedAt))
-  if (picture.isOpened && !isForced) return true
+  if (picture.isOpened && !isForced) return 'opened'
   const isWindows = (await $.env.get('OS')) === 'Windows_NT'
+  let isLaunched = false
   for (const argv of browserArgv(isWindows, paneUrl(port, arcade.token))) {
     const ran = await $.process.run(argv, { timeoutMs: 5000 }).catch(() => null)
-    if (ran && ran.exitCode === 0) break
+    if (ran && ran.exitCode === 0) { isLaunched = true; break }
   }
   picture.isOpened = true
   $.ui.invalidate('ui.render')
-  return true
+  return isLaunched ? 'opened' : 'link'
 }
 
 const routeTo = ($: EngineInterface, target: View | number) =>
@@ -684,7 +690,7 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'cat',
-      description: 'Open your AFK cats (/cat hide, /cat shelter, /cat adopt [name], /cat reveal, /cat reroll, /cat switch <name>, /cat rename <name>, /cat weather <city>, /cat export, /cat import <file>, /cat help)',
+      description: 'Open your AFK cats (/cat hide, /cat shelter, /cat adopt [name], /cat reveal, /cat reroll, /cat picture, /cat switch <name>, /cat rename <name>, /cat weather <city>, /cat export, /cat import <file>, /cat help)',
     })
     await readTheme($)
     paidUsd = await sessionUsd($)
@@ -761,7 +767,11 @@ export const register: Register = (on, options) => {
         }).finally(() => { for (const r of fresh) notifiedRuns.delete(r.id) })
       }
       // A frame still waiting on its blit holds the next one back, but never past STALL_MS.
-      if (paint.isBusy && now - paint.busyAt < STALL_MS) return
+      // The browser picture does not wait on that blit.
+      if (paint.isBusy && now - paint.busyAt < STALL_MS) {
+        if (picture.isWatching && latest) void pushPicture($, latest, now, flavorAt(now))
+        return
+      }
       paint.isBusy = true
       paint.busyAt = now
       try {
@@ -826,14 +836,16 @@ export const register: Register = (on, options) => {
           camera = followCam(camera, Math.round(motion.x / DESIGN), 14, yardCols(latest, cols), cols, frame)
         }
         // Skips the scene while the pane is closed and when a frame would repaint the same cells.
+        const showImage = paint.isMounted && paint.kind !== 'raster'
+        const source = showImage || picture.isWatching ? sceneImageOf(latest, paint.view, now, flavor) : null
+        if (picture.isWatching && source) void pushPicture($, latest, now, flavor, source)
         if (paint.isMounted && paint.kind === 'raster') {
           const cells = sceneCellsOf(latest, paint.view, now, flavor)
           if (cells !== paint.last) {
             paint.last = cells
             if ((await $.ui.blit({ requestId: PANE, key: SCENE, cells })).deny) paint.isMounted = false
           }
-        } else if (paint.isMounted) {
-          const source = sceneImageOf(latest, paint.view, now, flavor)
+        } else if (paint.isMounted && source) {
           if (source.rgba !== paint.last) {
             paint.last = source.rgba
             const { deny } = await $.ui.blit({ requestId: PANE, key: SCENE, source })
@@ -848,7 +860,6 @@ export const register: Register = (on, options) => {
           const key = trailKeyOf(latest, now)
           if (key !== trailBeatKey) { trailBeatKey = key; $.ui.invalidate('ui.render') }
         }
-        if (latest) void pushPicture($, latest, now, flavor)
         if (band.mode !== 'raster') return
         const isSprint = frame < sprintUntil
         runX = nextX(runX, band.cols, isSprint)
@@ -919,9 +930,9 @@ export const register: Register = (on, options) => {
       return { text: (await change($, prev => setWorld(prev, arg.trim().toLowerCase()))).log }
     }
     if (sub === 'picture') {
-      const ok = await openPicture($, true)
+      const status = await openPicture($, true)
       await $.ui.open({ id: PANE, title: 'AFK Cat' })
-      return { text: ok ? 'The yard picture is open in your browser.' : 'The picture needs Node.js on your PATH.' }
+      return { text: pictureText(status) }
     }
     if (sub === 'weather') {
       await routeTo($, 'weather')
@@ -1743,7 +1754,8 @@ export const register: Register = (on, options) => {
         <Box>
           <Button key="picture" plain hotkey="i" label="Picture (i)"
             onPress={async () => {
-              if (!(await openPicture($, true))) await change($, prev => ({ ...prev, log: 'The picture needs Node.js on your PATH.' }))
+              const status = await openPicture($, true)
+              if (status !== 'opened') await change($, prev => ({ ...prev, log: pictureText(status) }))
             }} />
           {picture.isOpened && arcade.port
             ? <Text color={tone.muted}><ui.Link href={paneUrl(arcade.port, arcade.token)}>{`localhost:${arcade.port}/pane`}</ui.Link></Text>
