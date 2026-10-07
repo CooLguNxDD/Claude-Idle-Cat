@@ -2,7 +2,7 @@ import { expect, test } from 'claude-code/testing'
 
 import { newHome } from '../game'
 import { seeded } from '../rng'
-import { arcadeUrl, browserArgv, newToken, parseLine, snapshotOf, splitLines } from './bridge'
+import { arcadeUrl, browserArgv, newToken, paneUrl, parseLine, snapshotOf, splitLines } from './bridge'
 import { startGame } from './rewards'
 
 test('stdout pieces become whole lines, the unfinished tail kept for later', async () => {
@@ -38,5 +38,6 @@ test('the snapshot carries the menu and the open round, and the token is 128-bit
   expect(playing.round?.id).toBe(t)
   expect(newToken(seeded(1))).toMatch(/^[0-9a-f]{32}$/)
   expect(arcadeUrl(80, 'abc')).toBe('http://localhost:80/?t=abc')
+  expect(paneUrl(80, 'abc')).toBe('http://localhost:80/pane?t=abc')
   expect(browserArgv(true, 'u')).toEqual([['rundll32', 'url.dll,FileProtocolHandler', 'u']])
 })

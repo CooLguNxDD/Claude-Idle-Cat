@@ -31,6 +31,7 @@ On this machine `~/.claude/settings.json` sets `env.CLAUDE_CODE_PLUGIN_DIRS` to 
   - The games in `hooks/arcade/games/*.ts` are shared: the mod reads their medals and `maxScore`, and the browser runs them.
   - `server/arcade.mjs` is plain Node with no dependencies. The mod spawns it with an `ARCADE_TOKEN`.
     - It also serves the token-protected `/location` page; device coordinates return as a validated `location` stdout message. Browser geolocation runs only after the user clicks its button.
+    - `/pane` is the same server's yard picture. The mod posts `{ rgba, width, height }` to `/api/pane` only while that tab is open. Other POST bodies stay capped at 8 KiB; the picture route allows one frame.
     - Append `&canvas=1` to an authorized arcade URL to inspect the Canvas fallback.
     - The first stdout line is `{"kind":"ready","port":N}`. After that, browser actions arrive as JSON lines; `parseLine` in `hooks/arcade/bridge.ts` reads them.
     - The mod pushes state to `POST /api/state`.
