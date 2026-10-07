@@ -40,7 +40,7 @@ test('a paid pull is one adoption; blocked pulls leave coins, RNG, receipt and c
   expect(paid.cats.length).toBe(2)
   expect(paid.cats[1]!.genes.isShiny).toBe(true)
   expect(paid.shinyCharm).toBe(false)
-  expect(paid.shelter).toEqual({ pulls: 1, last: { catId: 'c2', at: 2, cost: 100 } })
+  expect(paid.shelter).toEqual({ pulls: 1, last: { catId: 'c2', at: 2, cost: 100 }, pending: null, offer: null })
   let consumed = 0
   const rng = () => { consumed++; return 0 }
   const full = adopt({ ...paid, shinyCharm: true }, 3, rng)
@@ -57,7 +57,7 @@ test('old cats retain their genes and new adoption variants survive backups and 
   const base = newHome(1)
   const { shelter: _, ...old } = base
   expect(migrate(old, 2).cats[0]!.genes).toEqual(base.cats[0]!.genes)
-  expect(migrate(old, 2).shelter).toEqual({ pulls: 0, last: null })
+  expect(migrate(old, 2).shelter).toEqual({ pulls: 0, last: null, pending: null, offer: null })
   const genes: Genes = { coat: 'nebula', eyes: 'odd', personality: 'curious', isShiny: true,
     marking: 'blaze', silhouette: 'fluffy' }
   const visited = { ...base, shinyCharm: true, visitors: [
@@ -65,7 +65,7 @@ test('old cats retain their genes and new adoption variants survive backups and 
   ] }
   const adopted = adoptVisitor(visited, 'v2', 3)
   expect(adopted.cats[1]!.genes).toEqual(genes)
-  expect(adopted.shelter).toEqual({ pulls: 0, last: { catId: 'c2', at: 3, cost: 0 } })
+  expect(adopted.shelter).toEqual({ pulls: 0, last: { catId: 'c2', at: 3, cost: 0 }, pending: null, offer: null })
   expect(adopted.coins).toBe(base.coins + 17)
   expect(adopted.shinyCharm).toBe(true)
   const restored = parseBackup(toBackup(adopted, 4), 5)

@@ -36,9 +36,31 @@ export type Visitor = { id: string; name: string; genes: Genes; arrivedAt: numbe
 
 export type Slot = 'bowl' | 'bed' | 'toy' | 'rug' | 'plant' | 'hanging'
 
-export type View = 'cat' | 'skills' | 'home' | 'friends' | 'book' | 'miles' | 'arcade' | 'weather' | 'adopt' | 'expedition' | 'settings'
+export type View = 'cat' | 'skills' | 'home' | 'friends' | 'book' | 'miles' | 'arcade' | 'weather' | 'adopt' | 'expedition' | 'settings' | 'reveal' | 'reroll'
 export type Route = { view: View; history: View[] }
-export type Shelter = { pulls: number; last: { catId: string; at: number; cost: number } | null }
+export type PendingCat = {
+  id: string; name: string; genes: Genes; bornAt: number; cost: number; pulledAt: number; openedAt: number | null
+  // The shiny charm was spent on this parcel. Rerolls keep the guarantee.
+  isCharmed: boolean
+}
+export type BreedOffer = { catId: string; before: Genes; after: Genes; cost: number; at: number; openedAt: number | null }
+export type CatCommand =
+  | { type: 'shelter.pull'; name?: string }
+  | { type: 'shelter.open' }
+  | { type: 'shelter.rename'; name: string }
+  | { type: 'shelter.reroll' }
+  | { type: 'shelter.confirm' }
+  | { type: 'breed.reroll'; catId: string }
+  | { type: 'breed.again' }
+  | { type: 'breed.open' }
+  | { type: 'breed.rollback'; catId: string }
+  | { type: 'breed.confirm'; catId: string }
+export type Shelter = {
+  pulls: number
+  last: { catId: string; at: number; cost: number } | null
+  pending: PendingCat | null
+  offer: BreedOffer | null
+}
 
 export type WeatherCondition = 'clear' | 'partly-cloudy' | 'cloudy' | 'fog' | 'drizzle' | 'rain' | 'snow' | 'storm'
 export type WeatherLocation = { label: string; latitude: number; longitude: number; source: 'city' | 'coordinates' | 'device' }

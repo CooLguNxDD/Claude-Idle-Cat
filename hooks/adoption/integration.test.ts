@@ -31,16 +31,22 @@ test('Adopt is its own tab, charges one successful roll and Back returns to the 
     const coins = stored.coins
     await ui.press({ key: 'adopt' })
     if (surface === 'terminal') {
-      expect(stored.shelter.pulls).toBe(1)
+      expect(stored.shelter.pulls).toBe(0)
+      expect(stored.shelter.pending?.id).toBe('c2')
       expect(stored.coins).toBe(coins - 100)
-      await check('shelter-meet', 'successful roll')
+      await check('reveal-open', 'paid parcel')
+      await ui.press({ key: 'reveal-open' })
+      await ui.press({ key: 'reveal-confirm' })
+      expect(stored.shelter.pulls).toBe(1)
+      expect(stored.cats.length).toBe(2)
     } else {
       expect(stored.shelter.pulls).toBe(1)
       expect(stored.coins).toBe(coins)
+      expect(await ui.find({ key: 'reveal-open' })).toBeUndefined()
+      await ui.press({ key: 'shelter-meet' })
     }
-    await ui.press({ key: 'shelter-meet' })
     await check('pet', 'meet')
-    await ui.press({ key: 'tabs-back' })
+    await run('shelter')
     await check('adopt', 'back to shelter')
     await ui.press({ key: 'tabs-back' })
     await check('pet', 'back to cat')
@@ -70,7 +76,7 @@ test('October shelter odds include Ghost and the collection book labels its seas
   await ui.unmount()
 })
 
-test('the arrival card offers Pull again while there is room and coins', async ($, on) => {
+test('Roll & adopt can be used again while there is room and coins', async ($, on) => {
   const now = 1_700_000_000_000
   mock.clock(on, { now })
   let stored: Home = { ...newHome(now), tier: 2, coins: 1000, rev: 100 }
@@ -88,12 +94,22 @@ test('the arrival card offers Pull again while there is room and coins', async (
       scroll: { offset: 0, bodyRows: 50 }, view: {} } })
   await run('shelter')
   expect(await ui.find({ key: 'shelter-again' })).toBeUndefined()
+  const confirm = async () => {
+    await ui.press({ key: 'reveal-open' })
+    await ui.press({ key: 'reveal-confirm' })
+    await run('shelter')
+  }
   await ui.press({ key: 'adopt' })
-  await ui.press({ key: 'shelter-again' })
+  await confirm()
+  await ui.press({ key: 'adopt' })
+  await confirm()
   expect(stored.shelter.pulls).toBe(2)
   expect(stored.cats.length).toBe(3)
-  await ui.press({ key: 'shelter-again' })
+  await ui.press({ key: 'adopt' })
+  await confirm()
   expect(stored.cats.length).toBe(4)
-  expect(await ui.find({ key: 'shelter-again' })).toBeUndefined()
+  await ui.press({ key: 'adopt' })
+  expect(stored.cats.length).toBe(4)
+  expect(stored.shelter.pending).toBeNull()
   await ui.unmount()
 })

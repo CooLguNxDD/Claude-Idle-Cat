@@ -40,6 +40,8 @@ export const tierAt = (n: number): Tier => {
 }
 export const tierOf = (home: Home) => tierAt(home.tier)
 export const maxCats = (home: Home) => tierOf(home).maxCats
+// A paid parcel holds a spot until confirm, so a visitor cannot take the last room.
+export const reservedCats = (home: Home) => home.cats.length + (home.shelter.pending ? 1 : 0)
 export const LOAN_SHARE = 0.25
 
 export const homeMods = (home: Home): HomeMods => {
