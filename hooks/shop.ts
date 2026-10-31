@@ -25,6 +25,8 @@ export const canCraft = (h: Home, id: string): CraftCheck => {
   if (!canPay(h, s.cost)) return { ok: false, reason: `Costs ${costText(s.cost)}.` }
   return { ok: true, item: s }
 }
+// The cardboard playground the stray builds for itself; /cat build lists and crafts these.
+export const BUILDS = ['cardboard-tower', 'cardboard-tunnel', 'cardboard-pipeline'] as const
 // Pay validated costs and grant furniture, a permanent unlock or consumable inventory.
 export const craft = (h: Home, id: string, now: number): Home => {
   const check = canCraft(h, id)

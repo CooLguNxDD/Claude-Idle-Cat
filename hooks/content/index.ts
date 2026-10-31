@@ -139,6 +139,9 @@ import furnitureShellFountain from './furniture/shell-fountain'
 import furnitureStarlitRug from './furniture/starlit-rug'
 import furnitureCelestialBowl from './furniture/celestial-bowl'
 import furnitureCeramicBowl from './furniture/ceramic-bowl'
+import furnitureCardboardPipeline from './furniture/cardboard-pipeline'
+import furnitureCardboardTower from './furniture/cardboard-tower'
+import furnitureCardboardTunnel from './furniture/cardboard-tunnel'
 import shopGoldbowl from './shop/goldbowl'
 import shopRainbow from './shop/rainbow'
 import shopMoonlamp from './shop/moonlamp'
@@ -158,6 +161,9 @@ import shopStarlitRug from './shop/starlit-rug'
 import shopTrailSnacks from './shop/trail-snacks'
 import shopCelestialBowl from './shop/celestial-bowl'
 import shopCeramicBowl from './shop/ceramic-bowl'
+import shopCardboardPipeline from './shop/cardboard-pipeline'
+import shopCardboardTower from './shop/cardboard-tower'
+import shopCardboardTunnel from './shop/cardboard-tunnel'
 import materialFeather from './materials/feather'
 import materialNeonScrap from './materials/neon-scrap'
 import materialPineCone from './materials/pine-cone'
@@ -419,6 +425,9 @@ export const FURNITURE: readonly FurnitureSpec[] = [
   furnitureStarlitRug,
   furnitureCelestialBowl,
   furnitureCeramicBowl,
+  furnitureCardboardPipeline,
+  furnitureCardboardTower,
+  furnitureCardboardTunnel,
 ]
 // shop definitions in pinned order; engines apply runtime eligibility.
 export const SHOP: readonly ShopItem[] = [
@@ -441,6 +450,9 @@ export const SHOP: readonly ShopItem[] = [
   shopTrailSnacks,
   shopCelestialBowl,
   shopCeramicBowl,
+  shopCardboardPipeline,
+  shopCardboardTower,
+  shopCardboardTunnel,
 ]
 // materials definitions in pinned order; engines apply runtime eligibility.
 export const MATERIALS: readonly Material[] = [

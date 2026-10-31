@@ -27,7 +27,7 @@ On this machine `~/.claude/settings.json` sets `env.CLAUDE_CODE_PLUGIN_DIRS` to 
   - All other modules are pure: they take `(home, now, rng)` and return a new value, with no `$`, no `Date.now()` and no `Math.random()`.
 - **The browser arcade** (`web/`, served by `server/arcade.mjs`).
   - `web/*.ts` is bundled into `server/public/arcade.js`, which is committed. **After any change under `web/` or to what it imports (`hooks/arcade/{engine,games,render,art,medals,bridge}`, `hooks/art`, `hooks/theme.ts`), run `node tools/build-web.mjs` and commit the bundle.**
-  - `server/public/art/*.png` is generated from `tools/build-art.mjs`; regenerate it after changing its source art or theme palettes. The browser draws at 320×180 from a 112×64 simulation world.
+  - `server/public/art/*.png` is generated from `tools/build-art.mjs`; regenerate it after changing its source art or theme palettes. The browser draws at 320×180 from a 112×64 simulation world. The `/pane` picture renders at 8x (`BROWSER_SCALE`) every other frame; the terminal image stays at `PICTURE_SCALE` 4.
   - The games in `hooks/arcade/games/*.ts` are shared: the mod reads their medals and `maxScore`, and the browser runs them.
   - `server/arcade.mjs` is plain Node with no dependencies. The mod spawns it with an `ARCADE_TOKEN`.
     - It also serves the token-protected `/location` page; device coordinates return as a validated `location` stdout message. Browser geolocation runs only after the user clicks its button.
@@ -72,6 +72,9 @@ The `ui.render` hooks on Claude Code's own components pass with `next(e)` when `
 - `Home.shelter` stores successful paid pulls, the latest arrival receipt, a paid `pending` parcel, and one breed `offer`. Rarity comes from the coat registry. Optional markings/silhouettes default to classic, preserving old cat appearances. A pull charges when the parcel is created and confirms later; blocked pulls never spend coins, consume RNG, or use a shiny charm. A breed reroll costs a flat 200c. It keeps personality, waits for Open, and rollback does not refund. A shiny charm spent on a parcel stays on that parcel through rerolls. The parcel reserves one house slot until confirm.
 - Award arcade rounds only through `finishGame` in `hooks/arcade/rewards.ts`. It pays a round only if the mod started it (`arcade.open`), and it clamps both the time and the score, because browser input can't be trusted.
 - `/cat export` and `/cat import` (`hooks/backup.ts`) write to `~/.claude-kitten/backups/`. Import backs up the current save first; keep that behaviour.
+- Auto backups write `afk-cat-auto-<weekday>.json` at boot and every 30 minutes (`isAutoBackupDue`); `/cat reset` writes `-before-reset` first. Failed writes never block the game.
+- `boot()` in `register.tsx` loads the save and starts timers once per load. `session.start` calls it, and so does any `/cat` when the start was missed. Helpers that take `$` must be top-level declarations, or the validator refuses the module.
+- `change()` treats a function that returns the same household as a read: no new `rev`, save or arcade push. Read-only commands use `view($)`.
 
 ## Test kit gotchas (`claude-code/testing`)
 
@@ -102,7 +105,7 @@ claude plugin tag --push
 
 ## Content modules v2
 
-The append-only barrel has seventeen registries: breeds (28), moves (23), worlds (6), named cats (6), reactions (5), interactions (5), expeditions (7), quests (6), events (2), skills (21), furniture (31), shop (19), materials (7), behaviors (4), goals (4), speech, trail events (27). Speech lines are content files; the spoken line, recent lines and cooldowns live in memory in `register.tsx` and are never written to the save. `hooks/friends.ts` must not import `SPEECH` — the arcade rewards module imports friends, and the arcade bundle stays content-free. Each item is one file. New kinds use schemas and `*Problems()` validators in `hooks/content/progression.ts`, re-exported from `types.ts`. `hooks/content/registries.test.ts` validates every file and reference.
+The append-only barrel has seventeen registries: breeds (28), moves (23), worlds (6), named cats (6), reactions (5), interactions (5), expeditions (7), quests (6), events (2), skills (21), furniture (34), shop (22), materials (7), behaviors (4), goals (4), speech, trail events (27). Speech lines are content files; the spoken line, recent lines and cooldowns live in memory in `register.tsx` and are never written to the save. `hooks/friends.ts` must not import `SPEECH` — the arcade rewards module imports friends, and the arcade bundle stays content-free. Each item is one file. New kinds use schemas and `*Problems()` validators in `hooks/content/progression.ts`, re-exported from `types.ts`. `hooks/content/registries.test.ts` validates every file and reference.
 
 `SKILLS`, `CATALOG`, and `MILES_SHOP` retain their legacy module exports. The first barrel was seeded in the exact old 12-skill, 24-furniture and four-shop order; never sort existing imports. `legacy-fixture.ts` captures the 40-day stock sequence and old skill totals from f199b33. Nyan excludes cost/tier-gated Curio furniture, so appending the late pack preserves stock.
 

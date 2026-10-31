@@ -3,7 +3,8 @@ import { catsAtHome, isAway } from './away'
 import { claim, canSend, finishExpeditions, lootOf, readyRuns, resumeExpeditions, send, slotsOf } from './expeditions'
 import { claimQuest, questsFor, questState } from './quests'
 import { activeEvents, exchange } from './events'
-import { canCraft, costText, craft, drinkTea } from './shop'
+import { BUILDS, canCraft, costText, craft, drinkTea } from './shop'
+import { statusText } from './status'
 import { addBond, bondKey, partnerOf, pickInteraction, startPair, stepPair } from './pair'
 import type { PairRun } from './pair'
 import { pickReaction, rememberReaction } from './reactions'
@@ -24,7 +25,7 @@ import { arcadeUrl, browserArgv, newToken, paneUrl, parseLine, snapshotOf, split
 import { GAMES, gameOf } from './arcade/games'
 import { ENERGY_COST, PAID_PLAYS, featured, finishGame, playsLeft, quitGame, startGame } from './arcade/rewards'
 import { catArt } from './art'
-import { backupDir, backupName, inDir, parseBackup, pickBase, toBackup } from './backup'
+import { autoBackupName, backupDir, backupName, inDir, isAutoBackupDue, parseBackup, pickBase, toBackup } from './backup'
 import { buyCatnip, festivalOf, marketNow, seasonOf, sellCatnip, weekOf } from './calendar'
 import { ACHIEVEMENTS, MILES_SHOP, buyWithMiles, settle, tasksFor, track } from './collection'
 import { CRITTERS, critter, isAvailable, sell } from './critters'
@@ -113,6 +114,11 @@ let watchRun = 0
 let trailBeatKey = ''
 const openSections = new Set<string>(['available', 'seasonal'])
 let partyCursor = 0
+// Whether this load has booted the household and its timers (session.start or any /cat).
+let isBooted = false
+let hiddenFrames = 0
+let stalledFrames = 0
+let booting: Promise<void> | null = null
 const SETTING_CHOICES: Record<string, readonly string[]> = {
   'afk-cat.flavor': ['auto', 'daycycle', 'latte', 'frappe', 'macchiato', 'mocha'],
   'afk-cat.skin': ['full', 'light', 'off'],
@@ -205,12 +211,17 @@ const change = async ($: EngineInterface, fn: (home: Home, now: number) => Home,
   const stored = await $.store.get('home')
   let home!: Home
   let before!: Home
+  let isNoop = false
   await update($, homeRef, prev => {
     before = pickBase(stored, prev ?? newHome(now), now)
-    return (home = { ...settle(fn(before, now), now), rev: before.rev + 1 })
+    const next = fn(before, now)
+    // A change that returns the same household is a read: no new revision, save or arcade push.
+    if (next === before && before === prev) { isNoop = true; return (home = prev) }
+    return (home = { ...settle(next, now), rev: before.rev + 1 })
   })
   onApplied?.()
   latest = home
+  if (isNoop) return home
   const gain = Math.max(0, home.coins - before.coins + (deducted?.() ?? 0))
   earned.prompt += gain
   earned.chat += gain
@@ -354,10 +365,12 @@ const sceneCellsOf = (home: Home, view: View, now: number, flavor: Flavor) => sh
   ? shelterCells(home, now, frame, flavor, cols, shelterFocus(view))
   : view === 'expedition' ? trailCells(home, now, frame, flavor, cols, watchRun) : frameCells({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion,
     camX: camera.x, ...(pairRun ? { partner: { id: pairRun.partnerId, motion: pairRun.partner } } : {}), ...speechMark(home, now) })
-const sceneImageOf = (home: Home, view: View, now: number, flavor: Flavor): RgbaImage => showsParcel(home, view)
-  ? shelterImage(home, now, frame, flavor, cols, PICTURE_SCALE, shelterFocus(view))
-  : view === 'expedition' ? trailImage(home, now, frame, flavor, cols, watchRun, PICTURE_SCALE)
-  : frameImage({ home, now, tick: frame, hour: hourOf(now), flavor, cols, motion, camX: camera.x, ...(pairRun ? { partner: { id: pairRun.partnerId, motion: pairRun.partner } } : {}), ...speechMark(home, now) })
+// The browser picture has room for more detail than a terminal image, so it draws at 8x.
+const BROWSER_SCALE = 8
+const sceneImageOf = (home: Home, view: View, now: number, flavor: Flavor, scale = PICTURE_SCALE): RgbaImage => showsParcel(home, view)
+  ? shelterImage(home, now, frame, flavor, cols, scale, shelterFocus(view))
+  : view === 'expedition' ? trailImage(home, now, frame, flavor, cols, watchRun, scale)
+  : frameImage({ home, now, tick: frame, hour: hourOf(now), flavor, cols, scale, motion, camX: camera.x, ...(pairRun ? { partner: { id: pairRun.partnerId, motion: pairRun.partner } } : {}), ...speechMark(home, now) })
 // The watched run's beat and whether its finds are out, so the pane text refreshes when either changes.
 const watchedRun = (home: Home) => home.expeditions.runs.length ? home.expeditions.runs[watchRun % home.expeditions.runs.length] : undefined
 const trailKeyOf = (home: Home, now: number) => {
@@ -370,9 +383,10 @@ const trailKeyOf = (home: Home, now: number) => {
 const isAltDeny = (deny: string) => /\balt\b|placeholder/i.test(deny)
 
 // Pushes one yard picture. Skips repeats, and stops after the grace once no tab is watching.
-const pushPicture = async ($: EngineInterface, home: Home, now: number, flavor: Flavor, source = sceneImageOf(home, paint.view, now, flavor)) => {
+const pushPicture = async ($: EngineInterface, home: Home, now: number, flavor: Flavor, source?: RgbaImage) => {
   if (!picture.isWatching || !arcade.port || picture.isBusy) return
   if (picture.viewers === 0 && now - picture.openedAt > PICTURE_GRACE_MS) { picture.isWatching = false; return }
+  source ??= sceneImageOf(home, paint.view, now, flavor, BROWSER_SCALE)
   if (source.rgba === picture.last) return
   picture.isBusy = true
   picture.last = source.rgba
@@ -531,6 +545,10 @@ const weatherCommand = async ($: EngineInterface, arg: string): Promise<{ text: 
 }
 
 const HELP = [
+  '/cat start — wake the cats now: claim ready parties and top up the bowl',
+  '/cat status — coins, cats, bowl and expeditions in one message',
+  '/cat build [id] — list or build the cardboard tower, tunnel and pipeline',
+  '/cat backup — write a backup now (auto backups rotate daily every 30 minutes)',
   '/cat expedition — Expedition tab (x): watch the trail, send and claim parties',
   '/cat send <exp> <cat…> [+gear…] — send a party',
   '/cat claim [run] — collect ready rewards',
@@ -586,6 +604,20 @@ const sessionUsd = async ($: EngineInterface) => {
 }
 
 const userHome = async ($: EngineInterface) => (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
+
+// Writes the weekday auto backup when due (or forced); a failed write never blocks the game.
+let autoBackupAt = 0
+const autoBackup = async ($: EngineInterface, home: Home, now: number, isForced = false, name = autoBackupName(now)) => {
+  if (!isForced && !isAutoBackupDue(autoBackupAt, now)) return ''
+  const path = inDir(backupDir(await userHome($).catch(() => undefined)), name)
+  try {
+    await $.fs.write(path, toBackup(home, now))
+    autoBackupAt = now
+    return path
+  } catch {
+    return ''
+  }
+}
 
 // /cat export writes a dated backup; /cat import checks one, backs up the current save, then loads it.
 const backupCommand = async ($: EngineInterface, sub: 'export' | 'import', arg: string): Promise<{ text: string }> => {
@@ -674,6 +706,207 @@ const selectedTrail = (home: Home, now: number) => EXPEDITIONS.find(e => e.id ==
 const sectionOf = (home: Home, e: (typeof EXPEDITIONS)[number]) => e.available ? 'seasonal' : isUnlocked(home, e.unlock) ? 'available' : 'locked'
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
+// Loads the save and starts the timers once per load; /cat runs it too when session.start was missed.
+const boot = ($: EngineInterface): Promise<void> => (booting ??= bootOnce($).then(() => { isBooted = true }, err => { booting = null; throw err }))
+const bootOnce = async ($: EngineInterface) => {
+  // A /cat that boots late already has its command; a failed register must not stop the yard.
+  await $.command.register({
+    name: 'cat',
+    description: 'Open your AFK cats (/cat start, /cat status, /cat build, /cat backup, /cat hide, /cat shelter, /cat adopt [name], /cat reveal, /cat reroll, /cat picture, /cat switch <name>, /cat rename <name>, /cat weather <city>, /cat export, /cat import <file>, /cat help)',
+  }).catch(() => undefined)
+  await readTheme($).catch(() => undefined)
+  paidUsd = await sessionUsd($)
+  const saved = (await $.store.get('home')) ?? (await $.store.get('cat'))
+  let bonus = 0
+  let returns: string[] = []
+  let pendingBrain: SpeechEvent[] = []
+  const home = await change($, (_, t) => {
+    const loaded = resumeExpeditions(migrate(saved, t), t)
+    const thought = thinkWithEvents(tick(loaded, t), t, Math.random, isOnScreen)
+    pendingBrain = thought.events
+    const day = checkIn(thought.home, t)
+    bonus = day.bonus
+    returns = readyRuns(day.home, t).filter(r => !day.home.expeditions.inbox.includes(r.id)).map(r => r.exp)
+    return finishExpeditions(saved ? welcomeBack(loaded, day.home, t) : day.home, t)
+  })
+  for (const exp of returns) $.ui.toast(`Expedition ready: ${EXPEDITIONS.find(e => e.id === exp)?.label ?? exp}. Claim in Expeditions.`)
+  // Time away and the streak bonus are not this chat's earnings.
+  earned.prompt = 0
+  earned.chat = 0
+  lastPay = null
+  chatMinutes = 0
+  owedMinutes = 0
+  if (home.effect?.kind === 'welcome') $.ui.toast(home.log)
+  if (bonus > 0) $.ui.toast(`Day ${home.streak} streak bonus: +${bonus}c`)
+  lastWeather = home.weather.current?.condition ?? ''
+  nextIdleAt = (await $.clock.now()) + 45_000 + Math.floor(Math.random() * 45_000)
+  for (const ev of pendingBrain) void say($, ev)
+  void refreshWeather($).catch(() => undefined)
+  $.clock.every(60_000, () => { void refreshWeather($).catch(() => undefined) })
+  $.clock.every(TICK_MS, () => void readTheme($).catch(() => undefined).then(() => {
+    let auto = 0
+    let pendingTick: SpeechEvent[] = []
+    return change($, (prev, t) => {
+      const r = tickTally(prev, t)
+      auto = r.deducted
+      const thought = thinkWithEvents(r.home, t, Math.random, isOnScreen)
+      pendingTick = thought.events
+      return thought.home
+    }, () => auto).then(async home => {
+      for (const ev of pendingTick) void say($, ev)
+      await autoBackup($, home, await $.clock.now())
+    })
+  }))
+  // Keeps the arcade server alive; it shuts itself down two minutes after the pings stop.
+  $.clock.every(30_000, () => {
+    if (!arcade.port) return
+    void $.http.fetch(`http://127.0.0.1:${arcade.port}/api/ping`, { method: 'POST', headers: { 'x-arcade-token': arcade.token } })
+      .catch(() => undefined)
+  })
+  $.clock.every(500, () => {
+    if (band.mode === 'text') $.ui.invalidate('ui.render')
+  })
+  $.clock.every(FRAME_MS, async () => {
+    if (!latest) return
+    // With nothing on screen the loop only checks speech and finished runs, once a second.
+    if (!paint.isMounted && !picture.isWatching && band.mode !== 'raster' && ++hiddenFrames % 8) return
+    const now = await $.clock.now()
+    const dayKey = String(dayOf(now))
+    if (festivalDay !== dayKey) {
+      festivalDay = dayKey
+      const fest = festivalOf(new Date(now).getMonth() + 1)
+      const names = activeEvents(now).map(event => event.id)
+      if (fest || names.length) void say($, { on: 'festival', catId: activeCat(latest).id, about: [fest, ...names].filter((id): id is string => !!id) })
+    }
+    if (paint.isMounted && (!said || now >= said.until) && now >= nextIdleAt) void say($, { on: 'idle', catId: activeCat(latest).id })
+    for (const id of notifiedRuns) if (!latest.expeditions.runs.some(r => r.id === id)) notifiedRuns.delete(id)
+    const fresh = readyRuns(latest, now).filter(r => !latest!.expeditions.inbox.includes(r.id) && !notifiedRuns.has(r.id))
+    if (fresh.length) {
+      for (const r of fresh) notifiedRuns.add(r.id)
+      void queue(async () => {
+        let notices: string[] = []
+        await change($, (h, t) => {
+          notices = readyRuns(h, t).filter(r => !h.expeditions.inbox.includes(r.id)).map(r => r.exp)
+          return finishExpeditions(h, t)
+        })
+        for (const exp of notices) $.ui.toast(`Expedition ready: ${EXPEDITIONS.find(e => e.id === exp)?.label ?? exp}. Claim in Expeditions.`)
+        $.ui.invalidate('ui.render')
+      }).finally(() => { for (const r of fresh) notifiedRuns.delete(r.id) })
+    }
+    // A frame still waiting on its blit holds the next one back, but never past STALL_MS.
+    // The browser picture does not wait on that blit.
+    if (paint.isBusy && now - paint.busyAt < STALL_MS) {
+      // The 8x picture keeps its every-other-tick cadence while the terminal blit is stalled.
+      if (picture.isWatching && latest && ++stalledFrames % 2 === 0) void pushPicture($, latest, now, flavorNow(now))
+      return
+    }
+    paint.isBusy = true
+    paint.busyAt = now
+    try {
+      frame += 1
+      if (partnerReply && frame >= partnerReply.frame) {
+        const ev = partnerReply.ev
+        partnerReply = null
+        void say($, ev)
+      }
+      const flavor = flavorNow(now)
+      // The active cat roams only while someone can see it.
+      if (paint.isMounted || picture.isWatching) {
+        motionRng ??= seeded(now)
+        const cat = activeCat(latest), ctx = motionCtxOf(latest, cols, hourOf(now))
+        if (motionCatId !== cat.id) { motion = startMotion(CLASSIC_X); motionCatId = cat.id; pairRun = null; intentKey = '' }
+        if (pairRun && (pairRun.leadId !== cat.id || isAway(latest, pairRun.partnerId) || isAway(latest, pairRun.leadId))) pairRun = null
+        const intent = cat.intent
+        const behavior = intent ? BEHAVIORS.find(b => b.id === intent.id) : undefined
+        const key = intent ? `${cat.id}:${intent.id}:${intent.at}` : ''
+        if (behavior && intent && intentKey !== key) {
+          intentKey = key
+          if (behavior.partner && intent.with) {
+            const yard = latest
+            const buddy = yard.cats.find(c => c.id === intent.with && !c.isAsleep && !isAway(yard, c.id))
+            const picked = buddy && pickInteraction(latest, cat, buddy, motionRng)
+            pairRun = picked && buddy ? { ...startPair(picked, cat.id, buddy.id, motion, ctx, motionRng), isIntent: true } : null
+            if (pairRun && picked && buddy) {
+              void say($, { on: 'pair.start', catId: cat.id, role: 'lead', buddyId: buddy.id, about: [picked.id], vars: { buddy: buddy.name } })
+              partnerReply = { frame: frame + 20, ev: { on: 'pair.start', catId: buddy.id, role: 'partner', buddyId: cat.id, about: [picked.id], vars: { buddy: cat.name } } }
+            }
+          } else {
+            pairRun = null
+            motion = forceMove(motion, behavior.move, ctx, motionRng, behavior.seconds)
+          }
+        }
+        if (!pairRun && !intent && frame >= reactionUntil && frame % 240 === 0 && !isAway(latest, cat.id)) {
+          const buddy = partnerOf(latest, cat.id, motionRng)
+          const i = buddy && pickInteraction(latest, cat, buddy, motionRng)
+          if (i && buddy) {
+            pairRun = startPair(i, cat.id, buddy.id, motion, ctx, motionRng)
+            void say($, { on: 'pair.start', catId: cat.id, role: 'lead', buddyId: buddy.id, about: [i.id], vars: { buddy: buddy.name } })
+            partnerReply = { frame: frame + 20, ev: { on: 'pair.start', catId: buddy.id, role: 'partner', buddyId: cat.id, about: [i.id], vars: { buddy: cat.name } } }
+          }
+        }
+        if (pairRun) {
+          pairRun = stepPair(pairRun, ctx); motion = pairRun.lead
+          if (pairRun.left <= 0) {
+            const run = pairRun, i = INTERACTIONS.find(item => item.id === run.id)!
+            pairRun = null; motion = { ...motion, left: 0 }
+            const buddy = latest.cats.find(c => c.id === run.partnerId)
+            void say($, { on: 'pair.end', catId: run.leadId, role: 'lead', buddyId: run.partnerId, about: [i.id], vars: { buddy: buddy?.name ?? '' } })
+            if (!run.isIntent) void queue(() => change($, (h, t) => {
+              if (isAway(h, run.leadId) || isAway(h, run.partnerId)) return h
+              const key = bondKey(run.leadId, run.partnerId), before = h.bonds[key]?.points ?? 0
+              let bondedHome = addBond(h, run.leadId, run.partnerId, i.bond, t)
+              if (h.cats.some(c => [run.leadId, run.partnerId].includes(c.id) && skillTotals(c).harmony > 0)) bondedHome = { ...bondedHome, cats: bondedHome.cats.map(c => [run.leadId, run.partnerId].includes(c.id) ? { ...c, joy: Math.min(100, c.joy + 5) } : c) }
+              const gained = (bondedHome.bonds[key]?.points ?? 0) - before
+              return track({ ...bondedHome, log: i.line }, 'bond', gained, t)
+            }))
+          }
+        } else if (!isAway(latest, cat.id)) motion = stepMotion(motion, ctx, motionRng)
+        camera = followCam(camera, Math.round(motion.x / DESIGN), 14, yardCols(latest, cols), cols, frame)
+      }
+      // Skips the scene while the pane is closed and when a frame would repaint the same cells.
+      const showImage = paint.isMounted && paint.kind !== 'raster'
+      const source = showImage ? sceneImageOf(latest, paint.view, now, flavor) : null
+      // An 8x frame costs a few times a terminal one, so the browser picture updates every other frame.
+      if (picture.isWatching && frame % 2 === 0) void pushPicture($, latest, now, flavor)
+      if (paint.isMounted && paint.kind === 'raster') {
+        const cells = sceneCellsOf(latest, paint.view, now, flavor)
+        if (cells !== paint.last) {
+          paint.last = cells
+          if ((await $.ui.blit({ requestId: PANE, key: SCENE, cells })).deny) paint.isMounted = false
+        }
+      } else if (paint.isMounted && source) {
+        if (source.rgba !== paint.last) {
+          paint.last = source.rgba
+          const { deny } = await $.ui.blit({ requestId: PANE, key: SCENE, source })
+          if (deny) paint.isMounted = false
+          if (deny && canvasMode === 'auto' && isAltDeny(deny)) {
+            isImageBlocked = true
+            $.ui.invalidate('ui.render')
+          }
+        }
+      }
+      if (paint.isMounted && paint.view === 'expedition') {
+        const key = trailKeyOf(latest, now)
+        if (key !== trailBeatKey) { trailBeatKey = key; $.ui.invalidate('ui.render') }
+      }
+      if (band.mode !== 'raster') return
+      const isSprint = frame < sprintUntil
+      runX = nextX(runX, band.cols, isSprint)
+      const run = { cat: activeCat(latest), flavor, tick: frame, x: runX, cols: band.cols, isSprint, isAway: !catsAtHome(latest).length }
+      if ((await $.ui.blit({ requestId: band.id, key: RUNNER, cells: runFrame(run) })).deny) band.mode = 'off'
+    } finally {
+      paint.isBusy = false
+    }
+  })
+  await autoBackup($, home, await $.clock.now(), true)
+}
+
+// The household as saved, including a newer save from another session; writes only when one is adopted.
+const view = async ($: EngineInterface): Promise<Home> => {
+  if (!isBooted || !latest) await boot($)
+  return change($, h => h)
+}
+
 export const register: Register = (on, options) => {
   reactionMode = options.reactions === 'off' || options.reactions === 'quiet' ? options.reactions : 'on'
   speechMode = options.speech === 'off' || options.speech === 'quiet' ? options.speech : 'on'
@@ -687,188 +920,10 @@ export const register: Register = (on, options) => {
   const flavorAt = (now: number) => resolveFlavor(flavorSetting, claudeTheme, hourOf(now))
   flavorNow = flavorAt
 
+  isBooted = false
+  booting = null
   on('session.start', async ($, e, next) => {
-    await $.command.register({
-      name: 'cat',
-      description: 'Open your AFK cats (/cat hide, /cat shelter, /cat adopt [name], /cat reveal, /cat reroll, /cat picture, /cat switch <name>, /cat rename <name>, /cat weather <city>, /cat export, /cat import <file>, /cat help)',
-    })
-    await readTheme($)
-    paidUsd = await sessionUsd($)
-    const saved = (await $.store.get('home')) ?? (await $.store.get('cat'))
-    let bonus = 0
-    let returns: string[] = []
-    let pendingBrain: SpeechEvent[] = []
-    const home = await change($, (_, t) => {
-      const loaded = resumeExpeditions(migrate(saved, t), t)
-      const thought = thinkWithEvents(tick(loaded, t), t, Math.random, isOnScreen)
-      pendingBrain = thought.events
-      const day = checkIn(thought.home, t)
-      bonus = day.bonus
-      returns = readyRuns(day.home, t).filter(r => !day.home.expeditions.inbox.includes(r.id)).map(r => r.exp)
-      return finishExpeditions(saved ? welcomeBack(loaded, day.home, t) : day.home, t)
-    })
-    for (const exp of returns) $.ui.toast(`Expedition ready: ${EXPEDITIONS.find(e => e.id === exp)?.label ?? exp}. Claim in Expeditions.`)
-    // Time away and the streak bonus are not this chat's earnings.
-    earned.prompt = 0
-    earned.chat = 0
-    lastPay = null
-    chatMinutes = 0
-    owedMinutes = 0
-    if (home.effect?.kind === 'welcome') $.ui.toast(home.log)
-    if (bonus > 0) $.ui.toast(`Day ${home.streak} streak bonus: +${bonus}c`)
-    lastWeather = home.weather.current?.condition ?? ''
-    nextIdleAt = (await $.clock.now()) + 45_000 + Math.floor(Math.random() * 45_000)
-    for (const ev of pendingBrain) void say($, ev)
-    void refreshWeather($)
-    $.clock.every(60_000, () => { void refreshWeather($) })
-    $.clock.every(TICK_MS, () => void readTheme($).then(() => {
-      let auto = 0
-      let pendingTick: SpeechEvent[] = []
-      return change($, (prev, t) => {
-        const r = tickTally(prev, t)
-        auto = r.deducted
-        const thought = thinkWithEvents(r.home, t, Math.random, isOnScreen)
-        pendingTick = thought.events
-        return thought.home
-      }, () => auto).then(() => { for (const ev of pendingTick) void say($, ev) })
-    }))
-    // Keeps the arcade server alive; it shuts itself down two minutes after the pings stop.
-    $.clock.every(30_000, () => {
-      if (!arcade.port) return
-      void $.http.fetch(`http://127.0.0.1:${arcade.port}/api/ping`, { method: 'POST', headers: { 'x-arcade-token': arcade.token } })
-        .catch(() => undefined)
-    })
-    $.clock.every(500, () => {
-      if (band.mode === 'text') $.ui.invalidate('ui.render')
-    })
-    $.clock.every(FRAME_MS, async () => {
-      if (!latest) return
-      const now = await $.clock.now()
-      const dayKey = String(dayOf(now))
-      if (festivalDay !== dayKey) {
-        festivalDay = dayKey
-        const fest = festivalOf(new Date(now).getMonth() + 1)
-        const names = activeEvents(now).map(event => event.id)
-        if (fest || names.length) void say($, { on: 'festival', catId: activeCat(latest).id, about: [fest, ...names].filter((id): id is string => !!id) })
-      }
-      if (paint.isMounted && (!said || now >= said.until) && now >= nextIdleAt) void say($, { on: 'idle', catId: activeCat(latest).id })
-      for (const id of notifiedRuns) if (!latest.expeditions.runs.some(r => r.id === id)) notifiedRuns.delete(id)
-      const fresh = readyRuns(latest, now).filter(r => !latest!.expeditions.inbox.includes(r.id) && !notifiedRuns.has(r.id))
-      if (fresh.length) {
-        for (const r of fresh) notifiedRuns.add(r.id)
-        void queue(async () => {
-          let notices: string[] = []
-          await change($, (h, t) => {
-            notices = readyRuns(h, t).filter(r => !h.expeditions.inbox.includes(r.id)).map(r => r.exp)
-            return finishExpeditions(h, t)
-          })
-          for (const exp of notices) $.ui.toast(`Expedition ready: ${EXPEDITIONS.find(e => e.id === exp)?.label ?? exp}. Claim in Expeditions.`)
-          $.ui.invalidate('ui.render')
-        }).finally(() => { for (const r of fresh) notifiedRuns.delete(r.id) })
-      }
-      // A frame still waiting on its blit holds the next one back, but never past STALL_MS.
-      // The browser picture does not wait on that blit.
-      if (paint.isBusy && now - paint.busyAt < STALL_MS) {
-        if (picture.isWatching && latest) void pushPicture($, latest, now, flavorAt(now))
-        return
-      }
-      paint.isBusy = true
-      paint.busyAt = now
-      try {
-        frame += 1
-        if (partnerReply && frame >= partnerReply.frame) {
-          const ev = partnerReply.ev
-          partnerReply = null
-          void say($, ev)
-        }
-        const flavor = flavorAt(now)
-        // The active cat roams only while someone can see it.
-        if (paint.isMounted || picture.isWatching) {
-          motionRng ??= seeded(now)
-          const cat = activeCat(latest), ctx = motionCtxOf(latest, cols, hourOf(now))
-          if (motionCatId !== cat.id) { motion = startMotion(CLASSIC_X); motionCatId = cat.id; pairRun = null; intentKey = '' }
-          if (pairRun && (pairRun.leadId !== cat.id || isAway(latest, pairRun.partnerId) || isAway(latest, pairRun.leadId))) pairRun = null
-          const intent = cat.intent
-          const behavior = intent ? BEHAVIORS.find(b => b.id === intent.id) : undefined
-          const key = intent ? `${cat.id}:${intent.id}:${intent.at}` : ''
-          if (behavior && intent && intentKey !== key) {
-            intentKey = key
-            if (behavior.partner && intent.with) {
-              const yard = latest
-              const buddy = yard.cats.find(c => c.id === intent.with && !c.isAsleep && !isAway(yard, c.id))
-              const picked = buddy && pickInteraction(latest, cat, buddy, motionRng)
-              pairRun = picked && buddy ? { ...startPair(picked, cat.id, buddy.id, motion, ctx, motionRng), isIntent: true } : null
-              if (pairRun && picked && buddy) {
-                void say($, { on: 'pair.start', catId: cat.id, role: 'lead', buddyId: buddy.id, about: [picked.id], vars: { buddy: buddy.name } })
-                partnerReply = { frame: frame + 20, ev: { on: 'pair.start', catId: buddy.id, role: 'partner', buddyId: cat.id, about: [picked.id], vars: { buddy: cat.name } } }
-              }
-            } else {
-              pairRun = null
-              motion = forceMove(motion, behavior.move, ctx, motionRng, behavior.seconds)
-            }
-          }
-          if (!pairRun && !intent && frame >= reactionUntil && frame % 240 === 0 && !isAway(latest, cat.id)) {
-            const buddy = partnerOf(latest, cat.id, motionRng)
-            const i = buddy && pickInteraction(latest, cat, buddy, motionRng)
-            if (i && buddy) {
-              pairRun = startPair(i, cat.id, buddy.id, motion, ctx, motionRng)
-              void say($, { on: 'pair.start', catId: cat.id, role: 'lead', buddyId: buddy.id, about: [i.id], vars: { buddy: buddy.name } })
-              partnerReply = { frame: frame + 20, ev: { on: 'pair.start', catId: buddy.id, role: 'partner', buddyId: cat.id, about: [i.id], vars: { buddy: cat.name } } }
-            }
-          }
-          if (pairRun) {
-            pairRun = stepPair(pairRun, ctx); motion = pairRun.lead
-            if (pairRun.left <= 0) {
-              const run = pairRun, i = INTERACTIONS.find(item => item.id === run.id)!
-              pairRun = null; motion = { ...motion, left: 0 }
-              const buddy = latest.cats.find(c => c.id === run.partnerId)
-              void say($, { on: 'pair.end', catId: run.leadId, role: 'lead', buddyId: run.partnerId, about: [i.id], vars: { buddy: buddy?.name ?? '' } })
-              if (!run.isIntent) void queue(() => change($, (h, t) => {
-                if (isAway(h, run.leadId) || isAway(h, run.partnerId)) return h
-                const key = bondKey(run.leadId, run.partnerId), before = h.bonds[key]?.points ?? 0
-                let bondedHome = addBond(h, run.leadId, run.partnerId, i.bond, t)
-                if (h.cats.some(c => [run.leadId, run.partnerId].includes(c.id) && skillTotals(c).harmony > 0)) bondedHome = { ...bondedHome, cats: bondedHome.cats.map(c => [run.leadId, run.partnerId].includes(c.id) ? { ...c, joy: Math.min(100, c.joy + 5) } : c) }
-                const gained = (bondedHome.bonds[key]?.points ?? 0) - before
-                return track({ ...bondedHome, log: i.line }, 'bond', gained, t)
-              }))
-            }
-          } else if (!isAway(latest, cat.id)) motion = stepMotion(motion, ctx, motionRng)
-          camera = followCam(camera, Math.round(motion.x / DESIGN), 14, yardCols(latest, cols), cols, frame)
-        }
-        // Skips the scene while the pane is closed and when a frame would repaint the same cells.
-        const showImage = paint.isMounted && paint.kind !== 'raster'
-        const source = showImage || picture.isWatching ? sceneImageOf(latest, paint.view, now, flavor) : null
-        if (picture.isWatching && source) void pushPicture($, latest, now, flavor, source)
-        if (paint.isMounted && paint.kind === 'raster') {
-          const cells = sceneCellsOf(latest, paint.view, now, flavor)
-          if (cells !== paint.last) {
-            paint.last = cells
-            if ((await $.ui.blit({ requestId: PANE, key: SCENE, cells })).deny) paint.isMounted = false
-          }
-        } else if (paint.isMounted && source) {
-          if (source.rgba !== paint.last) {
-            paint.last = source.rgba
-            const { deny } = await $.ui.blit({ requestId: PANE, key: SCENE, source })
-            if (deny) paint.isMounted = false
-            if (deny && canvasMode === 'auto' && isAltDeny(deny)) {
-              isImageBlocked = true
-              $.ui.invalidate('ui.render')
-            }
-          }
-        }
-        if (paint.isMounted && paint.view === 'expedition') {
-          const key = trailKeyOf(latest, now)
-          if (key !== trailBeatKey) { trailBeatKey = key; $.ui.invalidate('ui.render') }
-        }
-        if (band.mode !== 'raster') return
-        const isSprint = frame < sprintUntil
-        runX = nextX(runX, band.cols, isSprint)
-        const run = { cat: activeCat(latest), flavor, tick: frame, x: runX, cols: band.cols, isSprint, isAway: !catsAtHome(latest).length }
-        if ((await $.ui.blit({ requestId: band.id, key: RUNNER, cells: runFrame(run) })).deny) band.mode = 'off'
-      } finally {
-        paint.isBusy = false
-      }
-    })
+    await boot($)
     return next(e)
   })
 
@@ -891,17 +946,47 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'cat' }, async ($, e) => {
     const [sub = '', ...rest] = wordsOf(e.args)
     const arg = rest.join(' ')
+    if (!isBooted) await boot($)
+
+    if (sub === 'start') {
+      let claimed = 0
+      const home = await change($, (h, t) => {
+        const ready = readyRuns(h, t)
+        claimed = ready.length
+        const paid = ready.reduce((next, r) => claim(next, r.id, t), h)
+        return paid.bowl.food < bowlCap(paid) ? fillBowl(paid, bowlCap(paid), t) : paid
+      })
+      await $.ui.open({ id: PANE, title: 'AFK Cat' })
+      const cat = activeCat(home)
+      return { text: [`The cardboard box is open: ${cat.name} is ${cat.isAsleep ? 'napping' : 'awake'}.`, claimed ? `Claimed ${claimed} ${claimed === 1 ? 'party' : 'parties'}.` : '',
+        `Bowl ${home.bowl.food}/${bowlCap(home)}.`].filter(Boolean).join(' ') }
+    }
+    if (sub === 'status') return { text: statusText(await view($), await $.clock.now()) }
+    if (sub === 'backup') {
+      const now = await $.clock.now()
+      const path = await autoBackup($, await view($), now, true)
+      return { text: path ? `Backed up to ${path}. Auto backups rotate daily (afk-cat-auto-<day>.json) every 30 minutes.` : 'Could not write the backup.' }
+    }
+    if (sub === 'build') {
+      const home = await view($)
+      if (!arg) {
+        const lines = BUILDS.map(id => SHOP.find(i => i.id === id)).filter(i => !!i)
+          .map(i => `${i.id} (${i.name}) ${home.owned.includes(i.grants) ? 'built' : costText(i.cost)}${isUnlocked(home, i.unlock) ? '' : ` (needs ${unlockHint(i.unlock)})`}`)
+        return { text: `The cat can build: ${lines.join(', ')}. /cat build <id>.` }
+      }
+      return { text: (await change($, (h, t) => craft(h, arg, t))).log }
+    }
 
     if (['expedition', 'quests', 'curio', 'settings'].includes(sub)) {
       await routeTo($, sub === 'expedition' ? 'expedition' : sub === 'quests' ? 'miles' : sub === 'settings' ? 'settings' : 'home')
-      await change($, h => h)
+      await view($)
       await $.ui.open({ id: PANE, title: 'AFK Cat' })
       return { text: sub === 'curio' ? 'Pip’s Curio shop is always open.' : `Opened ${sub}.` }
     }
     if (sub === 'send') {
       const id = rest[0] ?? '', names = rest.slice(1).filter(s => !s.startsWith('+'))
       const gear = rest.slice(1).filter(s => s.startsWith('+')).map(s => s.slice(1))
-      await change($, h => h)
+      await view($)
       const ids = names.map(n => catRef(latest!, n))
       return { text: (await departure($, id, ids, gear)).log }
     }
@@ -923,7 +1008,7 @@ export const register: Register = (on, options) => {
     if (sub === 'world') {
       if (rest[0] === 'buy') return { text: (await change($, (p, t) => buyWorld(p, rest.slice(1).join(' ').trim().toLowerCase(), t))).log }
       if (!arg) {
-        const home = await change($, h => h)
+        const home = await view($)
         const lines = WORLDS.map(w => `${w.id} (${w.label}) ${isWorldOwned(home, w.id) ? 'owned' : costText(w.cost ?? {})}`)
         return { text: `Worlds: ${lines.join(', ')}. /cat world <id> · /cat world buy <id>.` }
       }
@@ -959,7 +1044,7 @@ export const register: Register = (on, options) => {
     }
     if (sub === 'reroll') {
       const action = rest[0]
-      const current = await change($, prev => prev)
+      const current = await view($)
       const catId = current.shelter.offer?.catId ?? activeCat(current).id
       const named = arg && !['open', 'confirm', 'rollback', 'again'].includes(action ?? '')
         ? current.cats.find(c => c.id === arg || c.name.toLowerCase() === arg.toLowerCase()) : undefined
@@ -982,8 +1067,12 @@ export const register: Register = (on, options) => {
       await routeTo($, home.shelter.pending ? 'reveal' : 'adopt')
     }
     else if (sub === 'switch') home = await change($, prev => (arg ? switchTo(prev, arg) : nextCat(prev)))
-    else if (sub === 'reset') home = await change($, (_, t) => newHome(t))
-    else home = await change($, prev => prev)
+    else if (sub === 'reset') {
+      const before = await view($), now = await $.clock.now()
+      await autoBackup($, before, now, true, backupName(now, '-before-reset'))
+      home = await change($, (_, t) => newHome(t))
+    }
+    else home = await view($)
     await $.ui.open({ id: PANE, title: 'AFK Cat' })
     if (sub === 'switch') return { text: `${home.log} Cats: ${home.cats.map(c => c.name).join(', ')}.` }
     return { text: 'Your cats are in the pane.' }
