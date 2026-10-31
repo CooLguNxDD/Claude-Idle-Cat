@@ -117,6 +117,7 @@ let partyCursor = 0
 // Whether this load has booted the household and its timers (session.start or any /cat).
 let isBooted = false
 let hiddenFrames = 0
+let stalledFrames = 0
 let booting: Promise<void> | null = null
 const SETTING_CHOICES: Record<string, readonly string[]> = {
   'afk-cat.flavor': ['auto', 'daycycle', 'latte', 'frappe', 'macchiato', 'mocha'],
@@ -795,7 +796,8 @@ const bootOnce = async ($: EngineInterface) => {
     // A frame still waiting on its blit holds the next one back, but never past STALL_MS.
     // The browser picture does not wait on that blit.
     if (paint.isBusy && now - paint.busyAt < STALL_MS) {
-      if (picture.isWatching && latest) void pushPicture($, latest, now, flavorNow(now))
+      // The 8x picture keeps its every-other-tick cadence while the terminal blit is stalled.
+      if (picture.isWatching && latest && ++stalledFrames % 2 === 0) void pushPicture($, latest, now, flavorNow(now))
       return
     }
     paint.isBusy = true

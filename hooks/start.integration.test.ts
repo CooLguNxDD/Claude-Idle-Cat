@@ -1,5 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { Home } from '../types'
+import { send } from './expeditions'
+import { newHome } from './game'
 
 const t = new Date(2026, 9, 2, 14, 5).getTime()
 
@@ -18,7 +20,11 @@ test('/cat start boots without session.start, then status, build, backup and res
     command: 'cat', args, origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 160 },
   })).text ?? ''
 
-  expect(await run('start')).toMatch(/Mochi is (awake|napping)/)
+  // A party that came home while nobody was looking is claimed on start.
+  const away = send({ ...newHome(t - 86_400_000), coins: 1000 }, 'garden-patrol', ['c1'], [], t - 86_400_000, 7)
+  disk.set('home', { ...away, rev: 1 })
+  expect(await run('start')).toMatch(/Mochi is (awake|napping)\. Claimed 1 party\./)
+  expect((disk.get('home') as Home).expeditions.runs).toEqual([])
   expect(files.has('afk-cat-auto-fri.json')).toBe(true)
   expect(await run('status')).toMatch(/Mochi Lv\d/)
 
