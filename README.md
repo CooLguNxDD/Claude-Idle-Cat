@@ -40,6 +40,10 @@ Then type `/cat` to open the pane. Meow.
 | `/cat` (or `/cat show`) | open the pane (knock, knock) |
 | `/cat hide` | close the pane (the cats keep earning, they're professionals) |
 | `/cat help` | list the commands |
+| `/cat start` | wake the yard now (even if session start was missed): claim ready parties and top up the bowl |
+| `/cat status` | coins, miles, cats home or away, bowl and expeditions in one message, no pane needed |
+| `/cat build [id]` | list or build the stray's cardboard playground: `cardboard-tower`, `cardboard-tunnel`, `cardboard-pipeline` (coins + materials) |
+| `/cat backup` | write a backup now. Auto backups rotate through `~/.claude-kitten/backups/afk-cat-auto-<day>.json` every 30 minutes, and `/cat reset` saves `…-before-reset.json` first |
 | `/cat expedition` / `x` | Expedition tab (between Home and Friends): the animated trail, slots, party picker, gear, collapsible trail lists, rewards. While parties are out the tab turns green and reads `Expedition-N` |
 | `‹` / `›` beside the trail caption | (Expedition tab, two or more parties) switch which party the trail picture follows |
 | `/cat send <exp> <cat…> [+gear…]` | send 1–3 cats by id or single-word name; gear is consumed per run |

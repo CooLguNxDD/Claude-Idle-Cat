@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { backupDir, backupName, parseBackup, pickBase, toBackup } from './backup'
+import { AUTO_BACKUP_MS, autoBackupName, backupDir, backupName, isAutoBackupDue, parseBackup, pickBase, toBackup } from './backup'
 import { adopt, newHome } from './game'
 import { seeded } from './rng'
 
@@ -56,7 +56,8 @@ test('/cat export writes a backup and /cat import restores it after backing up t
   })).text ?? ''
   await run('rename Biscuit')
   const saved = 'C:\\Users\\me\\.claude-kitten\\backups\\afk-cat-2026-10-02-1405.json'
-  expect(await run('export')).toContain(`Saved Biscuit and 10c to ${saved}`)
+  // The first /cat boots the household like session.start, so the day-one check-in has paid.
+  expect(await run('export')).toContain(`Saved Biscuit and 20c to ${saved}`)
   expect(JSON.parse(fileNamed('afk-cat-2026-10-02-1405.json') ?? '{}').app).toBe('afk-cat')
   await run('rename Pudding')
   expect(await run('import')).toMatch(/Usage/)
@@ -90,4 +91,13 @@ test('a save another session wrote is picked up instead of overwritten', async (
   disk.set('home', { ...ours, rev: ours.rev + 3, cats: ours.cats.map(c => ({ ...c, name: 'Elsewhere' })) })
   expect(await run('switch')).toMatch(/Cats: Elsewhere\./)
   expect((disk.get('home') as { rev: number }).rev).toBe(ours.rev + 4)
+})
+
+test('auto backups rotate through one file per weekday and wait 30 minutes between writes', async () => {
+  expect(autoBackupName(t)).toBe('afk-cat-auto-fri.json')
+  expect(autoBackupName(t + 7 * 86_400_000)).toBe('afk-cat-auto-fri.json')
+  expect(autoBackupName(t + 86_400_000)).toBe('afk-cat-auto-sat.json')
+  expect(isAutoBackupDue(0, t)).toBe(true)
+  expect(isAutoBackupDue(t, t + AUTO_BACKUP_MS - 1)).toBe(false)
+  expect(isAutoBackupDue(t, t + AUTO_BACKUP_MS)).toBe(true)
 })
