@@ -742,7 +742,7 @@ const bootOnce = async ($: EngineInterface) => {
   for (const ev of pendingBrain) void say($, ev)
   void refreshWeather($).catch(() => undefined)
   $.clock.every(60_000, () => { void refreshWeather($).catch(() => undefined) })
-  $.clock.every(TICK_MS, () => void readTheme($).then(() => {
+  $.clock.every(TICK_MS, () => void readTheme($).catch(() => undefined).then(() => {
     let auto = 0
     let pendingTick: SpeechEvent[] = []
     return change($, (prev, t) => {
@@ -899,10 +899,10 @@ const bootOnce = async ($: EngineInterface) => {
   await autoBackup($, home, await $.clock.now(), true)
 }
 
-// The household as last saved, without a write; boots first when session.start was missed.
+// The household as saved, including a newer save from another session; writes only when one is adopted.
 const view = async ($: EngineInterface): Promise<Home> => {
   if (!isBooted || !latest) await boot($)
-  return latest ?? change($, h => h)
+  return change($, h => h)
 }
 
 export const register: Register = (on, options) => {
@@ -955,7 +955,8 @@ export const register: Register = (on, options) => {
         return paid.bowl.food < bowlCap(paid) ? fillBowl(paid, bowlCap(paid), t) : paid
       })
       await $.ui.open({ id: PANE, title: 'AFK Cat' })
-      return { text: [`The cardboard box is open: ${activeCat(home).name} is awake.`, claimed ? `Claimed ${claimed} ${claimed === 1 ? 'party' : 'parties'}.` : '',
+      const cat = activeCat(home)
+      return { text: [`The cardboard box is open: ${cat.name} is ${cat.isAsleep ? 'napping' : 'awake'}.`, claimed ? `Claimed ${claimed} ${claimed === 1 ? 'party' : 'parties'}.` : '',
         `Bowl ${home.bowl.food}/${bowlCap(home)}.`].filter(Boolean).join(' ') }
     }
     if (sub === 'status') return { text: statusText(await view($), await $.clock.now()) }
@@ -968,7 +969,7 @@ export const register: Register = (on, options) => {
       const home = await view($)
       if (!arg) {
         const lines = BUILDS.map(id => SHOP.find(i => i.id === id)).filter(i => !!i)
-          .map(i => `${i.id} (${i.name}) ${home.owned.includes(i.grants) ? 'built' : costText(i.cost)}`)
+          .map(i => `${i.id} (${i.name}) ${home.owned.includes(i.grants) ? 'built' : costText(i.cost)}${isUnlocked(home, i.unlock) ? '' : ` (needs ${unlockHint(i.unlock)})`}`)
         return { text: `The cat can build: ${lines.join(', ')}. /cat build <id>.` }
       }
       return { text: (await change($, (h, t) => craft(h, arg, t))).log }

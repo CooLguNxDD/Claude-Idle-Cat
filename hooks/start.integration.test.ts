@@ -18,7 +18,7 @@ test('/cat start boots without session.start, then status, build, backup and res
     command: 'cat', args, origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 160 },
   })).text ?? ''
 
-  expect(await run('start')).toMatch(/Mochi is awake/)
+  expect(await run('start')).toMatch(/Mochi is (awake|napping)/)
   expect(files.has('afk-cat-auto-fri.json')).toBe(true)
   expect(await run('status')).toMatch(/Mochi Lv\d/)
 
@@ -28,10 +28,11 @@ test('/cat start boots without session.start, then status, build, backup and res
   await run('show')
   expect((disk.get('home') as Home).rev).toBe(rev)
 
-  expect(await run('build')).toMatch(/cardboard-tunnel \(Cardboard tunnel\) 240c \+ 3 feather/)
-  disk.set('home', { ...(disk.get('home') as Home), rev: rev + 5, coins: 1000, materials: { feather: 3 } })
+  expect(await run('build')).toMatch(/cardboard-tunnel \(Cardboard tunnel\) 240c \+ 3 feather \(needs house tier 1\)/)
+  disk.set('home', { ...(disk.get('home') as Home), rev: rev + 5, tier: 1, coins: 1000, materials: { feather: 3 } })
   expect(await run('build cardboard-tunnel')).toMatch(/crafted Cardboard tunnel/)
   expect((disk.get('home') as Home).owned).toContain('cardboard-tunnel')
+  expect((disk.get('home') as Home).decor.rug).toBe('cardboard-tunnel')
 
   expect(await run('backup')).toMatch(/Backed up to .*afk-cat-auto-fri\.json/)
   await run('reset')

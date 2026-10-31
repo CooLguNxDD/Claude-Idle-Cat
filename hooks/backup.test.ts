@@ -100,4 +100,6 @@ test('auto backups rotate through one file per weekday and wait 30 minutes betwe
   expect(isAutoBackupDue(0, t)).toBe(true)
   expect(isAutoBackupDue(t, t + AUTO_BACKUP_MS - 1)).toBe(false)
   expect(isAutoBackupDue(t, t + AUTO_BACKUP_MS)).toBe(true)
+  // A clock stepped backwards writes again instead of waiting out the gap.
+  expect(isAutoBackupDue(t, t - 60_000)).toBe(true)
 })

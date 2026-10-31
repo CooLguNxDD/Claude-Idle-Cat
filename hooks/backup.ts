@@ -48,4 +48,4 @@ export const pickBase = (stored: unknown, current: Home, now: number): Home => {
 const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 export const AUTO_BACKUP_MS = 30 * 60_000
 export const autoBackupName = (now: number) => `afk-cat-auto-${WEEKDAYS[new Date(now).getDay()]}.json`
-export const isAutoBackupDue = (lastAt: number, now: number) => !lastAt || now - lastAt >= AUTO_BACKUP_MS
+export const isAutoBackupDue = (lastAt: number, now: number) => !lastAt || now < lastAt || now - lastAt >= AUTO_BACKUP_MS

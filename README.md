@@ -42,7 +42,7 @@ Then type `/cat` to open the pane. Meow.
 | `/cat help` | list the commands |
 | `/cat start` | wake the yard now (even if session start was missed): claim ready parties and top up the bowl |
 | `/cat status` | coins, miles, cats home or away, bowl and expeditions in one message, no pane needed |
-| `/cat build [id]` | list or build the stray's cardboard playground: `cardboard-tower`, `cardboard-tunnel`, `cardboard-pipeline` (coins + materials) |
+| `/cat build [id]` | list or build the stray's cardboard playground: `cardboard-tower`, `cardboard-tunnel`, `cardboard-pipeline` (coins + materials; the tunnel needs house tier 1 and the pipeline tier 2) |
 | `/cat backup` | write a backup now. Auto backups rotate through `~/.claude-kitten/backups/afk-cat-auto-<day>.json` every 30 minutes, and `/cat reset` saves `…-before-reset.json` first |
 | `/cat expedition` / `x` | Expedition tab (between Home and Friends): the animated trail, slots, party picker, gear, collapsible trail lists, rewards. While parties are out the tab turns green and reads `Expedition-N` |
 | `‹` / `›` beside the trail caption | (Expedition tab, two or more parties) switch which party the trail picture follows |
@@ -81,7 +81,7 @@ Then type `/cat` to open the pane. Meow.
 | `e` `n` | Pet · Nap/Wake |
 | `j` / `l` / `0` | (Cat tab) pan the yard left / right · follow the cat again (it resumes on its own after 10 s) |
 | `p` | Play: opens the Arcade in your browser |
-| `/cat picture` · `i` | open the yard picture in the browser (the 4× scene, for terminals that cannot draw it) |
+| `/cat picture` · `i` | open the yard picture in the browser (an 8× scene, for terminals that cannot draw it) |
 | `o` | (Arcade tab) open or reopen the browser arcade |
 | `w` | open/close the cat list |
 | `‹` / `›` in the top bar | previous / next tab; wraps at either end, with tabs fitting on one line |
@@ -295,7 +295,7 @@ The **cat badge** draws the active cat as `ᓚᘏᗢ` in its own coat colors (a 
 
 ## 🖼️ Pane canvas
 
-In kitty and Ghostty the pane's scene draws as a real pixel picture at 4× the half-block detail, with banners in a tiny pixel font. Other terminals keep the half-block scene. `i` or `/cat picture` opens that same picture in the browser, on the arcade's local server, and scales it to the window. Pick a mode in `/config` → **Pane canvas**:
+In kitty and Ghostty the pane's scene draws as a real pixel picture at 4× the half-block detail, with banners in a tiny pixel font. Other terminals keep the half-block scene. `i` or `/cat picture` opens the picture in the browser at 8×, on the arcade's local server, and scales it to the window. Pick a mode in `/config` → **Pane canvas**:
 
 | Value | What it does |
 | --- | --- |
