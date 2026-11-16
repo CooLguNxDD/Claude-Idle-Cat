@@ -951,7 +951,7 @@ const bootOnce = async ($: EngineInterface) => {
 }
 
 // The household as saved, including a newer save from another session; writes only when one is adopted.
-const view = async ($: EngineInterface): Promise<Home> => {
+const currentHome = async ($: EngineInterface): Promise<Home> => {
   if (!isBooted || !latest) await boot($)
   return change($, h => h)
 }
@@ -1010,14 +1010,14 @@ export const register: Register = (on, options) => {
       return { text: [`The cardboard box is open: ${cat.name} is ${cat.isAsleep ? 'napping' : 'awake'}.`, claimed ? `Claimed ${claimed} ${claimed === 1 ? 'party' : 'parties'}.` : '',
         `Bowl ${home.bowl.food}/${bowlCap(home)}.`].filter(Boolean).join(' ') }
     }
-    if (sub === 'status') return { text: statusText(await view($), await $.clock.now()) }
+    if (sub === 'status') return { text: statusText(await currentHome($), await $.clock.now()) }
     if (sub === 'backup') {
       const now = await $.clock.now()
-      const path = await autoBackup($, await view($), now, true)
+      const path = await autoBackup($, await currentHome($), now, true)
       return { text: path ? `Backed up to ${path}. Auto backups rotate daily (afk-cat-auto-<day>.json) every 30 minutes.` : 'Could not write the backup.' }
     }
     if (sub === 'build') {
-      const home = await view($)
+      const home = await currentHome($)
       if (!arg) {
         const lines = BUILDS.map(id => SHOP.find(i => i.id === id)).filter(i => !!i)
           .map(i => `${i.id} (${i.name}) ${home.owned.includes(i.grants) ? 'built' : costText(i.cost)}${isUnlocked(home, i.unlock) ? '' : ` (needs ${unlockHint(i.unlock)})`}`)
@@ -1028,14 +1028,14 @@ export const register: Register = (on, options) => {
 
     if (['expedition', 'quests', 'curio', 'settings'].includes(sub)) {
       await routeTo($, sub === 'expedition' ? 'expedition' : sub === 'quests' ? 'miles' : sub === 'settings' ? 'settings' : 'home')
-      await view($)
+      await currentHome($)
       await $.ui.open({ id: PANE, title: 'AFK Cat' })
       return { text: sub === 'curio' ? 'Pip’s Curio shop is always open.' : `Opened ${sub}.` }
     }
     if (sub === 'send') {
       const id = rest[0] ?? '', names = rest.slice(1).filter(s => !s.startsWith('+'))
       const gear = rest.slice(1).filter(s => s.startsWith('+')).map(s => s.slice(1))
-      await view($)
+      await currentHome($)
       const ids = names.map(n => catRef(latest!, n))
       return { text: (await departure($, id, ids, gear)).log }
     }
@@ -1057,7 +1057,7 @@ export const register: Register = (on, options) => {
     if (sub === 'world') {
       if (rest[0] === 'buy') return { text: (await change($, (p, t) => buyWorld(p, rest.slice(1).join(' ').trim().toLowerCase(), t))).log }
       if (!arg) {
-        const home = await view($)
+        const home = await currentHome($)
         const lines = WORLDS.map(w => `${w.id} (${w.label}) ${isWorldOwned(home, w.id) ? 'owned' : costText(w.cost ?? {})}`)
         return { text: `Worlds: ${lines.join(', ')}. /cat world <id> · /cat world buy <id>.` }
       }
@@ -1093,7 +1093,7 @@ export const register: Register = (on, options) => {
     }
     if (sub === 'reroll') {
       const action = rest[0]
-      const current = await view($)
+      const current = await currentHome($)
       const catId = current.shelter.offer?.catId ?? activeCat(current).id
       const named = arg && !['open', 'confirm', 'rollback', 'again'].includes(action ?? '')
         ? current.cats.find(c => c.id === arg || c.name.toLowerCase() === arg.toLowerCase()) : undefined
@@ -1117,11 +1117,11 @@ export const register: Register = (on, options) => {
     }
     else if (sub === 'switch') home = await change($, prev => (arg ? switchTo(prev, arg) : nextCat(prev)))
     else if (sub === 'reset') {
-      const before = await view($), now = await $.clock.now()
+      const before = await currentHome($), now = await $.clock.now()
       await autoBackup($, before, now, true, backupName(now, '-before-reset'))
       home = await change($, (_, t) => newHome(t))
     }
-    else home = await view($)
+    else home = await currentHome($)
     await $.ui.open({ id: PANE, title: 'AFK Cat' })
     if (sub === 'switch') return { text: `${home.log} Cats: ${home.cats.map(c => c.name).join(', ')}.` }
     return { text: 'Your cats are in the pane.' }
