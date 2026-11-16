@@ -33,7 +33,8 @@ export const saveProblem = (saved: unknown, now: number, isLegacy = false): stri
   if (!Array.isArray(s.cats) || s.cats.length === 0) return 'there are no cats in it'
   if (!s.cats.every(c => !!c && typeof c === 'object' && typeof (c as { id?: unknown }).id === 'string')) return 'a cat in it is damaged'
   if (typeof s.coins !== 'number' || !Number.isFinite(s.coins)) return 'its coins are damaged'
-  if (s.version === 3 && (typeof s.rev !== 'number' || !Number.isFinite(s.rev))) return 'its revision is damaged'
+  // Early v3 saves had no rev; migrate supplies it.
+  if (s.version === 3 && s.rev !== undefined && (typeof s.rev !== 'number' || !Number.isFinite(s.rev))) return 'its revision is damaged'
   try {
     if (migrate(saved, now).cats.length === 0) return 'there are no cats in it'
   } catch {
@@ -50,7 +51,9 @@ export const pickRecovery = (files: { name: string; text: string }[], now: numbe
     if (!isRecoveryCandidate(f.name)) continue
     const parsed = parseBackup(f.text, now)
     if ('error' in parsed) continue
-    const at = Date.parse((JSON.parse(f.text) as Backup).exportedAt) || 0
+    const exportedAt: unknown = (JSON.parse(f.text) as Backup).exportedAt
+    const at = typeof exportedAt === 'string' ? Date.parse(exportedAt) : NaN
+    if (!Number.isFinite(at)) continue
     if (!best || at > best.at) best = { home: parsed.home, name: f.name, at }
   }
   return best && { home: best.home, name: best.name }

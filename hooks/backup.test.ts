@@ -118,6 +118,8 @@ test('a damaged save is named, and a good or legacy one passes', async () => {
   expect(saveProblem({ ...good, cats: [null] }, t)).toBe('a cat in it is damaged')
   expect(saveProblem({ ...good, coins: null }, t)).toBe('its coins are damaged')
   expect(saveProblem({ ...good, rev: 'x' }, t)).toBe('its revision is damaged')
+  const { rev: _rev, ...early } = good
+  expect(saveProblem(early, t)).toBe('')
 })
 
 test('recovery picks the newest backup that still loads and skips damaged copies', async () => {
@@ -132,6 +134,8 @@ test('recovery picks the newest backup that still loads and skips damaged copies
   expect(pickRecovery([older, torn, newest, damaged, stranger], t)?.name).toBe('afk-cat-auto-fri.json')
   expect(pickRecovery([older, torn], t)?.home.cats[0]?.name).toBe('Older')
   expect(pickRecovery([torn, damaged], t)).toBeUndefined()
+  const odd = { name: 'afk-cat-odd.json', text: newest.text.replace(/"exportedAt": "[^"]*"/, '"exportedAt": {"toString": null}') }
+  expect(pickRecovery([odd, older], t)?.name).toBe('afk-cat-auto-thu.json')
 })
 
 test('a damaged save with a newer revision never replaces the good one in memory', async () => {

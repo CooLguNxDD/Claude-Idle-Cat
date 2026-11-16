@@ -766,8 +766,10 @@ const bootOnce = async ($: EngineInterface) => {
   let bonus = 0
   let returns: string[] = []
   let pendingBrain: SpeechEvent[] = []
-  const home = await change($, (_, t) => {
-    const loaded = resumeExpeditions(migrate(saved, t), t)
+  const home = await change($, (base, t) => {
+    const fromLoad = migrate(saved, t)
+    // Another session may have saved a newer household while this one loaded; that one wins.
+    const loaded = resumeExpeditions(base.rev > fromLoad.rev ? base : fromLoad, t)
     const thought = thinkWithEvents(tick(loaded, t), t, Math.random, isOnScreen)
     pendingBrain = thought.events
     const day = checkIn(thought.home, t)
