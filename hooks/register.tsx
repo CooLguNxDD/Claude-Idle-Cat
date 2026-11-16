@@ -25,7 +25,8 @@ import { arcadeUrl, browserArgv, newToken, paneUrl, parseLine, snapshotOf, split
 import { GAMES, gameOf } from './arcade/games'
 import { ENERGY_COST, PAID_PLAYS, featured, finishGame, playsLeft, quitGame, startGame } from './arcade/rewards'
 import { catArt } from './art'
-import { autoBackupName, backupDir, backupName, inDir, isAutoBackupDue, parseBackup, pickBase, toBackup } from './backup'
+import { autoBackupName, backupDir, backupName, inDir, isAutoBackupDue, isRecoveryCandidate, parseBackup, pickBase, pickRecovery,
+  saveProblem, toBackup } from './backup'
 import { buyCatnip, festivalOf, marketNow, seasonOf, sellCatnip, weekOf } from './calendar'
 import { ACHIEVEMENTS, MILES_SHOP, buyWithMiles, settle, tasksFor, track } from './collection'
 import { CRITTERS, critter, isAvailable, sell } from './critters'
@@ -611,12 +612,57 @@ const autoBackup = async ($: EngineInterface, home: Home, now: number, isForced 
   if (!isForced && !isAutoBackupDue(autoBackupAt, now)) return ''
   const path = inDir(backupDir(await userHome($).catch(() => undefined)), name)
   try {
-    await $.fs.write(path, toBackup(home, now))
+    const text = toBackup(home, now)
+    await $.fs.write(path, text)
+    // The engine has no rename, so a write is read back when it can be; a torn one is retried on the next tick.
+    const back = await $.fs.read(path).then(String, () => text)
+    if (back !== text) return ''
     autoBackupAt = now
     return path
   } catch {
     return ''
   }
+}
+
+// Loads the stored household; a damaged one is copied aside and the newest good backup takes its place.
+const loadSave = async ($: EngineInterface, now: number): Promise<{ saved: unknown; notice: string }> => {
+  let raw: unknown
+  let problem = ''
+  try {
+    raw = await $.store.get('home')
+  } catch {
+    problem = 'the save could not be read'
+  }
+  if (!problem && raw == null) {
+    const legacy = await $.store.get('cat').catch(() => undefined)
+    if (legacy == null) return { saved: undefined, notice: '' }
+    problem = saveProblem(legacy, now, true)
+    if (!problem) return { saved: legacy, notice: '' }
+    raw = legacy
+  } else if (!problem) {
+    problem = saveProblem(raw, now)
+    if (!problem) return { saved: raw, notice: '' }
+  }
+  const dir = backupDir(await userHome($).catch(() => undefined))
+  const damaged = inDir(dir, backupName(now, '-damaged'))
+  let kept = ''
+  try {
+    let text: string
+    try { text = JSON.stringify(raw, null, 2) ?? String(raw) } catch { text = String(raw) }
+    await $.fs.write(damaged, `${text}\n`)
+    kept = ` The damaged copy is at ${damaged}.`
+  } catch { /* the recovery still goes ahead */ }
+  const files: { name: string; text: string }[] = []
+  const entries = await $.fs.list(dir).catch(() => [])
+  for (const e of entries) {
+    if (e.kind !== 'file' || !isRecoveryCandidate(e.name)) continue
+    const text = await $.fs.read(inDir(dir, e.name)).then(String, () => '')
+    if (text) files.push({ name: e.name, text })
+  }
+  const found = pickRecovery(files, now)
+  if (!found) return { saved: undefined, notice: `⚠️ Your save was damaged (${problem}) and no backup could be read, so the yard starts fresh.${kept}` }
+  const names = found.home.cats.map(c => c.name).join(', ')
+  return { saved: found.home, notice: `🩹 Your save was damaged (${problem}). Restored ${names} from ${found.name}.${kept}` }
 }
 
 // /cat export writes a dated backup; /cat import checks one, backs up the current save, then loads it.
@@ -716,12 +762,14 @@ const bootOnce = async ($: EngineInterface) => {
   }).catch(() => undefined)
   await readTheme($).catch(() => undefined)
   paidUsd = await sessionUsd($)
-  const saved = (await $.store.get('home')) ?? (await $.store.get('cat'))
+  const { saved, notice: loadNotice } = await loadSave($, await $.clock.now())
   let bonus = 0
   let returns: string[] = []
   let pendingBrain: SpeechEvent[] = []
-  const home = await change($, (_, t) => {
-    const loaded = resumeExpeditions(migrate(saved, t), t)
+  const home = await change($, (base, t) => {
+    const fromLoad = migrate(saved, t)
+    // Another session may have saved a newer household while this one loaded; that one wins.
+    const loaded = resumeExpeditions(base.rev > fromLoad.rev ? base : fromLoad, t)
     const thought = thinkWithEvents(tick(loaded, t), t, Math.random, isOnScreen)
     pendingBrain = thought.events
     const day = checkIn(thought.home, t)
@@ -729,6 +777,7 @@ const bootOnce = async ($: EngineInterface) => {
     returns = readyRuns(day.home, t).filter(r => !day.home.expeditions.inbox.includes(r.id)).map(r => r.exp)
     return finishExpeditions(saved ? welcomeBack(loaded, day.home, t) : day.home, t)
   })
+  if (loadNotice) $.ui.toast(loadNotice)
   for (const exp of returns) $.ui.toast(`Expedition ready: ${EXPEDITIONS.find(e => e.id === exp)?.label ?? exp}. Claim in Expeditions.`)
   // Time away and the streak bonus are not this chat's earnings.
   earned.prompt = 0

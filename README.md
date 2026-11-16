@@ -43,7 +43,7 @@ Then type `/cat` to open the pane. Meow.
 | `/cat start` | wake the yard now (even if session start was missed): claim ready parties and top up the bowl |
 | `/cat status` | coins, miles, cats home or away, bowl and expeditions in one message, no pane needed |
 | `/cat build [id]` | list or build the stray's cardboard playground: `cardboard-tower`, `cardboard-tunnel`, `cardboard-pipeline` (coins + materials; the tunnel needs house tier 1 and the pipeline tier 2) |
-| `/cat backup` | write a backup now. Auto backups rotate through `~/.claude-kitten/backups/afk-cat-auto-<day>.json` every 30 minutes, and `/cat reset` saves `…-before-reset.json` first |
+| `/cat backup` | write a backup now. Auto backups rotate through `~/.claude-kitten/backups/afk-cat-auto-<day>.json` every 30 minutes, and `/cat reset` saves `…-before-reset.json` first. If the save is ever damaged, the yard loads the newest backup that still reads, keeps the broken copy as `…-damaged.json`, and tells you in a toast |
 | `/cat expedition` / `x` | Expedition tab (between Home and Friends): the animated trail, slots, party picker, gear, collapsible trail lists, rewards. While parties are out the tab turns green and reads `Expedition-N` |
 | `‹` / `›` beside the trail caption | (Expedition tab, two or more parties) switch which party the trail picture follows |
 | `/cat send <exp> <cat…> [+gear…]` | send 1–3 cats by id or single-word name; gear is consumed per run |
@@ -344,7 +344,7 @@ The mod both fetches from the network (`http.fetch`) and runs programs (`process
 
 Nothing else is fetched. The pages opened in the browser are `http://localhost` on that same port.
 
-**Files.** `fs.read` and `fs.write` run only when you use `/cat import` or `/cat export`. Export writes a JSON backup of your cats. Import reads the path you give it, writes a safety copy of the current save, then loads the backup into the plugin store (`$.store`). The default directory is `~/.claude-kitten/backups/`, from `USERPROFILE` or `HOME`. The file name includes the date, so the path cannot be one fixed string. These are your save backups. They are not build files, start-up files, settings files, or instruction files. The file bytes are not passed to `http.fetch` and are not sent anywhere.
+**Files.** `fs.read`, `fs.write` and `fs.list` touch only `~/.claude-kitten/backups/` (or the path you give `/cat import` or `/cat export`): auto backups are written there and read back to check them, and a damaged save is recovered by listing and reading the backups there. Export writes a JSON backup of your cats. Import reads the path you give it, writes a safety copy of the current save, then loads the backup into the plugin store (`$.store`). The default directory is `~/.claude-kitten/backups/`, from `USERPROFILE` or `HOME`. The file name includes the date, so the path cannot be one fixed string. These are your save backups. They are not build files, start-up files, settings files, or instruction files. The file bytes are not passed to `http.fetch` and are not sent anywhere.
 
 **Conversation.** The `turn.complete` hook can see the turn, and the mod can also `http.fetch`, but conversation text is not sent. That hook reads `durationMs` and, when Claude Code reports it, the session cost in US dollars. Those numbers pay the cat coins on this machine. It does not read message text. `turn.start` only resets the coin counter for the prompt. Both hooks pass the event on unchanged with `return next(e)`.
 

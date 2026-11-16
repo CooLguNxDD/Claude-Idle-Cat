@@ -73,6 +73,7 @@ The `ui.render` hooks on Claude Code's own components pass with `next(e)` when `
 - Award arcade rounds only through `finishGame` in `hooks/arcade/rewards.ts`. It pays a round only if the mod started it (`arcade.open`), and it clamps both the time and the score, because browser input can't be trusted.
 - `/cat export` and `/cat import` (`hooks/backup.ts`) write to `~/.claude-kitten/backups/`. Import backs up the current save first; keep that behaviour.
 - Auto backups write `afk-cat-auto-<weekday>.json` at boot and every 30 minutes (`isAutoBackupDue`); `/cat reset` writes `-before-reset` first. Failed writes never block the game.
+- `boot()` loads the store through `loadSave`: a value that fails `saveProblem` is written aside as `-damaged`, and the newest backup that passes `parseBackup` (`pickRecovery`, by `exportedAt`) replaces it, with a toast. `pickBase` never adopts a damaged save. The engine has no rename, so auto backups are read back after writing instead of renamed into place.
 - `boot()` in `register.tsx` loads the save and starts timers once per load. `session.start` calls it, and so does any `/cat` when the start was missed. Helpers that take `$` must be top-level declarations, or the validator refuses the module.
 - `change()` treats a function that returns the same household as a read: no new `rev`, save or arcade push. Read-only commands use `view($)`.
 
