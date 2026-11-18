@@ -197,3 +197,19 @@ test('a corrupted save with no readable backup starts fresh but keeps the damage
   expect(toasts.some(x => x.includes('no backup could be read'))).toBe(true)
   expect([...files.values()].some(x => x.includes('not a household'))).toBe(true)
 })
+
+test('a missing save with a good backup on disk is restored, not started fresh', { timeoutMs: 15_000 }, async ($, on) => {
+  // 2026-11-17: a crash zeroed the store file; once the host could read the store again it was simply empty.
+  const good = { ...adopt({ ...newHome(t), coins: 900 }, t, seeded(5)), rev: 12 }
+  const named = { ...good, cats: good.cats.map((c, i) => ({ ...c, name: i ? 'Mochi' : 'Tofu' })) }
+  const { disk, toasts } = await bootDamaged($, on, undefined, { 'afk-cat-auto-fri.json': toBackup(named, t - 3_600_000) })
+  const saved = disk.get('home') as { cats: { name: string }[]; coins: number }
+  expect(saved.cats.map(c => c.name)).toEqual(['Tofu', 'Mochi'])
+  expect(toasts.some(x => x.includes('Your save was missing. Restored Tofu, Mochi from afk-cat-auto-fri.json'))).toBe(true)
+})
+
+test('a missing save with no backup starts fresh quietly', { timeoutMs: 15_000 }, async ($, on) => {
+  const { disk, toasts } = await bootDamaged($, on, undefined, {})
+  expect(saveProblem(disk.get('home'), t)).toBe('')
+  expect(toasts.some(x => x.includes('missing') || x.includes('damaged'))).toBe(false)
+})
