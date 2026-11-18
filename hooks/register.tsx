@@ -218,7 +218,8 @@ const change = async ($: EngineInterface, fn: (home: Home, now: number) => Home,
     const next = fn(before, now)
     // A change that returns the same household is a read: no new revision, save or arcade push.
     if (next === before && before === prev) { isNoop = true; return (home = prev) }
-    return (home = { ...settle(next, now), rev: before.rev + 1 })
+    // A restored household keeps a revision above its own, so an older session can't overwrite it.
+    return (home = { ...settle(next, now), rev: Math.max(before.rev, next.rev ?? 0) + 1 })
   })
   onApplied?.()
   latest = home

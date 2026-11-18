@@ -206,6 +206,8 @@ test('a missing save with a good backup on disk is restored, not started fresh',
   const saved = disk.get('home') as { cats: { name: string }[]; coins: number }
   expect(saved.cats.map(c => c.name)).toEqual(['Tofu', 'Mochi'])
   expect(toasts.some(x => x.includes('Your save was missing. Restored Tofu, Mochi from afk-cat-auto-fri.json'))).toBe(true)
+  // Saved above the backup's own revision, so an older session's next save can't overwrite the restore.
+  expect((disk.get('home') as { rev: number }).rev).toBeGreaterThan(12)
 })
 
 test('a missing save with no backup starts fresh quietly', { timeoutMs: 15_000 }, async ($, on) => {
