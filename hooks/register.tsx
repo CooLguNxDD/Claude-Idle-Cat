@@ -218,7 +218,8 @@ const change = async ($: EngineInterface, fn: (home: Home, now: number) => Home,
     const next = fn(before, now)
     // A change that returns the same household is a read: no new revision, save or arcade push.
     if (next === before && before === prev) { isNoop = true; return (home = prev) }
-    return (home = { ...settle(next, now), rev: before.rev + 1 })
+    // A restored household keeps a revision above its own, so an older session can't overwrite it.
+    return (home = { ...settle(next, now), rev: Math.max(before.rev, next.rev ?? 0) + 1 })
   })
   onApplied?.()
   latest = home
@@ -635,7 +636,8 @@ const loadSave = async ($: EngineInterface, now: number): Promise<{ saved: unkno
   }
   if (!problem && raw == null) {
     const legacy = await $.store.get('cat').catch(() => undefined)
-    if (legacy == null) return { saved: undefined, notice: '' }
+    // No save at all: a lost store file (a crash zeroed it) still comes back from the newest backup.
+    if (legacy == null) return restoreMissing($, now)
     problem = saveProblem(legacy, now, true)
     if (!problem) return { saved: legacy, notice: '' }
     raw = legacy
@@ -646,12 +648,32 @@ const loadSave = async ($: EngineInterface, now: number): Promise<{ saved: unkno
   const dir = backupDir(await userHome($).catch(() => undefined))
   const damaged = inDir(dir, backupName(now, '-damaged'))
   let kept = ''
-  try {
-    let text: string
-    try { text = JSON.stringify(raw, null, 2) ?? String(raw) } catch { text = String(raw) }
-    await $.fs.write(damaged, `${text}\n`)
-    kept = ` The damaged copy is at ${damaged}.`
-  } catch { /* the recovery still goes ahead */ }
+  // An unreadable store gives no value to keep; writing `undefined` aside on every start only piles up files.
+  if (raw !== undefined) {
+    try {
+      let text: string
+      try { text = JSON.stringify(raw, null, 2) ?? String(raw) } catch { text = String(raw) }
+      await $.fs.write(damaged, `${text}\n`)
+      kept = ` The damaged copy is at ${damaged}.`
+    } catch { /* the recovery still goes ahead */ }
+  }
+  const found = await newestBackup($, dir, now)
+  if (!found) return { saved: undefined, notice: `⚠️ Your save was damaged (${problem}) and no backup could be read, so the yard starts fresh.${kept}` }
+  const names = found.home.cats.map(c => c.name).join(', ')
+  return { saved: found.home, notice: `🩹 Your save was damaged (${problem}). Restored ${names} from ${found.name}.${kept}` }
+}
+
+// A missing save (no store value at all) with a good backup on disk is a lost file, not a new player.
+const restoreMissing = async ($: EngineInterface, now: number): Promise<{ saved: unknown; notice: string }> => {
+  const dir = backupDir(await userHome($).catch(() => undefined))
+  const found = await newestBackup($, dir, now)
+  if (!found) return { saved: undefined, notice: '' }
+  const names = found.home.cats.map(c => c.name).join(', ')
+  return { saved: found.home, notice: `🩹 Your save was missing. Restored ${names} from ${found.name}.` }
+}
+
+// The newest backup in `dir` that still loads (pickRecovery), or undefined.
+const newestBackup = async ($: EngineInterface, dir: string, now: number) => {
   const files: { name: string; text: string }[] = []
   const entries = await $.fs.list(dir).catch(() => [])
   for (const e of entries) {
@@ -659,10 +681,7 @@ const loadSave = async ($: EngineInterface, now: number): Promise<{ saved: unkno
     const text = await $.fs.read(inDir(dir, e.name)).then(String, () => '')
     if (text) files.push({ name: e.name, text })
   }
-  const found = pickRecovery(files, now)
-  if (!found) return { saved: undefined, notice: `⚠️ Your save was damaged (${problem}) and no backup could be read, so the yard starts fresh.${kept}` }
-  const names = found.home.cats.map(c => c.name).join(', ')
-  return { saved: found.home, notice: `🩹 Your save was damaged (${problem}). Restored ${names} from ${found.name}.${kept}` }
+  return pickRecovery(files, now)
 }
 
 // /cat export writes a dated backup; /cat import checks one, backs up the current save, then loads it.
