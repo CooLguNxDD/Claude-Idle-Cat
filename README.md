@@ -1,4 +1,4 @@
-# Claude Idle Cat
+﻿# Claude Idle Cat
 
 `afk-cat`: An AFK virtual-pet cat that lives inside Claude Code as a mod (a plugin of function hooks).
 It's a Tamagotchi with an idle-game loop: look after the cat, earn coins, buy upgrades and come back for streak bonuses. Claude does the work, the cat does the napping. Everybody wins.
@@ -6,6 +6,15 @@ It's a Tamagotchi with an idle-game loop: look after the cat, earn coins, buy up
 ![Claude Idle Cat demo](docs/video/claude-idle-cat-x-20s.gif)
 
 > *Once upon a time, a stray cat lived in a cardboard box. Poor. Broke. Zero coins, one very damp box.*
+
+**Highlights**
+
+- **Idle loop:** feed, pet, earn coins, buy upgrades, keep a streak. Claude works while the cats nap, and they react to what Claude is doing.
+- **28 breeds and 6 worlds:** backyard, snowy cabin, neon alley, rooftops, beach pier and space station. Each has its own scenery, with live weather and seasonal events.
+- **Expeditions, friends and quests:** send cats on timed trails, build pair bonds, run daily quest chains, craft from the Curio shop.
+- **Browser arcade:** 6 mini-games (catch, dash, lanes, laser, tank, whack) with medals, served locally on `127.0.0.1` and token-protected.
+- **Catppuccin everywhere:** four flavors for the pane, and optionally Claude Code itself.
+- **Transparent:** the only outside host it contacts is Open-Meteo, for weather, and saves are backed up automatically. See [What this mod runs and sends](#what-this-mod-runs-and-sends).
 > *So the cats collect one coin at a time.* 🏗️🐾
 
 ## 📦 Install
@@ -471,10 +480,17 @@ Set the same `version` in `.claude-plugin/plugin.json` and on the `afk-cat` entr
 
 The mod API is early access and can change between Claude Code releases. This version was built against 2.1.287.
 
----
 
-*From a cardboard box to a cat tower. Not bad for a broke stray.* 😸
+### Expedition notes
 
 Expedition world requirements apply to the currently selected yard: switch to Neon Alley to send a Neon Rooftops party. Switching worlds afterward keeps that party and its frozen rewards. Return notifications persist across session reloads; rewards stay available until you claim. A long test command can trigger a nap at 20 seconds and a celebration when its tests pass.
 
 `/cat send garden-patrol "Sir Miso"` and `/cat exchange "Sir Miso" "Captain Bean"` accept quoted names as well as cat ids. Gift exchange reports when the daily bond cap prevents extra bond points.
+
+### Built with Cat Fleet
+
+Claude Idle Cat is maintained with **Cat Fleet**, a multi-model coding-agent fleet working under a human maintainer. Agents implement steps in isolated git worktrees. Each change passes the checks above and a cross-family review before it merges. The shared chat and task board the fleet uses is open source too: [Whiskers-Agent-Chat](https://github.com/CooLguNxDD/Whiskers-Agent-Chat).
+
+---
+
+*From a cardboard box to a cat tower. Not bad for a broke stray.* 😸

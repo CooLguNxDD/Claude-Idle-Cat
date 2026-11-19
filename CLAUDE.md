@@ -127,3 +127,5 @@ Review fixes are recorded in `docs/content-v2-review-fixes.md`. Reactions are be
 ## Expedition trail
 
 The Expedition tab (`x`, between Home and Friends) draws `hooks/scene/trail.ts` instead of the yard. It reads `Expedition-N` on a green background while N parties are out (`tabLabel` in `hooks/ui/tabs.ts`). `hooks/trail.ts` builds a run's beats from `run.seed` (salted), `startAt` and `endsAt` and deals the frozen `run.loot` over the forage, treasure, boss and discover beats. Trail events are cosmetic: never let them change loot, the save, or RNG used by `send`. Events live in `hooks/content/trail-events/` (`defineTrailEvent`). An expedition's optional `flow` names its events, boss and backdrop. `expedition-event-gen` writes both. The watched run and open trail sections live in memory in `register.tsx`.
+
+@.fleet-rules.md

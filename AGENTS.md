@@ -20,3 +20,5 @@ Quick essentials (full detail in CLAUDE.md):
   - Mod (`hooks/`): sandbox where everything external goes through `$` inside `hooks/register.tsx`. All other modules are pure `(home, now, rng)`.
   - Browser arcade (`web/`, served by `server/arcade.mjs`): after changes to `web/` or shared imports, run `node tools/build-web.mjs` and commit `server/public/arcade.js`.
 - Separate git repo: never mix commits across sibling projects.
+
+Read `.fleet-rules.md` before working: its rules are binding.
